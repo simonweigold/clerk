@@ -1,0 +1,1 @@
+Here is an interesting fact:\n{workflow_1}\nRate the fact based on these criteria:\n{resource_2}\nYour response follows this schema:/*N/*(N=the rating number)

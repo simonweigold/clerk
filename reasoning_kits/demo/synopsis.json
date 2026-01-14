@@ -1,0 +1,24 @@
+{
+    "resources": {
+        "1": {
+            "file": "resource_1.txt",
+            "resource_id": "resource_1"
+        },
+        "2": {
+            "file": "resource_2.csv",
+            "resource_id": "resource_2"
+        }
+    },
+    "workflow": {
+        "1": {
+            "file": "instruction_1.txt",
+            "evaluation": "",
+            "output_id": "workflow_1"
+        },
+        "2": {
+            "file": "instruction_2.txt",
+            "evaluation": "",
+            "output_id": "workflow_2"
+        }
+    }
+}

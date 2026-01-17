@@ -1,8 +1,90 @@
 # CLERK
 Community Library of Executable Reasoning Kits
 
+## Setup
+
+1. Install dependencies with UV:
+```bash
+uv sync
+```
+
+2. Create a `.env` file with your OpenAI API key:
+```bash
+cp .env.example .env
+# Edit .env and add your OPENAI_API_KEY
+```
+
+## Usage
+
+### CLI Commands
+
+List available reasoning kits:
+```bash
+uv run clerk list
+```
+
+Show info about a reasoning kit:
+```bash
+uv run clerk info demo
+```
+
+Run a reasoning kit:
+```bash
+uv run clerk run demo
+```
+
+### Programmatic Usage
+
+```python
+from clerk.loader import load_reasoning_kit
+from clerk.graph import run_reasoning_kit
+
+kit = load_reasoning_kit("reasoning_kits/demo")
+outputs = run_reasoning_kit(kit)
+```
+
+## Creating New Reasoning Kits
+
+1. Create a new directory under `reasoning_kits/`
+2. Add resource files named `resource_1.txt`, `resource_2.csv`, etc.
+3. Add instruction files named `instruction_1.txt`, `instruction_2.txt`, etc.
+
 ## Reasoning Kit Structure
-The abstract overview of a reasoning kit.
+
+A reasoning kit is a directory with auto-discovered files:
+
+```
+reasoning_kits/
+└── my_kit/
+    ├── resource_1.txt      # Referenced as {resource_1} in prompts
+    ├── resource_2.csv      # Referenced as {resource_2} in prompts
+    ├── instruction_1.txt   # First workflow step, output: {workflow_1}
+    ├── instruction_2.txt   # Second workflow step, output: {workflow_2}
+    └── instruction_3.txt   # Third workflow step, output: {workflow_3}
+```
+
+### Resources
+- Files matching `resource_*.txt` or `resource_*.csv` are loaded as resources
+- The resource ID is derived from the filename (e.g., `resource_1.txt` → `{resource_1}`)
+
+### Workflow Steps
+- Files matching `instruction_*.txt` define workflow steps
+- Steps are executed in numerical order (1, 2, 3, ...)
+- Each step's output is stored as `{workflow_N}` for use in later steps
+
+### Placeholders
+In instruction files, use placeholders to reference:
+- Resources: `{resource_1}`, `{resource_2}`, etc.
+- Previous outputs: `{workflow_1}`, `{workflow_2}`, etc.
+
+Example `instruction_2.txt`:
+```
+Here is some context: {resource_1}
+Based on the previous analysis: {workflow_1}
+Please provide a summary.
+```
+
+The abstract overview of a reasoning kit:
 
 ```
 {
@@ -42,13 +124,13 @@ The abstract overview of a reasoning kit.
 ```
 
 ## Workflow
-The workflow runs chronologically. I.e., start with the first item in workflow. Import all necessary resources referenced in workflow_1. Then go one etc. See general tasks for more details.
+The workflow runs chronologically. Steps are executed in order (1, 2, 3, ...) with each step's output available to subsequent steps via placeholders.
 
 ## General Tasks
+- [x] Langchain logic, which executes all steps from the workflow
+- [x] After final event, present all results back to user
 - [ ] Let user define resources and workflow from terminal
-- [ ] Langchain logic, which executes all steps from the workflow
 - [ ] For evaluation steps, interrupt logic and ask for user feedback
-- [ ] After final event, present all results back to user
 - [ ] Wrap this in FastAPI
 
 ## Tasks (to be implemented another time)

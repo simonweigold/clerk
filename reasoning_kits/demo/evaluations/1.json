@@ -1,0 +1,15 @@
+{
+    "mode": "transparent",
+    "steps": {
+        "1": {
+            "input": "You are an interesting fact extractor. Read {resource_1} and extract an interesting fact from it. Only response with the interesting fact in the format:\n/*Interesting Fact/*",
+            "output": "/*Interesting Fact*/",
+            "evaluation": 100
+        },
+        "2": {
+            "input": "Here is an interesting fact:\n{workflow_1}\nRate the fact based on these criteria:\n{resource_2}\nYour response follows this schema:/*N/*(N=the rating number)",
+            "output": "/*N/*",
+            "evaluation": 100
+        }
+    }
+}

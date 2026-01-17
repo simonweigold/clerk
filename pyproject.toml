@@ -1,0 +1,26 @@
+[project]
+name = "clerk"
+version = "0.1.0"
+description = "Community Library of Executable Reasoning Kits"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "langchain>=1.2.4",
+    "langchain-openai>=1.1.7",
+    "langgraph>=1.0.6",
+    "python-dotenv>=1.2.1",
+]
+
+[project.scripts]
+clerk = "clerk.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/clerk"]
+
+[tool.uv]
+package = true
+

@@ -43,6 +43,17 @@ def main():
         default="reasoning_kits",
         help="Base path for reasoning kits (if using kit name)",
     )
+    run_parser.add_argument(
+        "--evaluate",
+        action="store_true",
+        help="Enable step-by-step evaluation prompts",
+    )
+    run_parser.add_argument(
+        "--mode",
+        choices=["transparent", "anonymous"],
+        default="transparent",
+        help="Evaluation mode: 'transparent' stores full text, 'anonymous' stores char counts",
+    )
 
     # Info command
     info_parser = subparsers.add_parser("info", help="Show info about a reasoning kit")
@@ -73,7 +84,11 @@ def main():
         kit_path = resolve_kit_path(args.kit, args.base_path)
         try:
             kit = load_reasoning_kit(kit_path)
-            outputs = run_reasoning_kit(kit)
+            outputs = run_reasoning_kit(
+                kit,
+                evaluate=args.evaluate,
+                evaluation_mode=args.mode,
+            )
             sys.exit(0)
         except FileNotFoundError as e:
             print(f"Error: {e}")

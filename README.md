@@ -129,9 +129,10 @@ The workflow runs chronologically. Steps are executed in order (1, 2, 3, ...) wi
 ## General Tasks
 - [x] Langchain logic, which executes all steps from the workflow
 - [x] After final event, present all results back to user
-- [ ] Let user define resources and workflow from terminal
-- [ ] For evaluation steps, interrupt logic and ask for user feedback
+- [x] For evaluation steps, interrupt logic and ask for user feedback
 - [ ] Wrap this in FastAPI
+    - [ ] Reasoning Kit definition layer
+    - [ ] Execution layer
 
 ## Tasks (to be implemented another time)
 - [ ] change reasoning_kits/demo/resource_1.txt to pdf and add pdf support for resources.

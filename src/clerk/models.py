@@ -1,6 +1,5 @@
 """Data models for reasoning kits."""
 
-from typing import Any
 from pydantic import BaseModel
 
 
@@ -29,6 +28,21 @@ class ReasoningKit(BaseModel):
     workflow: dict[str, WorkflowStep]
 
 
+class StepEvaluation(BaseModel):
+    """Evaluation data for a single workflow step."""
+
+    input: str | int  # Full text (transparent) or char count (anonymous)
+    output: str | int  # Full text (transparent) or char count (anonymous)
+    evaluation: int  # 0-100 score from user
+
+
+class Evaluation(BaseModel):
+    """Complete evaluation for a reasoning kit run."""
+
+    mode: str  # "transparent" or "anonymous"
+    steps: dict[str, StepEvaluation]  # step number -> evaluation
+
+
 class GraphState(BaseModel):
     """State for the LangGraph execution."""
 
@@ -40,4 +54,3 @@ class GraphState(BaseModel):
 
     class Config:
         arbitrary_types_allowed = True
-

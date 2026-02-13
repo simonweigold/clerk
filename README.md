@@ -131,9 +131,14 @@ The workflow runs chronologically. Steps are executed in order (1, 2, 3, ...) wi
 - [x] After final event, present all results back to user
 - [x] For evaluation steps, interrupt logic and ask for user feedback
 - [x] Database layer, which centralizes the storage for reasoning kits
-- [ ] Wrap this in FastAPI
-    - [ ] Reasoning Kit definition layer
-    - [ ] Execution layer
+- [ ] Reasoning Kit definition layer (via terminal)
+- [ ] Execution layer (via terminal)
+- [ ] UI, which can be launched via `clerk web`
+    - [ ] wraps the Reasoning Kit definition layer in an intuitive way
+    - [ ] allows execution of Kits (including evaluation if desired)
+- [ ] Spin up local db for storage (as alternative to Supabase)
+- [ ] Docker implementation
 
 ## Tasks (to be implemented another time)
 - [ ] change reasoning_kits/demo/resource_1.txt to pdf and add pdf support for resources.
+- [ ] collect some more practical use cases for showcasing

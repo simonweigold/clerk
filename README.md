@@ -130,6 +130,7 @@ The workflow runs chronologically. Steps are executed in order (1, 2, 3, ...) wi
 - [x] Langchain logic, which executes all steps from the workflow
 - [x] After final event, present all results back to user
 - [x] For evaluation steps, interrupt logic and ask for user feedback
+- [x] Database layer, which centralizes the storage for reasoning kits
 - [ ] Wrap this in FastAPI
     - [ ] Reasoning Kit definition layer
     - [ ] Execution layer

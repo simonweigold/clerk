@@ -2,6 +2,7 @@
 
 import json
 from pathlib import Path
+from uuid import UUID
 
 from .models import Evaluation, StepEvaluation
 
@@ -110,3 +111,177 @@ def create_step_evaluation(
             output=len(output),
             evaluation=score,
         )
+
+
+# =============================================================================
+# DATABASE EVALUATION FUNCTIONS
+# =============================================================================
+
+
+async def save_evaluation_to_db(
+    run_id: UUID,
+    step_number: int,
+    prompt: str,
+    output: str,
+    score: int,
+    mode: str,
+    model_used: str | None = None,
+    tokens_used: int | None = None,
+    latency_ms: int | None = None,
+) -> None:
+    """Save a step evaluation to the database.
+
+    Args:
+        run_id: The execution run's UUID
+        step_number: The workflow step number
+        prompt: The input prompt sent to the LLM
+        output: The output received from the LLM
+        score: The user's evaluation score (0-100)
+        mode: Either "transparent" or "anonymous"
+        model_used: LLM model used for this step
+        tokens_used: Total tokens consumed
+        latency_ms: Execution latency in milliseconds
+    """
+    from .db import ExecutionRepository, get_async_session
+
+    async with get_async_session() as session:
+        repo = ExecutionRepository(session)
+
+        if mode == "transparent":
+            await repo.add_step_execution(
+                run_id=run_id,
+                step_number=step_number,
+                input_text=prompt,
+                output_text=output,
+                evaluation_score=score,
+                model_used=model_used,
+                tokens_used=tokens_used,
+                latency_ms=latency_ms,
+            )
+        else:  # anonymous
+            await repo.add_step_execution(
+                run_id=run_id,
+                step_number=step_number,
+                input_char_count=len(prompt),
+                output_char_count=len(output),
+                evaluation_score=score,
+                model_used=model_used,
+                tokens_used=tokens_used,
+                latency_ms=latency_ms,
+            )
+
+
+async def save_step_to_db(
+    run_id: UUID,
+    step_number: int,
+    prompt: str,
+    output: str,
+    mode: str,
+    model_used: str | None = None,
+    tokens_used: int | None = None,
+    latency_ms: int | None = None,
+) -> None:
+    """Save a step execution (without evaluation) to the database.
+
+    Args:
+        run_id: The execution run's UUID
+        step_number: The workflow step number
+        prompt: The input prompt sent to the LLM
+        output: The output received from the LLM
+        mode: Either "transparent" or "anonymous"
+        model_used: LLM model used for this step
+        tokens_used: Total tokens consumed
+        latency_ms: Execution latency in milliseconds
+    """
+    from .db import ExecutionRepository, get_async_session
+
+    async with get_async_session() as session:
+        repo = ExecutionRepository(session)
+
+        if mode == "transparent":
+            await repo.add_step_execution(
+                run_id=run_id,
+                step_number=step_number,
+                input_text=prompt,
+                output_text=output,
+                model_used=model_used,
+                tokens_used=tokens_used,
+                latency_ms=latency_ms,
+            )
+        else:  # anonymous
+            await repo.add_step_execution(
+                run_id=run_id,
+                step_number=step_number,
+                input_char_count=len(prompt),
+                output_char_count=len(output),
+                model_used=model_used,
+                tokens_used=tokens_used,
+                latency_ms=latency_ms,
+            )
+
+
+async def update_step_evaluation_in_db(
+    run_id: UUID,
+    step_number: int,
+    score: int,
+) -> None:
+    """Update the evaluation score for a step in the database.
+
+    Args:
+        run_id: The execution run's UUID
+        step_number: The workflow step number
+        score: The user's evaluation score (0-100)
+    """
+    from .db import ExecutionRepository, get_async_session
+
+    async with get_async_session() as session:
+        repo = ExecutionRepository(session)
+        await repo.update_step_evaluation(
+            run_id=run_id,
+            step_number=step_number,
+            evaluation_score=score,
+        )
+
+
+async def create_execution_run(
+    version_id: UUID,
+    storage_mode: str,
+    user_id: UUID | None = None,
+) -> UUID:
+    """Create a new execution run in the database.
+
+    Args:
+        version_id: The kit version's UUID
+        storage_mode: Either "transparent" or "anonymous"
+        user_id: Optional user ID
+
+    Returns:
+        The created run's UUID
+    """
+    from .db import ExecutionRepository, get_async_session
+
+    async with get_async_session() as session:
+        repo = ExecutionRepository(session)
+        run = await repo.create(
+            version_id=version_id,
+            storage_mode=storage_mode,
+            user_id=user_id,
+        )
+        return run.id
+
+
+async def complete_execution_run(
+    run_id: UUID,
+    error: str | None = None,
+) -> None:
+    """Mark an execution run as completed or failed.
+
+    Args:
+        run_id: The run's UUID
+        error: Error message if failed (None for success)
+    """
+    from .db import ExecutionRepository, get_async_session
+
+    async with get_async_session() as session:
+        repo = ExecutionRepository(session)
+        await repo.complete_run(run_id=run_id, error=error)

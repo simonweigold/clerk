@@ -2,6 +2,7 @@
 
 import argparse
 import asyncio
+import re
 import sys
 from pathlib import Path
 
@@ -172,6 +173,176 @@ def main() -> None:
     sync_subparsers.add_parser("list", help="Compare local and database kits")
 
     # =========================================================================
+    # KIT COMMAND GROUP
+    # =========================================================================
+    kit_parser = subparsers.add_parser(
+        "kit", help="Create and manage reasoning kit definitions"
+    )
+    kit_subparsers = kit_parser.add_subparsers(dest="kit_command", help="Kit commands")
+
+    # kit create
+    kit_create_parser = kit_subparsers.add_parser(
+        "create", help="Create a new reasoning kit"
+    )
+    kit_create_parser.add_argument("name", type=str, help="Name of the kit to create")
+    kit_create_parser.add_argument(
+        "--description",
+        type=str,
+        help="Description of the kit",
+    )
+    kit_create_parser.add_argument(
+        "--base-path",
+        type=str,
+        default="reasoning_kits",
+        help="Base path for reasoning kits",
+    )
+
+    # kit delete
+    kit_delete_parser = kit_subparsers.add_parser(
+        "delete", help="Delete a reasoning kit"
+    )
+    kit_delete_parser.add_argument("name", type=str, help="Name of the kit to delete")
+    kit_delete_parser.add_argument(
+        "--base-path",
+        type=str,
+        default="reasoning_kits",
+        help="Base path for reasoning kits",
+    )
+    kit_delete_parser.add_argument(
+        "--force",
+        "-f",
+        action="store_true",
+        help="Skip confirmation prompt",
+    )
+
+    # kit add-resource
+    kit_add_resource_parser = kit_subparsers.add_parser(
+        "add-resource", help="Add a resource to a reasoning kit"
+    )
+    kit_add_resource_parser.add_argument("kit", type=str, help="Name of the kit")
+    kit_add_resource_parser.add_argument(
+        "--file",
+        type=str,
+        help="Path to resource file",
+    )
+    kit_add_resource_parser.add_argument(
+        "--content",
+        type=str,
+        help="Inline content for resource",
+    )
+    kit_add_resource_parser.add_argument(
+        "--filename",
+        type=str,
+        help="Filename for inline content (required with --content)",
+    )
+    kit_add_resource_parser.add_argument(
+        "--base-path",
+        type=str,
+        default="reasoning_kits",
+        help="Base path for reasoning kits",
+    )
+
+    # kit add-step
+    kit_add_step_parser = kit_subparsers.add_parser(
+        "add-step", help="Add a workflow step to a reasoning kit"
+    )
+    kit_add_step_parser.add_argument("kit", type=str, help="Name of the kit")
+    kit_add_step_parser.add_argument(
+        "--file",
+        type=str,
+        help="Path to instruction file",
+    )
+    kit_add_step_parser.add_argument(
+        "--prompt",
+        type=str,
+        help="Inline prompt text for step",
+    )
+    kit_add_step_parser.add_argument(
+        "--base-path",
+        type=str,
+        default="reasoning_kits",
+        help="Base path for reasoning kits",
+    )
+
+    # kit edit-resource
+    kit_edit_resource_parser = kit_subparsers.add_parser(
+        "edit-resource", help="Edit a resource in a reasoning kit"
+    )
+    kit_edit_resource_parser.add_argument("kit", type=str, help="Name of the kit")
+    kit_edit_resource_parser.add_argument(
+        "number", type=int, help="Resource number to edit"
+    )
+    kit_edit_resource_parser.add_argument(
+        "--file",
+        type=str,
+        help="Path to new resource file",
+    )
+    kit_edit_resource_parser.add_argument(
+        "--content",
+        type=str,
+        help="New inline content for resource",
+    )
+    kit_edit_resource_parser.add_argument(
+        "--base-path",
+        type=str,
+        default="reasoning_kits",
+        help="Base path for reasoning kits",
+    )
+
+    # kit edit-step
+    kit_edit_step_parser = kit_subparsers.add_parser(
+        "edit-step", help="Edit a workflow step in a reasoning kit"
+    )
+    kit_edit_step_parser.add_argument("kit", type=str, help="Name of the kit")
+    kit_edit_step_parser.add_argument("number", type=int, help="Step number to edit")
+    kit_edit_step_parser.add_argument(
+        "--file",
+        type=str,
+        help="Path to new instruction file",
+    )
+    kit_edit_step_parser.add_argument(
+        "--prompt",
+        type=str,
+        help="New inline prompt text for step",
+    )
+    kit_edit_step_parser.add_argument(
+        "--base-path",
+        type=str,
+        default="reasoning_kits",
+        help="Base path for reasoning kits",
+    )
+
+    # kit delete-resource
+    kit_delete_resource_parser = kit_subparsers.add_parser(
+        "delete-resource", help="Delete a resource from a reasoning kit"
+    )
+    kit_delete_resource_parser.add_argument("kit", type=str, help="Name of the kit")
+    kit_delete_resource_parser.add_argument(
+        "number", type=int, help="Resource number to delete"
+    )
+    kit_delete_resource_parser.add_argument(
+        "--base-path",
+        type=str,
+        default="reasoning_kits",
+        help="Base path for reasoning kits",
+    )
+
+    # kit delete-step
+    kit_delete_step_parser = kit_subparsers.add_parser(
+        "delete-step", help="Delete a workflow step from a reasoning kit"
+    )
+    kit_delete_step_parser.add_argument("kit", type=str, help="Name of the kit")
+    kit_delete_step_parser.add_argument(
+        "number", type=int, help="Step number to delete"
+    )
+    kit_delete_step_parser.add_argument(
+        "--base-path",
+        type=str,
+        default="reasoning_kits",
+        help="Base path for reasoning kits",
+    )
+
+    # =========================================================================
     # PARSE AND DISPATCH
     # =========================================================================
     args = parser.parse_args()
@@ -186,6 +357,8 @@ def main() -> None:
         _cmd_db(args)
     elif args.command == "sync":
         _cmd_sync(args)
+    elif args.command == "kit":
+        _cmd_kit(args)
     else:
         parser.print_help()
 
@@ -694,6 +867,447 @@ def resolve_kit_path(kit: str, base_path: str) -> Path:
 
     # Return as-is and let the loader handle the error
     return Path(kit)
+
+
+# =============================================================================
+# KIT COMMAND GROUP - HELPER FUNCTIONS
+# =============================================================================
+
+
+def validate_kit_name(name: str) -> bool:
+    """Validate that kit name is filesystem-safe.
+
+    Args:
+        name: Kit name to validate
+
+    Returns:
+        True if valid, False otherwise
+    """
+    import re
+
+    # Allow alphanumeric, hyphens, underscores
+    pattern = r"^[a-z0-9_-]+$"
+    return bool(re.match(pattern, name.lower()))
+
+
+def get_next_resource_number(kit_path: Path) -> int:
+    """Get the next available resource number in a kit.
+
+    Args:
+        kit_path: Path to the reasoning kit directory
+
+    Returns:
+        Next available resource number (1-indexed)
+    """
+    resource_files = list(kit_path.glob("resource_*.*"))
+    if not resource_files:
+        return 1
+
+    # Extract numbers from existing resources
+    numbers = []
+    for f in resource_files:
+        match = re.search(r"resource_(\d+)\.", f.name)
+        if match:
+            numbers.append(int(match.group(1)))
+
+    return max(numbers) + 1 if numbers else 1
+
+
+def get_next_step_number(kit_path: Path) -> int:
+    """Get the next available step number in a kit.
+
+    Args:
+        kit_path: Path to the reasoning kit directory
+
+    Returns:
+        Next available step number (1-indexed)
+    """
+    instruction_files = list(kit_path.glob("instruction_*.txt"))
+    if not instruction_files:
+        return 1
+
+    # Extract numbers from existing instructions
+    numbers = []
+    for f in instruction_files:
+        match = re.search(r"instruction_(\d+)\.txt", f.name)
+        if match:
+            numbers.append(int(match.group(1)))
+
+    return max(numbers) + 1 if numbers else 1
+
+
+def find_resource_file(kit_path: Path, number: int) -> Path | None:
+    """Find a resource file by number.
+
+    Args:
+        kit_path: Path to the reasoning kit directory
+        number: Resource number to find
+
+    Returns:
+        Path to resource file if found, None otherwise
+    """
+    pattern = f"resource_{number}.*"
+    matches = list(kit_path.glob(pattern))
+    return matches[0] if matches else None
+
+
+def find_step_file(kit_path: Path, number: int) -> Path | None:
+    """Find a step file by number.
+
+    Args:
+        kit_path: Path to the reasoning kit directory
+        number: Step number to find
+
+    Returns:
+        Path to step file if found, None otherwise
+    """
+    step_file = kit_path / f"instruction_{number}.txt"
+    return step_file if step_file.exists() else None
+
+
+# =============================================================================
+# KIT COMMAND GROUP - COMMAND HANDLERS
+# =============================================================================
+
+
+def _cmd_kit(args: argparse.Namespace) -> None:
+    """Handle kit management commands."""
+    if args.kit_command == "create":
+        _kit_create(args)
+    elif args.kit_command == "delete":
+        _kit_delete(args)
+    elif args.kit_command == "add-resource":
+        _kit_add_resource(args)
+    elif args.kit_command == "add-step":
+        _kit_add_step(args)
+    elif args.kit_command == "edit-resource":
+        _kit_edit_resource(args)
+    elif args.kit_command == "edit-step":
+        _kit_edit_step(args)
+    elif args.kit_command == "delete-resource":
+        _kit_delete_resource(args)
+    elif args.kit_command == "delete-step":
+        _kit_delete_step(args)
+    else:
+        print(
+            "Usage: clerk kit [create|delete|add-resource|add-step|edit-resource|edit-step|delete-resource|delete-step]"
+        )
+        sys.exit(1)
+
+
+def _kit_create(args: argparse.Namespace) -> None:
+    """Create a new reasoning kit."""
+    kit_name = args.name.lower().replace(" ", "-")
+
+    # Validate kit name
+    if not validate_kit_name(kit_name):
+        print(f"Error: Invalid kit name '{kit_name}'")
+        print(
+            "Kit names must contain only lowercase letters, numbers, hyphens, and underscores"
+        )
+        sys.exit(1)
+
+    # Create kit directory
+    kit_path = Path(args.base_path) / kit_name
+    if kit_path.exists():
+        print(f"Error: Kit '{kit_name}' already exists at {kit_path}")
+        sys.exit(1)
+
+    try:
+        kit_path.mkdir(parents=True, exist_ok=False)
+        print(f"Created reasoning kit: {kit_name}")
+        print(f"Location: {kit_path}")
+
+        if args.description:
+            print(f"Description: {args.description}")
+            # Note: Description is not stored for file-based kits,
+            # but will be used when syncing to database
+
+        print("\nNext steps:")
+        print(f"  - Add resources: clerk kit add-resource {kit_name} --file <path>")
+        print(f"  - Add workflow steps: clerk kit add-step {kit_name} --prompt <text>")
+        print(f"  - View kit info: clerk info {kit_name}")
+
+    except Exception as e:
+        print(f"Error creating kit: {e}")
+        sys.exit(1)
+
+
+def _kit_delete(args: argparse.Namespace) -> None:
+    """Delete a reasoning kit."""
+    import shutil
+
+    kit_path = Path(args.base_path) / args.name
+
+    if not kit_path.exists():
+        print(f"Error: Kit '{args.name}' not found at {kit_path}")
+        sys.exit(1)
+
+    # Confirm deletion unless --force flag is used
+    if not args.force:
+        response = input(f"Are you sure you want to delete '{args.name}'? [y/N]: ")
+        if response.lower() not in ["y", "yes"]:
+            print("Deletion cancelled")
+            return
+
+    try:
+        shutil.rmtree(kit_path)
+        print(f"Deleted reasoning kit: {args.name}")
+    except Exception as e:
+        print(f"Error deleting kit: {e}")
+        sys.exit(1)
+
+
+def _kit_add_resource(args: argparse.Namespace) -> None:
+    """Add a resource to a reasoning kit."""
+    kit_path = Path(args.base_path) / args.kit
+
+    if not kit_path.exists():
+        print(f"Error: Kit '{args.kit}' not found at {kit_path}")
+        print(f"Create it first: clerk kit create {args.kit}")
+        sys.exit(1)
+
+    # Validate that either --file or --content is provided
+    if not args.file and not args.content:
+        print("Error: Either --file or --content must be provided")
+        sys.exit(1)
+
+    if args.content and not args.filename:
+        print("Error: --filename is required when using --content")
+        sys.exit(1)
+
+    if args.file and args.content:
+        print("Error: Cannot use both --file and --content")
+        sys.exit(1)
+
+    # Get next resource number
+    resource_num = get_next_resource_number(kit_path)
+
+    try:
+        if args.file:
+            # Copy from file
+            source_path = Path(args.file)
+            if not source_path.exists():
+                print(f"Error: File not found: {args.file}")
+                sys.exit(1)
+
+            extension = source_path.suffix or ".txt"
+            dest_path = kit_path / f"resource_{resource_num}{extension}"
+
+            import shutil
+
+            shutil.copy2(source_path, dest_path)
+            print(f"Added resource_{resource_num} from {args.file}")
+
+        else:
+            # Create from inline content
+            extension = Path(args.filename).suffix or ".txt"
+            dest_path = kit_path / f"resource_{resource_num}{extension}"
+            dest_path.write_text(args.content)
+            print(f"Added resource_{resource_num} with inline content")
+
+        print(f"Resource file: {dest_path.name}")
+        print(f"Reference in steps as: {{resource_{resource_num}}}")
+
+    except Exception as e:
+        print(f"Error adding resource: {e}")
+        sys.exit(1)
+
+
+def _kit_add_step(args: argparse.Namespace) -> None:
+    """Add a workflow step to a reasoning kit."""
+    kit_path = Path(args.base_path) / args.kit
+
+    if not kit_path.exists():
+        print(f"Error: Kit '{args.kit}' not found at {kit_path}")
+        print(f"Create it first: clerk kit create {args.kit}")
+        sys.exit(1)
+
+    # Validate that either --file or --prompt is provided
+    if not args.file and not args.prompt:
+        print("Error: Either --file or --prompt must be provided")
+        sys.exit(1)
+
+    if args.file and args.prompt:
+        print("Error: Cannot use both --file and --prompt")
+        sys.exit(1)
+
+    # Get next step number
+    step_num = get_next_step_number(kit_path)
+
+    try:
+        dest_path = kit_path / f"instruction_{step_num}.txt"
+
+        if args.file:
+            # Copy from file
+            source_path = Path(args.file)
+            if not source_path.exists():
+                print(f"Error: File not found: {args.file}")
+                sys.exit(1)
+
+            import shutil
+
+            shutil.copy2(source_path, dest_path)
+            print(f"Added instruction_{step_num} from {args.file}")
+
+        else:
+            # Create from inline prompt
+            dest_path.write_text(args.prompt)
+            print(f"Added instruction_{step_num} with inline prompt")
+
+        print(f"Step file: {dest_path.name}")
+        print(f"Output available as: {{workflow_{step_num}}}")
+
+    except Exception as e:
+        print(f"Error adding step: {e}")
+        sys.exit(1)
+
+
+def _kit_edit_resource(args: argparse.Namespace) -> None:
+    """Edit a resource in a reasoning kit."""
+    kit_path = Path(args.base_path) / args.kit
+
+    if not kit_path.exists():
+        print(f"Error: Kit '{args.kit}' not found at {kit_path}")
+        sys.exit(1)
+
+    # Validate that either --file or --content is provided
+    if not args.file and not args.content:
+        print("Error: Either --file or --content must be provided")
+        sys.exit(1)
+
+    if args.file and args.content:
+        print("Error: Cannot use both --file and --content")
+        sys.exit(1)
+
+    # Find existing resource file
+    existing_file = find_resource_file(kit_path, args.number)
+    if not existing_file:
+        print(f"Error: Resource {args.number} not found in kit '{args.kit}'")
+        sys.exit(1)
+
+    try:
+        if args.file:
+            # Replace with content from file
+            source_path = Path(args.file)
+            if not source_path.exists():
+                print(f"Error: File not found: {args.file}")
+                sys.exit(1)
+
+            # Keep same filename/extension
+            import shutil
+
+            shutil.copy2(source_path, existing_file)
+            print(f"Updated resource_{args.number} from {args.file}")
+
+        else:
+            # Replace with inline content
+            existing_file.write_text(args.content)
+            print(f"Updated resource_{args.number} with inline content")
+
+        print(f"Resource file: {existing_file.name}")
+
+    except Exception as e:
+        print(f"Error editing resource: {e}")
+        sys.exit(1)
+
+
+def _kit_edit_step(args: argparse.Namespace) -> None:
+    """Edit a workflow step in a reasoning kit."""
+    kit_path = Path(args.base_path) / args.kit
+
+    if not kit_path.exists():
+        print(f"Error: Kit '{args.kit}' not found at {kit_path}")
+        sys.exit(1)
+
+    # Validate that either --file or --prompt is provided
+    if not args.file and not args.prompt:
+        print("Error: Either --file or --prompt must be provided")
+        sys.exit(1)
+
+    if args.file and args.prompt:
+        print("Error: Cannot use both --file and --prompt")
+        sys.exit(1)
+
+    # Find existing step file
+    existing_file = find_step_file(kit_path, args.number)
+    if not existing_file:
+        print(f"Error: Step {args.number} not found in kit '{args.kit}'")
+        sys.exit(1)
+
+    try:
+        if args.file:
+            # Replace with content from file
+            source_path = Path(args.file)
+            if not source_path.exists():
+                print(f"Error: File not found: {args.file}")
+                sys.exit(1)
+
+            import shutil
+
+            shutil.copy2(source_path, existing_file)
+            print(f"Updated instruction_{args.number} from {args.file}")
+
+        else:
+            # Replace with inline prompt
+            existing_file.write_text(args.prompt)
+            print(f"Updated instruction_{args.number} with inline prompt")
+
+        print(f"Step file: {existing_file.name}")
+
+    except Exception as e:
+        print(f"Error editing step: {e}")
+        sys.exit(1)
+
+
+def _kit_delete_resource(args: argparse.Namespace) -> None:
+    """Delete a resource from a reasoning kit."""
+    kit_path = Path(args.base_path) / args.kit
+
+    if not kit_path.exists():
+        print(f"Error: Kit '{args.kit}' not found at {kit_path}")
+        sys.exit(1)
+
+    # Find existing resource file
+    existing_file = find_resource_file(kit_path, args.number)
+    if not existing_file:
+        print(f"Error: Resource {args.number} not found in kit '{args.kit}'")
+        sys.exit(1)
+
+    try:
+        existing_file.unlink()
+        print(f"Deleted resource_{args.number} from '{args.kit}'")
+        print(
+            f"Note: Remaining resources are NOT renumbered to preserve workflow references"
+        )
+
+    except Exception as e:
+        print(f"Error deleting resource: {e}")
+        sys.exit(1)
+
+
+def _kit_delete_step(args: argparse.Namespace) -> None:
+    """Delete a workflow step from a reasoning kit."""
+    kit_path = Path(args.base_path) / args.kit
+
+    if not kit_path.exists():
+        print(f"Error: Kit '{args.kit}' not found at {kit_path}")
+        sys.exit(1)
+
+    # Find existing step file
+    existing_file = find_step_file(kit_path, args.number)
+    if not existing_file:
+        print(f"Error: Step {args.number} not found in kit '{args.kit}'")
+        sys.exit(1)
+
+    try:
+        existing_file.unlink()
+        print(f"Deleted instruction_{args.number} from '{args.kit}'")
+        print(f"Note: Remaining steps are NOT renumbered to preserve workflow order")
+
+    except Exception as e:
+        print(f"Error deleting step: {e}")
+        sys.exit(1)
 
 
 if __name__ == "__main__":

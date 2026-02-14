@@ -126,17 +126,22 @@ The abstract overview of a reasoning kit:
 ## Workflow
 The workflow runs chronologically. Steps are executed in order (1, 2, 3, ...) with each step's output available to subsequent steps via placeholders.
 
+## MCP
+CLERK can be connected to other LLMs via MCP. The LLM can create new Reasoning Kits, edit and execute them. In order to be able to do this, it needs to be instructed via prompts.
+
 ## General Tasks
 - [x] Langchain logic, which executes all steps from the workflow
 - [x] After final event, present all results back to user
 - [x] For evaluation steps, interrupt logic and ask for user feedback
 - [x] Database layer, which centralizes the storage for reasoning kits
-- [ ] Reasoning Kit definition layer (via terminal)
-- [ ] Execution layer (via terminal)
+- [x] Reasoning Kit definition layer (via terminal)
 - [ ] UI, which can be launched via `clerk web`
     - [ ] wraps the Reasoning Kit definition layer in an intuitive way
     - [ ] allows execution of Kits (including evaluation if desired)
 - [ ] Spin up local db for storage (as alternative to Supabase)
+- [ ] MCP logic
+    - [ ] Log in to Supabase if desired
+    - [ ] If not: use local db instance
 - [ ] Docker implementation
 
 ## Tasks (to be implemented another time)

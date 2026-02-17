@@ -1,0 +1,321 @@
+{% extends "base.html" %}
+
+{% block title %}{{ kit.name }} — CLERK{% endblock %}
+
+{% block content %}
+<div class="fade-in">
+    <!-- Breadcrumb -->
+    <nav class="text-sm text-muted-foreground mb-6">
+        <a href="/" class="hover:text-foreground transition-colors">Kits</a>
+        <span class="mx-2">/</span>
+        <span class="text-foreground">{{ kit.name }}</span>
+    </nav>
+
+    <!-- Kit header -->
+    <div class="flex items-start justify-between mb-8">
+        <div>
+            <h1 class="text-3xl font-bold text-foreground tracking-tight">{{ kit.name }}</h1>
+            {% if kit.description %}
+            <p class="text-muted-foreground mt-2 text-base">{{ kit.description }}</p>
+            {% endif %}
+            <div class="flex items-center gap-3 mt-3">
+                <span class="badge">{{ source|capitalize }}</span>
+                {% if kit.version_number is defined and kit.version_number %}
+                <span class="badge badge-primary">v{{ kit.version_number }}</span>
+                {% endif %}
+                {% if kit.created_at %}
+                <span class="text-xs text-muted-foreground">Created {{ kit.created_at.strftime('%b %d, %Y') }}</span>
+                {% endif %}
+            </div>
+        </div>
+        <div class="flex items-center gap-2">
+            <a href="/kit/{{ kit.slug }}/run" class="btn btn-primary">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                Run
+            </a>
+            {% if is_owner and source == 'database' %}
+            <a href="/kit/{{ kit.slug }}/edit" class="btn btn-secondary">Edit</a>
+            {% endif %}
+        </div>
+    </div>
+
+    <hr class="divider">
+
+    <!-- Resources section -->
+    <section class="mb-8">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="text-xl font-semibold tracking-tight">Resources ({{ resources|length }})</h2>
+            {% if is_owner %}
+            <button class="btn btn-secondary btn-sm"
+                onclick="document.getElementById('add-resource-form').classList.toggle('hidden')">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                </svg>
+                Add Resource
+            </button>
+            {% endif %}
+        </div>
+
+        <!-- Add resource form (hidden by default) -->
+        {% if is_owner %}
+        <div id="add-resource-form" class="hidden mb-4">
+            <form action="/api/kits/{{ kit.slug }}/resources" method="post" enctype="multipart/form-data"
+                hx-boost="false" class="card p-5">
+                <label class="label" for="resource-file">Upload File</label>
+                <div class="drop-zone mb-3" id="resource-drop-zone"
+                    onclick="document.getElementById('resource-file-input').click()">
+                    <svg class="w-8 h-8 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                            d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                    </svg>
+                    <p class="text-sm">Click to select or drag and drop</p>
+                    <p class="text-xs mt-1">Supports .txt, .csv, .pdf, .xlsx</p>
+                </div>
+                <input type="file" name="file" id="resource-file-input" class="hidden"
+                    accept=".txt,.csv,.pdf,.xlsx,.xls,.md"
+                    onchange="document.getElementById('resource-drop-zone').querySelector('p').textContent = this.files[0]?.name || 'Click to select'">
+                <label class="label" for="resource-display-name">Display Name <span
+                        class="text-xs text-muted-foreground font-normal">(optional)</span></label>
+                <input type="text" name="display_name" id="resource-display-name" class="input mb-3"
+                    placeholder="e.g. Customer Feedback Data">
+                <label class="flex items-center gap-2 text-sm mb-3 cursor-pointer">
+                    <input type="checkbox" name="is_dynamic" value="true" class="rounded">
+                    <span>Dynamic resource</span>
+                    <span class="text-xs text-muted-foreground">&mdash; user provides content at execution time</span>
+                </label>
+                <div class="flex gap-2 justify-end">
+                    <button type="button" class="btn btn-ghost btn-sm"
+                        onclick="document.getElementById('add-resource-form').classList.add('hidden')">Cancel</button>
+                    <button type="submit" class="btn btn-primary btn-sm">Upload</button>
+                </div>
+            </form>
+        </div>
+        {% endif %}
+
+        {% if resources %}
+        <div class="space-y-3">
+            {% for resource in resources %}
+            <div class="card p-5">
+                <!-- Display mode -->
+                <div class="resource-display">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-3">
+                            <span class="badge badge-primary font-mono">#{{ resource.number }}</span>
+                            <div>
+                                {% if resource.display_name %}
+                                <span class="text-sm font-medium">{{ resource.display_name }}</span>
+                                <span class="text-xs text-muted-foreground ml-1">({{ resource.filename }})</span>
+                                {% else %}
+                                <span class="text-sm font-medium">{{ resource.filename }}</span>
+                                {% endif %}
+                                {% if resource.is_dynamic is defined and resource.is_dynamic %}
+                                <span class="badge ml-2"
+                                    style="background: #fef3c7; color: #92400e; border-color: #fde68a;">Dynamic</span>
+                                {% endif %}
+                                {% if resource.file_size_bytes %}
+                                <span class="text-xs text-muted-foreground ml-2">
+                                    {% if resource.file_size_bytes > 1024 %}
+                                    {{ (resource.file_size_bytes / 1024)|round(1) }} KB
+                                    {% else %}
+                                    {{ resource.file_size_bytes }} B
+                                    {% endif %}
+                                </span>
+                                {% endif %}
+                                {% if resource.mime_type %}
+                                <span class="text-xs text-muted-foreground ml-1">({{ resource.mime_type }})</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            {% if resource.extracted_text %}
+                            <button class="btn btn-ghost btn-sm"
+                                onclick="this.closest('.card').querySelector('.resource-preview').classList.toggle('hidden')">Preview</button>
+                            {% endif %}
+                            {% if is_owner %}
+                            <button class="btn btn-ghost btn-sm"
+                                onclick="this.closest('.card').querySelector('.resource-edit-form').classList.toggle('hidden'); this.closest('.card').querySelector('.resource-display').classList.toggle('hidden')">Edit</button>
+                            <form action="/api/kits/{{ kit.slug }}/resources/{{ resource.number }}/delete" method="post"
+                                hx-boost="false" onsubmit="return confirm('Delete resource {{ resource.number }}?')">
+                                <button type="submit"
+                                    class="btn btn-ghost btn-sm text-red-500 hover:text-red-700">Delete</button>
+                            </form>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% if resource.extracted_text %}
+                    <div
+                        class="resource-preview hidden mt-3 p-3 bg-muted rounded-lg text-sm text-muted-foreground font-mono whitespace-pre-wrap max-h-48 overflow-y-auto">
+                        {{ resource.extracted_text[:500] }}{% if resource.extracted_text|length > 500 %}...{% endif %}
+                    </div>
+                    {% endif %}
+                </div>
+                <!-- Edit mode (hidden) -->
+                {% if is_owner %}
+                <div class="resource-edit-form hidden">
+                    <form action="/api/kits/{{ kit.slug }}/resources/{{ resource.number }}/update" method="post"
+                        enctype="multipart/form-data" hx-boost="false">
+                        <div class="flex items-center gap-3 mb-4">
+                            <span class="badge badge-primary font-mono">#{{ resource.number }}</span>
+                            <span class="text-sm text-muted-foreground">{{ resource.filename }}</span>
+                        </div>
+                        <label class="label" for="resource-display-name-{{ resource.number }}">Display Name <span
+                                class="text-xs text-muted-foreground font-normal">(optional)</span></label>
+                        <input type="text" name="display_name" id="resource-display-name-{{ resource.number }}"
+                            class="input mb-3" value="{{ resource.display_name or '' }}"
+                            placeholder="e.g. Customer Feedback Data">
+                        <label class="flex items-center gap-2 text-sm mb-3 cursor-pointer">
+                            <input type="checkbox" name="is_dynamic" value="true" class="rounded" {% if
+                                resource.is_dynamic is defined and resource.is_dynamic %}checked{% endif %}>
+                            <span>Dynamic resource</span>
+                            <span class="text-xs text-muted-foreground">&mdash; user provides content at execution
+                                time</span>
+                        </label>
+                        <label class="label" for="resource-file-{{ resource.number }}">Replace File <span
+                                class="text-xs text-muted-foreground font-normal">(optional — leave empty to keep
+                                current file)</span></label>
+                        <input type="file" name="file" id="resource-file-{{ resource.number }}"
+                            class="input mb-3 text-sm" accept=".txt,.csv,.pdf,.xlsx,.xls,.md">
+                        <div class="flex gap-2 justify-end">
+                            <button type="button" class="btn btn-ghost btn-sm"
+                                onclick="this.closest('.card').querySelector('.resource-edit-form').classList.toggle('hidden'); this.closest('.card').querySelector('.resource-display').classList.toggle('hidden')">Cancel</button>
+                            <button type="submit" class="btn btn-primary btn-sm">Save</button>
+                        </div>
+                    </form>
+                </div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-sm text-muted-foreground italic">No resources. Add files that your workflow steps can reference.
+        </p>
+        {% endif %}
+    </section>
+
+    <hr class="divider">
+
+    <!-- Workflow Steps section -->
+    <section class="mb-8">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="text-xl font-semibold tracking-tight">Workflow Steps ({{ steps|length }})</h2>
+            {% if is_owner %}
+            <button class="btn btn-secondary btn-sm"
+                onclick="document.getElementById('add-step-form').classList.toggle('hidden')">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                </svg>
+                Add Step
+            </button>
+            {% endif %}
+        </div>
+
+        <!-- Add step form (hidden by default) -->
+        {% if is_owner %}
+        <div id="add-step-form" class="hidden mb-4">
+            <form action="/api/kits/{{ kit.slug }}/steps" method="post" hx-boost="false" class="card p-5">
+                <label class="label" for="step-name">Step Name <span
+                        class="text-xs text-muted-foreground font-normal">(optional)</span></label>
+                <input type="text" name="display_name" id="step-name" class="input mb-3"
+                    placeholder="e.g. Summarize Findings">
+                <label class="label" for="step-prompt">Prompt Template</label>
+                <textarea name="prompt" id="step-prompt" class="input mb-2" rows="5"
+                    placeholder="Enter the instruction prompt. Use {resource_1}, {workflow_1} etc. as placeholders."></textarea>
+                <p class="text-xs text-muted-foreground mb-3">
+                    Reference resources with <code
+                        class="bg-muted px-1.5 py-0.5 rounded-md">&#123;resource_N&#125;</code> and prior step outputs
+                    with <code class="bg-muted px-1.5 py-0.5 rounded-md">&#123;workflow_N&#125;</code>
+                </p>
+                <div class="flex gap-2 justify-end">
+                    <button type="button" class="btn btn-ghost btn-sm"
+                        onclick="document.getElementById('add-step-form').classList.add('hidden')">Cancel</button>
+                    <button type="submit" class="btn btn-primary btn-sm">Add Step</button>
+                </div>
+            </form>
+        </div>
+        {% endif %}
+
+        {% if steps %}
+        <div class="space-y-3">
+            {% for step in steps %}
+            <div class="step-card">
+                <div class="step-card-header flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                        <span class="badge badge-primary font-mono">Step {{ step.number }}</span>
+                        {% if step.display_name %}
+                        <span class="text-sm font-medium">{{ step.display_name }}</span>
+                        <span class="text-xs text-muted-foreground">&mdash; <code>{{ step.output_id }}</code></span>
+                        {% else %}
+                        <span class="text-xs text-muted-foreground">Output: <code>{{ step.output_id }}</code></span>
+                        {% endif %}
+                    </div>
+                    <div class="flex items-center gap-1">
+                        {% if is_owner %}
+                        <button class="btn btn-ghost btn-sm"
+                            onclick="this.closest('.step-card').querySelector('.step-edit-form').classList.toggle('hidden'); this.closest('.step-card').querySelector('.step-display').classList.toggle('hidden')">Edit</button>
+                        <form action="/api/kits/{{ kit.slug }}/steps/{{ step.number }}/delete" method="post"
+                            hx-boost="false" onsubmit="return confirm('Delete step {{ step.number }}?')">
+                            <button type="submit"
+                                class="btn btn-ghost btn-sm text-red-500 hover:text-red-700">Delete</button>
+                        </form>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="step-card-body">
+                    <!-- Display mode -->
+                    <div class="step-display">
+                        <pre>{{ step.prompt_template }}</pre>
+                    </div>
+                    <!-- Edit mode (hidden) -->
+                    {% if is_owner %}
+                    <div class="step-edit-form hidden">
+                        <form action="/api/kits/{{ kit.slug }}/steps/{{ step.number }}/update" method="post"
+                            hx-boost="false">
+                            <label class="label">Step Name <span
+                                    class="text-xs text-muted-foreground font-normal">(optional)</span></label>
+                            <input type="text" name="display_name" class="input mb-3"
+                                value="{{ step.display_name or '' }}" placeholder="e.g. Summarize Findings">
+                            <label class="label">Prompt Template</label>
+                            <textarea name="prompt" class="input mb-3" rows="6">{{ step.prompt_template }}</textarea>
+                            <div class="flex gap-2 justify-end">
+                                <button type="button" class="btn btn-ghost btn-sm"
+                                    onclick="this.closest('.step-card').querySelector('.step-edit-form').classList.toggle('hidden'); this.closest('.step-card').querySelector('.step-display').classList.toggle('hidden')">Cancel</button>
+                                <button type="submit" class="btn btn-primary btn-sm">Save</button>
+                            </div>
+                        </form>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-sm text-muted-foreground italic">No workflow steps. Add instruction prompts that will be executed
+            sequentially.</p>
+        {% endif %}
+    </section>
+
+    <!-- Delete kit -->
+    {% if is_owner %}
+    <hr class="divider">
+    <section>
+        <h2 class="text-xl font-semibold text-red-600 mb-3 tracking-tight">Danger Zone</h2>
+        <div class="card p-5 border-red-200 flex items-center justify-between">
+            <div>
+                <p class="font-medium">Delete this kit</p>
+                <p class="text-sm text-muted-foreground">This action cannot be undone. All resources, steps, and
+                    execution history will be permanently deleted.</p>
+            </div>
+            <form action="/api/kits/{{ kit.slug }}/delete" method="post" hx-boost="false"
+                onsubmit="return confirm('Are you sure you want to delete {{ kit.name }}? This cannot be undone.')">
+                <button type="submit" class="btn btn-destructive btn-sm">Delete Kit</button>
+            </form>
+        </div>
+    </section>
+    {% endif %}
+</div>
+{% endblock %}

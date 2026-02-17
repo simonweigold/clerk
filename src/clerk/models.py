@@ -9,6 +9,8 @@ class Resource(BaseModel):
     file: str
     resource_id: str
     content: str = ""  # Loaded at runtime
+    is_dynamic: bool = False  # Dynamic resources are provided by user at execution time
+    display_name: str | None = None  # Optional custom display name
 
 
 class WorkflowStep(BaseModel):
@@ -17,6 +19,7 @@ class WorkflowStep(BaseModel):
     file: str
     output_id: str
     prompt: str = ""  # Loaded at runtime
+    display_name: str | None = None  # Optional custom display name
 
 
 class ReasoningKit(BaseModel):

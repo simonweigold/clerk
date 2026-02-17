@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+
+{% block title %}Sign Up — CLERK{% endblock %}
+
+{% block content %}
+<div class="max-w-sm mx-auto fade-in">
+    <div class="glass-card">
+        <div class="text-center mb-8">
+            <h1 class="text-3xl font-bold mb-3 tracking-tight">Create Account</h1>
+            <p class="text-muted-foreground">Create an account to build and manage your own reasoning kits, track
+                executions, and share workflows with others.</p>
+        </div>
+
+        <form action="/api/auth/signup" method="post" hx-boost="false" class="space-y-5">
+            <div>
+                <label for="email" class="label">Email</label>
+                <input type="email" id="email" name="email" class="input" placeholder="you@example.com" required
+                    autocomplete="email">
+            </div>
+
+            <div>
+                <label for="password" class="label">Password</label>
+                <input type="password" id="password" name="password" class="input" placeholder="Choose a password"
+                    required autocomplete="new-password" minlength="6">
+                <p class="text-xs text-muted-foreground mt-1.5">Minimum 6 characters.</p>
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-lg w-full">Create Account</button>
+        </form>
+
+        <p class="text-center text-sm text-muted-foreground mt-6">
+            Already have an account?
+            <a href="/auth/login" class="text-primary hover:underline font-medium">Sign in</a>
+        </p>
+    </div>
+</div>
+{% endblock %}

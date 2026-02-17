@@ -135,15 +135,36 @@ CLERK can be connected to other LLMs via MCP. The LLM can create new Reasoning K
 - [x] For evaluation steps, interrupt logic and ask for user feedback
 - [x] Database layer, which centralizes the storage for reasoning kits
 - [x] Reasoning Kit definition layer (via terminal)
-- [ ] UI, which can be launched via `clerk web`
-    - [ ] wraps the Reasoning Kit definition layer in an intuitive way
-    - [ ] allows execution of Kits (including evaluation if desired)
-- [ ] Spin up local db for storage (as alternative to Supabase)
+- [x] UI, which can be launched via `clerk web`
+    - [x] wraps the Reasoning Kit definition layer in an intuitive way
+    - [x] allows execution of Kits (including evaluation if desired)
+- [ ] Spin up local db for storage (as alternative to Supabase) --> launch with `clerk web --local`
 - [ ] MCP logic
     - [ ] Log in to Supabase if desired
     - [ ] If not: use local db instance
+- [ ] New type: resources, workflows, tools!
+- [ ] Batch execution mode
 - [ ] Docker implementation
 
 ## Tasks (to be implemented another time)
 - [ ] change reasoning_kits/demo/resource_1.txt to pdf and add pdf support for resources.
 - [ ] collect some more practical use cases for showcasing
+
+
+
+
+- previewing resources doesnt work --> please fix
+
+- allow resources to be a website
+
+- add option to reset password for supabase when signing in
+- when user with mail address already exists in supabase tell the user
+
+- allow resizing of text input fields when editing workflow steps
+- allow resources to be input directly as txt
+
+- when executing a kit, allow user to edit an output (incase it is referenced in future steps)
+- when executing a kit, add option to view entire prompt
+
+- save workflow executions to db and allow user to access them again even after quitting
+- add download results option

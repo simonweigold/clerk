@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+
+{% block title %}CLERK — Reasoning Kits{% endblock %}
+
+{% block content %}
+<div class="fade-in">
+    <!-- Platform intro -->
+    <div class="mb-12">
+        <h1 class="text-4xl font-bold text-foreground mb-3 tracking-tight">CLERK</h1>
+        <p class="text-muted-foreground text-base max-w-xl leading-relaxed">
+            Community Library of Executable Reasoning Kits. Create, manage, and share
+            multi-step LLM reasoning workflows. Each kit defines a sequence of prompts
+            that build on each other, turning complex reasoning into reproducible pipelines.
+        </p>
+        <p class="text-muted-foreground text-base max-w-xl leading-relaxed mt-2">
+            Kits can be public or private. <a href="/auth/signup" class="text-primary hover:underline font-medium">Sign
+                up</a> to create and manage your own kits.
+        </p>
+    </div>
+
+    <!-- Page header -->
+    <div class="flex items-end justify-between mb-8">
+        <div>
+            <h2 class="text-2xl font-semibold text-foreground tracking-tight">Reasoning Kits</h2>
+            <p class="text-muted-foreground mt-1">Browse and run executable reasoning workflows</p>
+        </div>
+        {% if user %}
+        <a href="/kit/new" class="btn btn-primary">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+            </svg>
+            New Kit
+        </a>
+        {% endif %}
+    </div>
+
+    <!-- Search -->
+    <div class="mb-8">
+        <input type="search" name="q" placeholder="Search kits..." class="input max-w-md" hx-get="/api/search"
+            hx-trigger="input changed delay:300ms, search" hx-target="#kit-list" hx-indicator="#search-indicator">
+        <span id="search-indicator" class="htmx-indicator ml-2">
+            <span class="pulse-dot"></span>
+            <span class="pulse-dot"></span>
+            <span class="pulse-dot"></span>
+        </span>
+    </div>
+
+    <!-- Kit grid -->
+    <div id="kit-list">
+        {% include "partials/kit_list.html" %}
+    </div>
+</div>
+{% endblock %}

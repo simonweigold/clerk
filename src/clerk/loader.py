@@ -46,16 +46,21 @@ def load_reasoning_kit(kit_path: str | Path) -> ReasoningKit:
     if not kit_path.exists():
         raise FileNotFoundError(f"Reasoning kit not found: {kit_path}")
 
-    # Auto-discover resources (resource_*.*)
+    # Auto-discover resources (resource_*.* and dynamic_resource_*.*)
     resources: dict[str, Resource] = {}
     resource_files = sorted(kit_path.glob("resource_*.*"))
-    for idx, resource_file in enumerate(resource_files, start=1):
-        # Extract resource_id from filename (e.g., resource_1.txt -> resource_1)
-        resource_id = resource_file.stem
+    dynamic_resource_files = sorted(kit_path.glob("dynamic_resource_*.*"))
+    all_resource_files = resource_files + dynamic_resource_files
+    for idx, resource_file in enumerate(all_resource_files, start=1):
+        is_dynamic = resource_file.name.startswith("dynamic_resource_")
+        # Extract resource_id from filename
+        # dynamic_resource_1.txt -> resource_1, resource_1.txt -> resource_1
+        resource_id = resource_file.stem.replace("dynamic_", "")
         resource = Resource(
             file=resource_file.name,
             resource_id=resource_id,
-            content=resource_file.read_text(),
+            content="" if is_dynamic else resource_file.read_text(),
+            is_dynamic=is_dynamic,
         )
         resources[str(idx)] = resource
 
@@ -173,17 +178,25 @@ async def _convert_db_kit_to_model(
     # Load resources
     resources: dict[str, Resource] = {}
     for db_resource in version.resources:
-        # Download content from storage
-        try:
-            content = storage.download_resource_text(db_resource.storage_path)
-        except Exception:
-            # If download fails, use extracted text as fallback
-            content = db_resource.extracted_text or ""
+        is_dynamic = getattr(db_resource, "is_dynamic", False)
+
+        # Dynamic resources have no pre-loaded content
+        if is_dynamic:
+            content = ""
+        else:
+            # Download content from storage
+            try:
+                content = storage.download_resource_text(db_resource.storage_path)
+            except Exception:
+                # If download fails, use extracted text as fallback
+                content = db_resource.extracted_text or ""
 
         resource = Resource(
             file=db_resource.filename,
             resource_id=db_resource.resource_id,
             content=content,
+            is_dynamic=is_dynamic,
+            display_name=db_resource.display_name,
         )
         resources[str(db_resource.resource_number)] = resource
 
@@ -194,6 +207,7 @@ async def _convert_db_kit_to_model(
             file=f"instruction_{db_step.step_number}.txt",
             output_id=db_step.output_id,
             prompt=db_step.prompt_template,
+            display_name=db_step.display_name,
         )
         workflow[str(db_step.step_number)] = step
 
@@ -255,6 +269,7 @@ async def get_kit_info_from_db(slug: str) -> dict | None:
                         "filename": r.filename,
                         "mime_type": r.mime_type,
                         "file_size_bytes": r.file_size_bytes,
+                        "is_dynamic": getattr(r, "is_dynamic", False),
                     }
                     for r in version.resources
                 ],

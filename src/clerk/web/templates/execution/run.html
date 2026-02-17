@@ -1,0 +1,418 @@
+{% extends "base.html" %}
+
+{% block title %}Run {{ kit.name }} — CLERK{% endblock %}
+
+{% block content %}
+<div class="fade-in">
+    <!-- Breadcrumb -->
+    <nav class="text-sm text-muted-foreground mb-6">
+        <a href="/" class="hover:text-foreground transition-colors">Kits</a>
+        <span class="mx-2">/</span>
+        <a href="/kit/{{ kit.slug }}" class="hover:text-foreground transition-colors">{{ kit.name }}</a>
+        <span class="mx-2">/</span>
+        <span class="text-foreground">Run</span>
+    </nav>
+
+    <!-- Header -->
+    <div class="flex items-center justify-between mb-8">
+        <div>
+            <h1 class="text-3xl font-bold tracking-tight">{{ kit.name }}</h1>
+            <p class="text-muted-foreground mt-1">{{ total_steps }} workflow step{{ 's' if total_steps != 1 else '' }}
+            </p>
+        </div>
+        <a href="/kit/{{ kit.slug }}" class="btn btn-secondary">Back to Kit</a>
+    </div>
+
+    {% if dynamic_resources %}
+    <!-- Dynamic Resources -->
+    <div id="dynamic-resources-section" class="card mb-8">
+        <div class="card-header">
+            <h2 class="card-title">Dynamic Resources</h2>
+        </div>
+        <div class="card-body">
+            <p class="text-sm text-muted-foreground mb-4">This kit requires user-provided content for the following
+                resources. Fill in all fields before running.</p>
+            {% for dr in dynamic_resources %}
+            <div class="mb-4">
+                <label class="block text-sm font-medium mb-1" for="dynamic-{{ dr.resource_id }}">
+                    {% if dr.display_name %}{{ dr.display_name }}{% else %}{{ dr.resource_id }}{% endif %}
+                    <span class="text-xs text-muted-foreground ml-1">({{ dr.filename }})</span>
+                </label>
+                <textarea id="dynamic-{{ dr.resource_id }}" name="{{ dr.resource_id }}" rows="4"
+                    class="input w-full font-mono text-sm"
+                    placeholder="Paste or type content for {% if dr.display_name %}{{ dr.display_name }}{% else %}{{ dr.resource_id }}{% endif %}..."
+                    data-resource-id="{{ dr.resource_id }}" required></textarea>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Evaluation Settings -->
+    <div id="eval-settings-section" class="card mb-8">
+        <div class="card-body">
+            <div class="flex items-center gap-3 mb-3">
+                <input type="checkbox" id="eval-enabled" class="rounded border-gray-300">
+                <label for="eval-enabled" class="text-sm font-medium">Enable step-by-step evaluation</label>
+            </div>
+            <div id="eval-mode-group" class="ml-6" style="display: none;">
+                <p class="text-xs text-muted-foreground mb-2">Choose how prompt and output data is stored:</p>
+                <label class="flex items-center gap-2 mb-1 text-sm">
+                    <input type="radio" name="eval-mode" value="transparent" checked>
+                    Transparent — full text stored
+                </label>
+                <label class="flex items-center gap-2 text-sm">
+                    <input type="radio" name="eval-mode" value="anonymous">
+                    Anonymous — character counts only
+                </label>
+            </div>
+        </div>
+    </div>
+
+    <!-- Run button -->
+    <div class="mb-8">
+        <button id="run-btn" class="btn btn-primary btn-lg" onclick="startExecution()">
+            Run Kit
+        </button>
+    </div>
+
+    <!-- Progress bar -->
+    <div id="progress-section" class="mb-8" style="display: none;">
+        <div class="flex items-center justify-between mb-2">
+            <span class="text-sm font-medium" id="progress-label">Starting...</span>
+            <span class="text-sm text-muted-foreground" id="progress-count">0 / {{ total_steps }}</span>
+        </div>
+        <div class="progress-bar">
+            <div class="progress-bar-fill" id="progress-fill" style="width: 0%"></div>
+        </div>
+    </div>
+
+    <!-- Status banner -->
+    <div id="status-banner" style="display: none;" class="mb-6"></div>
+
+    <!-- Step output stream -->
+    <div id="step-stream" class="stream-container">
+        <!-- Step cards are injected here by JS -->
+    </div>
+
+    <!-- Empty state before execution -->
+    <div id="empty-state" class="empty-state">
+        <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="5 3 19 12 5 21 5 3"></polygon>
+        </svg>
+        <p class="text-lg mb-1 font-medium">Ready to run</p>
+        <p class="text-sm">{% if dynamic_resources %}Fill in the dynamic resources above, then click{% else %}Click{%
+            endif %} <strong>Run Kit</strong> to start executing the workflow.</p>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const totalSteps = {{ total_steps }};
+    const slug = "{{ kit.slug }}";
+    const hasDynamicResources = {{ 'true' if dynamic_resources else 'false' }};
+    let completedSteps = 0;
+    let evtSource = null;
+    let currentExecutionId = null;
+    let evaluateEnabled = false;
+    let evaluateMode = 'transparent';
+
+    // Toggle eval mode radio visibility
+    document.getElementById('eval-enabled').addEventListener('change', function () {
+        document.getElementById('eval-mode-group').style.display = this.checked ? 'block' : 'none';
+    });
+
+    function getDynamicResources() {
+        const resources = {};
+        document.querySelectorAll('#dynamic-resources-section textarea').forEach(function (el) {
+            const rid = el.dataset.resourceId;
+            if (rid) resources[rid] = el.value;
+        });
+        return resources;
+    }
+
+    function validateDynamicResources() {
+        if (!hasDynamicResources) return true;
+        let valid = true;
+        document.querySelectorAll('#dynamic-resources-section textarea').forEach(function (el) {
+            if (!el.value.trim()) {
+                el.style.borderColor = '#ef4444';
+                valid = false;
+            } else {
+                el.style.borderColor = '';
+            }
+        });
+        if (!valid) {
+            showBanner('error', 'Please fill in all dynamic resource fields before running.');
+        }
+        return valid;
+    }
+
+    function startExecution() {
+        if (!validateDynamicResources()) return;
+
+        evaluateEnabled = document.getElementById('eval-enabled').checked;
+        evaluateMode = document.querySelector('input[name="eval-mode"]:checked')?.value || 'transparent';
+
+        const runBtn = document.getElementById('run-btn');
+        const emptyState = document.getElementById('empty-state');
+        const progressSection = document.getElementById('progress-section');
+        const stepStream = document.getElementById('step-stream');
+        const statusBanner = document.getElementById('status-banner');
+
+        // Reset UI
+        runBtn.disabled = true;
+        runBtn.textContent = 'Running...';
+        emptyState.style.display = 'none';
+        progressSection.style.display = 'block';
+        statusBanner.style.display = 'none';
+        stepStream.innerHTML = '';
+        completedSteps = 0;
+        updateProgress(0, 'Starting...');
+
+        // Prepare execution config
+        const config = {
+            evaluate: evaluateEnabled,
+            evaluation_mode: evaluateMode,
+        };
+        if (hasDynamicResources) {
+            config.dynamic_resources = getDynamicResources();
+        }
+
+        // POST config, then connect SSE
+        fetch('/api/kits/' + slug + '/execute', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(config),
+        })
+            .then(function (resp) { return resp.json(); })
+            .then(function (data) {
+                if (data.error) {
+                    showBanner('error', data.error);
+                    runBtn.disabled = false;
+                    runBtn.textContent = 'Run Kit';
+                    return;
+                }
+                currentExecutionId = data.execution_id;
+                connectSSE(data.execution_id);
+            })
+            .catch(function (err) {
+                showBanner('error', 'Failed to start execution: ' + err.message);
+                runBtn.disabled = false;
+                runBtn.textContent = 'Run Kit';
+            });
+    }
+
+    function connectSSE(executionId) {
+        evtSource = new EventSource('/api/kits/' + slug + '/execute/' + executionId + '/stream');
+
+        evtSource.addEventListener('start', function (e) {
+            updateProgress(0, 'Executing workflow...');
+        });
+
+        evtSource.addEventListener('step-start', function (e) {
+            const data = JSON.parse(e.data);
+            const card = createStepCard(data.step, data.output_id, 'running', data.display_name);
+            document.getElementById('step-stream').appendChild(card);
+            card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        });
+
+        evtSource.addEventListener('step-complete', function (e) {
+            const data = JSON.parse(e.data);
+            completedSteps++;
+            const stepLabel = data.display_name ? data.display_name : 'Step ' + data.step;
+            updateProgress(completedSteps, stepLabel + ' complete');
+            updateStepCard(data.step, data);
+        });
+
+        evtSource.addEventListener('step-await-eval', function (e) {
+            const data = JSON.parse(e.data);
+            showEvalForm(data.step);
+        });
+
+        evtSource.addEventListener('step-error', function (e) {
+            const data = JSON.parse(e.data);
+            markStepError(data.step, data.error);
+        });
+
+        evtSource.addEventListener('done', function (e) {
+            const data = JSON.parse(e.data);
+            evtSource.close();
+            evtSource = null;
+
+            const runBtn = document.getElementById('run-btn');
+            runBtn.disabled = false;
+            runBtn.textContent = 'Run Again';
+
+            if (data.status === 'completed') {
+                updateProgress(totalSteps, 'Completed');
+                showBanner('success', 'Workflow completed successfully \u2014 ' + totalSteps + ' step' + (totalSteps !== 1 ? 's' : '') + ' executed.');
+            } else {
+                showBanner('error', 'Workflow failed: ' + (data.error || 'Unknown error'));
+            }
+        });
+
+        evtSource.onerror = function () {
+            if (evtSource) {
+                evtSource.close();
+                evtSource = null;
+            }
+            const runBtn = document.getElementById('run-btn');
+            runBtn.disabled = false;
+            runBtn.textContent = 'Run Again';
+            showBanner('error', 'Connection lost. The execution may still be running on the server.');
+        };
+    }
+
+    function updateProgress(completed, label) {
+        const pct = totalSteps > 0 ? Math.round((completed / totalSteps) * 100) : 0;
+        document.getElementById('progress-fill').style.width = pct + '%';
+        document.getElementById('progress-label').textContent = label;
+        document.getElementById('progress-count').textContent = completed + ' / ' + totalSteps;
+    }
+
+    function showBanner(type, message) {
+        const banner = document.getElementById('status-banner');
+        banner.className = 'flash flash-' + type + ' mb-6 fade-in';
+        banner.textContent = message;
+        banner.style.display = 'block';
+    }
+
+    function createStepCard(stepNum, outputId, status, displayName) {
+        const card = document.createElement('div');
+        card.className = 'step-card fade-in';
+        card.id = 'step-card-' + stepNum;
+        const headerLabel = displayName
+            ? 'Step ' + stepNum + ' \u2014 ' + escapeHtml(displayName) + ' <span class="text-xs text-muted-foreground">(' + escapeHtml(outputId) + ')</span>'
+            : 'Step ' + stepNum + ' \u2014 ' + escapeHtml(outputId);
+        card.innerHTML =
+            '<div class="step-card-header flex items-center justify-between">' +
+            '<span>' + headerLabel + '</span>' +
+            '<span id="step-status-' + stepNum + '" class="flex items-center gap-2 text-muted-foreground">' +
+            '<span class="pulse-dot"></span>' +
+            '<span class="pulse-dot"></span>' +
+            '<span class="pulse-dot"></span>' +
+            '</span>' +
+            '</div>' +
+            '<div class="step-card-body" id="step-body-' + stepNum + '">' +
+            '<p class="text-sm text-muted-foreground">Processing...</p>' +
+            '</div>';
+        return card;
+    }
+
+    function updateStepCard(stepNum, data) {
+        const statusEl = document.getElementById('step-status-' + stepNum);
+        if (statusEl) {
+            let meta = '';
+            if (data.latency_ms) {
+                meta += (data.latency_ms / 1000).toFixed(1) + 's';
+            }
+            if (data.tokens_used) {
+                meta += (meta ? ' \u00b7 ' : '') + data.tokens_used + ' tokens';
+            }
+            statusEl.innerHTML = '<span class="badge badge-primary">Done</span>' +
+                (meta ? '<span class="text-xs">' + meta + '</span>' : '');
+        }
+
+        const bodyEl = document.getElementById('step-body-' + stepNum);
+        if (bodyEl) {
+            let html = '';
+
+            // Collapsible prompt preview
+            if (data.prompt_preview) {
+                html += '<details class="mb-3">' +
+                    '<summary class="collapsible-trigger text-xs text-muted-foreground cursor-pointer">Prompt preview</summary>' +
+                    '<pre class="mt-2 text-xs p-3 rounded-lg" style="background: var(--color-muted);">' + escapeHtml(data.prompt_preview) + (data.prompt_preview.length >= 200 ? '...' : '') + '</pre>' +
+                    '</details>';
+            }
+
+            // Output
+            html += '<pre>' + escapeHtml(data.result) + '</pre>';
+            bodyEl.innerHTML = html;
+        }
+    }
+
+    function showEvalForm(stepNum) {
+        const bodyEl = document.getElementById('step-body-' + stepNum);
+        if (!bodyEl) return;
+
+        const evalHtml =
+            '<div class="eval-form mt-4 p-4 rounded-lg" style="background: var(--color-muted); border: 1px solid var(--color-border);">' +
+            '<label class="block text-sm font-medium mb-2">Rate this step (0\u2013100):</label>' +
+            '<div class="flex items-center gap-3">' +
+            '<input type="number" id="eval-score-' + stepNum + '" min="0" max="100" value="" placeholder="0\u2013100" class="input w-24 text-sm">' +
+            '<button class="btn btn-primary text-sm" onclick="submitEval(' + stepNum + ')">Submit &amp; Continue</button>' +
+            '</div>' +
+            '</div>';
+        bodyEl.insertAdjacentHTML('beforeend', evalHtml);
+
+        const input = document.getElementById('eval-score-' + stepNum);
+        if (input) input.focus();
+    }
+
+    function submitEval(stepNum) {
+        const input = document.getElementById('eval-score-' + stepNum);
+        const score = parseInt(input.value, 10);
+        if (isNaN(score) || score < 0 || score > 100) {
+            input.style.borderColor = '#ef4444';
+            return;
+        }
+
+        // Disable the form
+        input.disabled = true;
+        input.parentElement.querySelector('button').disabled = true;
+        input.parentElement.querySelector('button').textContent = 'Submitting...';
+
+        fetch('/api/kits/' + slug + '/evaluate-step', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                execution_id: currentExecutionId,
+                step: stepNum,
+                score: score,
+            }),
+        })
+            .then(function (resp) { return resp.json(); })
+            .then(function (data) {
+                if (data.ok) {
+                    // Replace eval form with score badge
+                    const evalForm = input.closest('.eval-form');
+                    evalForm.innerHTML = '<span class="text-sm text-muted-foreground">Evaluation: <strong>' + score + '</strong> / 100</span>';
+                } else {
+                    showBanner('error', 'Failed to submit evaluation: ' + (data.error || 'Unknown error'));
+                }
+            })
+            .catch(function (err) {
+                showBanner('error', 'Failed to submit evaluation: ' + err.message);
+            });
+    }
+
+    function markStepError(stepNum, error) {
+        const statusEl = document.getElementById('step-status-' + stepNum);
+        if (statusEl) {
+            statusEl.innerHTML = '<span class="badge" style="background: #fef2f2; color: #991b1b; border-color: #fecaca;">Error</span>';
+        }
+
+        const bodyEl = document.getElementById('step-body-' + stepNum);
+        if (bodyEl) {
+            bodyEl.innerHTML = '<p class="text-sm" style="color: #991b1b;">' + escapeHtml(error) + '</p>';
+        }
+    }
+
+    function escapeHtml(str) {
+        if (!str) return '';
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+    }
+
+    // Clean up on page unload
+    window.addEventListener('beforeunload', function () {
+        if (evtSource) {
+            evtSource.close();
+        }
+    });
+</script>
+{% endblock %}

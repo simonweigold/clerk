@@ -429,6 +429,8 @@ class KitVersionRepository:
         mime_type: str | None = None,
         extracted_text: str | None = None,
         file_size_bytes: int | None = None,
+        is_dynamic: bool = False,
+        display_name: str | None = None,
     ) -> Resource:
         """Add a resource to a version.
 
@@ -440,6 +442,8 @@ class KitVersionRepository:
             mime_type: MIME type of the file
             extracted_text: Extracted text content for search
             file_size_bytes: File size in bytes
+            is_dynamic: Whether the resource is user-supplied at execution time
+            display_name: Optional custom display name
 
         Returns:
             Created resource
@@ -452,6 +456,8 @@ class KitVersionRepository:
             mime_type=mime_type,
             extracted_text=extracted_text,
             file_size_bytes=file_size_bytes,
+            is_dynamic=is_dynamic,
+            display_name=display_name,
         )
         self.session.add(resource)
         await self.session.flush()
@@ -462,6 +468,7 @@ class KitVersionRepository:
         version_id: UUID,
         step_number: int,
         prompt_template: str,
+        display_name: str | None = None,
     ) -> WorkflowStep:
         """Add a workflow step to a version.
 
@@ -469,6 +476,7 @@ class KitVersionRepository:
             version_id: The version's UUID
             step_number: The step number (1, 2, 3, ...)
             prompt_template: The instruction prompt template
+            display_name: Optional custom display name
 
         Returns:
             Created workflow step
@@ -477,6 +485,7 @@ class KitVersionRepository:
             version_id=version_id,
             step_number=step_number,
             prompt_template=prompt_template,
+            display_name=display_name,
         )
         self.session.add(step)
         await self.session.flush()

@@ -432,6 +432,9 @@ async def run_reasoning_kit_async(
 ) -> dict[str, str]:
     """Async version of run_reasoning_kit for use in async contexts.
 
+    Executes each workflow step using async LLM calls (ainvoke) and
+    native async database operations, avoiding event loop blocking.
+
     Args:
         kit: The reasoning kit to execute
         evaluate: Whether to enable step-by-step evaluation
@@ -443,13 +446,73 @@ async def run_reasoning_kit_async(
     Returns:
         Dict of all outputs from the workflow
     """
-    # For now, delegate to sync version
-    # TODO: Implement fully async execution with async LLM calls
-    return run_reasoning_kit(
-        kit=kit,
-        evaluate=evaluate,
-        evaluation_mode=evaluation_mode,
-        save_to_db=save_to_db,
-        db_version_id=db_version_id,
-        model=model,
-    )
+    # Create database execution run if enabled
+    db_run_id: UUID | None = None
+    if save_to_db:
+        if db_version_id is None:
+            save_to_db = False
+        else:
+            try:
+                db_run_id = await create_execution_run(
+                    version_id=db_version_id,
+                    storage_mode=evaluation_mode,
+                )
+            except Exception:
+                save_to_db = False
+
+    resources = {r.resource_id: r.content for r in kit.resources.values()}
+    outputs: dict[str, str] = {}
+    llm = ChatOpenAI(model=model, temperature=0)
+    error_message: str | None = None
+
+    for step_key in sorted(kit.workflow.keys(), key=int):
+        step = kit.workflow[step_key]
+        step_num = int(step_key)
+
+        prompt = resolve_placeholders(step.prompt, resources, outputs)
+        start_time = time.time()
+
+        try:
+            response = await llm.ainvoke(prompt)
+            result = str(response.content)
+            latency_ms = int((time.time() - start_time) * 1000)
+
+            tokens_used = None
+            if hasattr(response, "response_metadata"):
+                metadata = response.response_metadata
+                if "token_usage" in metadata:
+                    tokens_used = metadata["token_usage"].get("total_tokens")
+
+            outputs[step.output_id] = result
+
+            # Save step to database
+            if save_to_db and db_run_id:
+                try:
+                    await save_step_to_db(
+                        run_id=db_run_id,
+                        step_number=step_num,
+                        prompt=prompt,
+                        output=result,
+                        mode=evaluation_mode,
+                        model_used=model,
+                        tokens_used=tokens_used,
+                        latency_ms=latency_ms,
+                    )
+                except Exception:
+                    pass
+
+        except Exception as e:
+            error_message = str(e)
+            break
+
+    # Complete database execution run
+    if save_to_db and db_run_id:
+        try:
+            await complete_execution_run(db_run_id, error=error_message)
+        except Exception:
+            pass
+
+    if error_message:
+        raise RuntimeError(error_message)
+
+    return outputs

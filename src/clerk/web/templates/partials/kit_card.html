@@ -1,0 +1,19 @@
+<a href="/kit/{{ kit.slug }}" class="card card-hoverable block p-6 hover:no-underline fade-in">
+    <h3 class="font-semibold text-foreground text-lg mb-1">{{ kit.name }}</h3>
+    {% if kit.description %}
+    <p class="text-muted-foreground line-clamp-2 mb-3">{{ kit.description }}</p>
+    {% else %}
+    <p class="text-muted-foreground mb-3 italic">No description</p>
+    {% endif %}
+    <div class="flex items-center gap-3">
+        {% if kit.is_public %}
+        <span class="badge">Public</span>
+        {% else %}
+        <span class="badge">Private</span>
+        {% endif %}
+        {% if kit.updated_at %}
+        <span class="text-xs text-muted-foreground">Updated {{ kit.updated_at.strftime('%b %d, %Y') if kit.updated_at
+            else '' }}</span>
+        {% endif %}
+    </div>
+</a>

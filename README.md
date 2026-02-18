@@ -33,6 +33,16 @@ Run a reasoning kit:
 uv run clerk run demo
 ```
 
+Run web app:
+(optional):
+```bash
+npx tailwindcss@3 -i src/clerk/web/static/css/tailwind.input.css -o src/clerk/web/static/css/tailwind.built.css --minify
+```
+Mandatory:
+```bash
+uv run clerk web
+```
+
 ### Programmatic Usage
 
 ```python

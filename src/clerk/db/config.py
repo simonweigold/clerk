@@ -124,7 +124,7 @@ def get_async_engine(direct: bool = False) -> AsyncEngine:
             _engine_direct = create_async_engine(
                 url,
                 echo=False,
-                pool_pre_ping=True,
+                pool_recycle=300,
                 connect_args=connect_args,
             )
         return _engine_direct
@@ -133,7 +133,7 @@ def get_async_engine(direct: bool = False) -> AsyncEngine:
             _engine = create_async_engine(
                 cast(str, config.database_url),
                 echo=False,
-                pool_pre_ping=True,
+                pool_recycle=300,
                 pool_size=5,
                 max_overflow=10,
                 connect_args=connect_args,

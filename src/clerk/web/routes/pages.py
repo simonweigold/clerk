@@ -412,6 +412,109 @@ async def kit_run_page(
 
 
 # =============================================================================
+# EXECUTION HISTORY
+# =============================================================================
+
+
+@router.get("/kit/{slug}/history", response_class=HTMLResponse)
+async def kit_history_page(
+    request: Request, slug: str, user: dict | None = Depends(get_optional_user)
+):
+    """Execution history page for a kit."""
+    from ...db.config import get_config
+
+    templates = _templates(request)
+
+    if not user:
+        _flash(request, "Sign in to view your execution history.", "info")
+        return RedirectResponse(f"/kit/{slug}", status_code=303)
+
+    config = get_config()
+    kit_data = None
+
+    if config.is_database_configured:
+        try:
+            from ...db import ReasoningKitRepository, get_async_session
+
+            async with get_async_session() as session:
+                repo = ReasoningKitRepository(session)
+                db_kit = await repo.get_by_slug(slug)
+                if db_kit:
+                    kit_data = {
+                        "slug": db_kit.slug,
+                        "name": db_kit.name,
+                    }
+        except Exception:
+            pass
+
+    if kit_data is None:
+        _flash(request, f"Kit '{slug}' not found.", "error")
+        return RedirectResponse("/", status_code=303)
+
+    return templates.TemplateResponse(
+        request,
+        "execution/history.html",
+        {
+            "kit": kit_data,
+            "user": user,
+            "active_page": "history",
+            "flash_messages": _get_flash(request),
+        },
+    )
+
+
+@router.get("/kit/{slug}/history/{run_id}", response_class=HTMLResponse)
+async def kit_execution_detail_page(
+    request: Request,
+    slug: str,
+    run_id: str,
+    user: dict | None = Depends(get_optional_user),
+):
+    """Read-only view of a past execution."""
+    from ...db.config import get_config
+
+    templates = _templates(request)
+
+    if not user:
+        _flash(request, "Sign in to view execution details.", "info")
+        return RedirectResponse(f"/kit/{slug}", status_code=303)
+
+    config = get_config()
+    kit_data = None
+
+    if config.is_database_configured:
+        try:
+            from ...db import ReasoningKitRepository, get_async_session
+
+            async with get_async_session() as session:
+                repo = ReasoningKitRepository(session)
+                db_kit = await repo.get_by_slug(slug)
+                if db_kit:
+                    kit_data = {
+                        "slug": db_kit.slug,
+                        "name": db_kit.name,
+                    }
+        except Exception:
+            pass
+
+    if kit_data is None:
+        _flash(request, f"Kit '{slug}' not found.", "error")
+        return RedirectResponse("/", status_code=303)
+
+    return templates.TemplateResponse(
+        request,
+        "execution/detail.html",
+        {
+            "kit": kit_data,
+            "run_id": run_id,
+            "user": user,
+            "active_page": "history",
+            "flash_messages": _get_flash(request),
+        },
+    )
+
+
+# =============================================================================
 # AUTH PAGES
 # =============================================================================
 

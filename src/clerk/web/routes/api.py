@@ -1002,6 +1002,7 @@ async def start_execution(
         "save_to_db": save_to_db,
         "eval_event": asyncio.Event() if evaluate else None,
         "eval_score": None,
+        "user_id": user["id"] if user else None,
     }
 
     return {"execution_id": execution_id}
@@ -1043,11 +1044,13 @@ async def execute_kit_stream(
 
         # Create DB run if needed
         db_run_id = None
+        user_id_str = exec_state.get("user_id")
         if persist and db_version_id:
             try:
                 db_run_id = await create_execution_run(
                     version_id=db_version_id,
                     storage_mode=evaluation_mode if evaluate else "transparent",
+                    user_id=UUID(user_id_str) if user_id_str else None,
                 )
             except Exception:
                 persist = False
@@ -1156,7 +1159,7 @@ async def execute_kit_stream(
             except Exception:
                 pass
 
-        yield f"event: done\ndata: {json.dumps({'status': 'completed', 'total_steps': len(kit.workflow)})}\n\n"
+        yield f"event: done\ndata: {json.dumps({'status': 'completed', 'total_steps': len(kit.workflow), 'run_id': str(db_run_id) if db_run_id else None})}\n\n"
         # Clean up
         _executions.pop(execution_id, None)
 
@@ -1210,6 +1213,353 @@ async def evaluate_step(
     eval_event.set()
 
     return {"ok": True}
+
+
+# =============================================================================
+# EXECUTION HISTORY & DOWNLOAD
+# =============================================================================
+
+
+@router.get("/kits/{slug}/executions")
+async def list_executions(
+    request: Request,
+    slug: str,
+    user: dict | None = Depends(get_optional_user),
+):
+    """List past execution runs for a kit (per-user).
+
+    Returns JSON array of execution runs.
+    """
+    if not user:
+        return {"error": "Sign in to view execution history.", "runs": []}
+
+    from ...db.config import get_config
+
+    config = get_config()
+    if not config.is_database_configured:
+        return {"runs": []}
+
+    try:
+        from ...db import (
+            ExecutionRepository,
+            ReasoningKitRepository,
+            get_async_session as _get_session,
+        )
+
+        async with _get_session() as session:
+            kit_repo = ReasoningKitRepository(session)
+            db_kit = await kit_repo.get_by_slug(slug)
+            if not db_kit:
+                return {"error": f"Kit '{slug}' not found.", "runs": []}
+
+            exec_repo = ExecutionRepository(session)
+            runs = await exec_repo.list_for_kit(
+                kit_id=db_kit.id,
+                user_id=UUID(user["id"]),
+            )
+
+            return {
+                "runs": [
+                    {
+                        "id": str(run.id),
+                        "status": run.status,
+                        "label": run.label,
+                        "started_at": run.started_at.isoformat() if run.started_at else None,
+                        "completed_at": run.completed_at.isoformat() if run.completed_at else None,
+                        "storage_mode": run.storage_mode,
+                        "total_steps": len(run.step_executions),
+                        "error_message": run.error_message,
+                    }
+                    for run in runs
+                ]
+            }
+    except Exception as e:
+        return {"error": str(e), "runs": []}
+
+
+@router.get("/kits/{slug}/executions/{run_id}")
+async def get_execution(
+    request: Request,
+    slug: str,
+    run_id: str,
+    user: dict | None = Depends(get_optional_user),
+):
+    """Get execution run detail with all step outputs."""
+    if not user:
+        return {"error": "Sign in to view execution details."}
+
+    from ...db.config import get_config
+
+    config = get_config()
+    if not config.is_database_configured:
+        return {"error": "Database not configured."}
+
+    try:
+        from ...db import ExecutionRepository, get_async_session as _get_session
+
+        async with _get_session() as session:
+            repo = ExecutionRepository(session)
+            run = await repo.get_by_id(UUID(run_id))
+
+            if not run:
+                return {"error": "Execution not found."}
+
+            # Per-user access check
+            if str(run.user_id) != user["id"]:
+                return {"error": "Access denied."}
+
+            # Build step data with version step info for display names
+            step_display_names = {}
+            if run.version and run.version.workflow_steps:
+                for ws in run.version.workflow_steps:
+                    step_display_names[ws.step_number] = {
+                        "display_name": ws.display_name,
+                        "output_id": ws.output_id,
+                    }
+
+            steps = []
+            for step in sorted(run.step_executions, key=lambda s: s.step_number):
+                ws_info = step_display_names.get(step.step_number, {})
+                steps.append(
+                    {
+                        "step_number": step.step_number,
+                        "display_name": ws_info.get("display_name"),
+                        "output_id": ws_info.get("output_id", f"workflow_{step.step_number}"),
+                        "input_text": step.input_text,
+                        "output_text": step.output_text,
+                        "evaluation_score": step.evaluation_score,
+                        "model_used": step.model_used,
+                        "tokens_used": step.tokens_used,
+                        "latency_ms": step.latency_ms,
+                        "executed_at": step.executed_at.isoformat() if step.executed_at else None,
+                    }
+                )
+
+            kit_name = None
+            if run.version and run.version.kit:
+                kit_name = run.version.kit.name
+
+            return {
+                "id": str(run.id),
+                "kit_name": kit_name,
+                "status": run.status,
+                "label": run.label,
+                "storage_mode": run.storage_mode,
+                "started_at": run.started_at.isoformat() if run.started_at else None,
+                "completed_at": run.completed_at.isoformat() if run.completed_at else None,
+                "error_message": run.error_message,
+                "steps": steps,
+            }
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@router.get("/kits/{slug}/executions/{run_id}/download")
+async def download_execution(
+    request: Request,
+    slug: str,
+    run_id: str,
+    format: str = "md",
+    user: dict | None = Depends(get_optional_user),
+):
+    """Download execution results as Markdown or JSON.
+
+    Query params:
+        format: "md" (default) or "json"
+    """
+    if not user:
+        return {"error": "Sign in to download results."}
+
+    from ...db.config import get_config
+
+    config = get_config()
+    if not config.is_database_configured:
+        return {"error": "Database not configured."}
+
+    try:
+        from ...db import ExecutionRepository, get_async_session as _get_session
+
+        async with _get_session() as session:
+            repo = ExecutionRepository(session)
+            run = await repo.get_by_id(UUID(run_id))
+
+            if not run:
+                return {"error": "Execution not found."}
+
+            if str(run.user_id) != user["id"]:
+                return {"error": "Access denied."}
+
+            # Get kit name
+            kit_name = slug
+            if run.version and run.version.kit:
+                kit_name = run.version.kit.name
+
+            # Build step display names
+            step_display_names = {}
+            if run.version and run.version.workflow_steps:
+                for ws in run.version.workflow_steps:
+                    step_display_names[ws.step_number] = {
+                        "display_name": ws.display_name,
+                        "output_id": ws.output_id,
+                    }
+
+            sorted_steps = sorted(run.step_executions, key=lambda s: s.step_number)
+
+            if format == "json":
+                content = _build_json_download(run, kit_name, sorted_steps, step_display_names)
+                media_type = "application/json"
+                ext = "json"
+            else:
+                content = _build_markdown_download(run, kit_name, sorted_steps, step_display_names)
+                media_type = "text/markdown"
+                ext = "md"
+
+            label_slug = run.label.replace(" ", "_").lower() if run.label else ""
+            ts = run.started_at.strftime("%Y%m%d_%H%M%S") if run.started_at else "unknown"
+            filename = f"{slug}_{ts}"
+            if label_slug:
+                filename += f"_{label_slug}"
+            filename += f".{ext}"
+
+            from starlette.responses import Response
+
+            return Response(
+                content=content,
+                media_type=media_type,
+                headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+            )
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@router.post("/kits/{slug}/executions/{run_id}/label")
+async def update_execution_label(
+    request: Request,
+    slug: str,
+    run_id: str,
+    user: dict | None = Depends(get_optional_user),
+):
+    """Update execution label.
+
+    Accepts JSON body: {"label": "My custom label"}
+    """
+    if not user:
+        return {"ok": False, "error": "Sign in required."}
+
+    try:
+        body = await request.json()
+    except Exception:
+        return {"ok": False, "error": "Invalid JSON body."}
+
+    label = body.get("label", "").strip() or None
+
+    from ...db.config import get_config
+
+    config = get_config()
+    if not config.is_database_configured:
+        return {"ok": False, "error": "Database not configured."}
+
+    try:
+        from ...db import ExecutionRepository, get_async_session as _get_session
+
+        async with _get_session() as session:
+            repo = ExecutionRepository(session)
+            run = await repo.get_by_id(UUID(run_id))
+
+            if not run:
+                return {"ok": False, "error": "Execution not found."}
+
+            if str(run.user_id) != user["id"]:
+                return {"ok": False, "error": "Access denied."}
+
+            await repo.update_label(UUID(run_id), label)
+            return {"ok": True, "label": label}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+def _build_markdown_download(run, kit_name, sorted_steps, step_display_names):
+    """Build a Markdown report for an execution run."""
+    lines = [f"# {kit_name} — Execution Results"]
+    if run.label:
+        lines.append(f"\n**Label:** {run.label}")
+    lines.append(f"\n**Status:** {run.status}")
+    if run.started_at:
+        lines.append(f"**Started:** {run.started_at.strftime('%Y-%m-%d %H:%M:%S UTC')}")
+    if run.completed_at:
+        lines.append(f"**Completed:** {run.completed_at.strftime('%Y-%m-%d %H:%M:%S UTC')}")
+    lines.append(f"**Storage Mode:** {run.storage_mode}")
+    lines.append("")
+
+    for step in sorted_steps:
+        ws_info = step_display_names.get(step.step_number, {})
+        display_name = ws_info.get("display_name")
+        output_id = ws_info.get("output_id", f"workflow_{step.step_number}")
+
+        header = f"## Step {step.step_number}"
+        if display_name:
+            header += f" — {display_name}"
+        header += f" ({output_id})"
+        lines.append(header)
+        lines.append("")
+
+        meta_parts = []
+        if step.model_used:
+            meta_parts.append(f"Model: {step.model_used}")
+        if step.latency_ms:
+            meta_parts.append(f"Latency: {step.latency_ms / 1000:.1f}s")
+        if step.tokens_used:
+            meta_parts.append(f"Tokens: {step.tokens_used}")
+        if step.evaluation_score is not None:
+            meta_parts.append(f"Evaluation: {step.evaluation_score}/100")
+        if meta_parts:
+            lines.append(f"*{' · '.join(meta_parts)}*")
+            lines.append("")
+
+        if step.output_text:
+            lines.append(step.output_text)
+        elif step.output_char_count is not None:
+            lines.append(f"*[Anonymous mode — {step.output_char_count} characters]*")
+        lines.append("")
+        lines.append("---")
+        lines.append("")
+
+    return "\n".join(lines)
+
+
+def _build_json_download(run, kit_name, sorted_steps, step_display_names):
+    """Build a JSON report for an execution run."""
+    data = {
+        "kit_name": kit_name,
+        "run_id": str(run.id),
+        "status": run.status,
+        "label": run.label,
+        "storage_mode": run.storage_mode,
+        "started_at": run.started_at.isoformat() if run.started_at else None,
+        "completed_at": run.completed_at.isoformat() if run.completed_at else None,
+        "steps": [],
+    }
+
+    for step in sorted_steps:
+        ws_info = step_display_names.get(step.step_number, {})
+        data["steps"].append(
+            {
+                "step_number": step.step_number,
+                "display_name": ws_info.get("display_name"),
+                "output_id": ws_info.get("output_id", f"workflow_{step.step_number}"),
+                "input_text": step.input_text,
+                "output_text": step.output_text,
+                "input_char_count": step.input_char_count,
+                "output_char_count": step.output_char_count,
+                "evaluation_score": step.evaluation_score,
+                "model_used": step.model_used,
+                "tokens_used": step.tokens_used,
+                "latency_ms": step.latency_ms,
+                "executed_at": step.executed_at.isoformat() if step.executed_at else None,
+            }
+        )
+
+    return json.dumps(data, indent=2, ensure_ascii=False)
 
 
 # =============================================================================

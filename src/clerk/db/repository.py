@@ -505,12 +505,20 @@ class ExecutionRepository:
             run_id: The run's UUID
 
         Returns:
-            Execution run with step executions loaded
+            Execution run with step executions and version loaded
         """
         stmt = (
             select(ExecutionRun)
             .where(ExecutionRun.id == run_id)
-            .options(selectinload(ExecutionRun.step_executions))
+            .options(
+                selectinload(ExecutionRun.step_executions),
+                selectinload(ExecutionRun.version).selectinload(
+                    KitVersion.kit
+                ),
+                selectinload(ExecutionRun.version).selectinload(
+                    KitVersion.workflow_steps
+                ),
+            )
         )
         result = await self.session.execute(stmt)
         return result.scalar_one_or_none()
@@ -529,6 +537,38 @@ class ExecutionRepository:
             .where(ExecutionRun.version_id == version_id)
             .order_by(ExecutionRun.started_at.desc())
         )
+        result = await self.session.execute(stmt)
+        return list(result.scalars().all())
+
+    async def list_for_kit(
+        self,
+        kit_id: UUID,
+        user_id: UUID | None = None,
+        limit: int = 100,
+    ) -> list[ExecutionRun]:
+        """List execution runs for a kit (across all versions).
+
+        Args:
+            kit_id: The kit's UUID
+            user_id: If provided, only return runs by this user
+            limit: Maximum number of runs to return
+
+        Returns:
+            List of execution runs ordered by start time descending
+        """
+        stmt = (
+            select(ExecutionRun)
+            .join(KitVersion, ExecutionRun.version_id == KitVersion.id)
+            .where(KitVersion.kit_id == kit_id)
+            .options(
+                selectinload(ExecutionRun.step_executions),
+                selectinload(ExecutionRun.version),
+            )
+            .order_by(ExecutionRun.started_at.desc())
+            .limit(limit)
+        )
+        if user_id is not None:
+            stmt = stmt.where(ExecutionRun.user_id == user_id)
         result = await self.session.execute(stmt)
         return list(result.scalars().all())
 
@@ -648,6 +688,28 @@ class ExecutionRepository:
         await self.session.flush()
         return run
 
+    async def update_label(
+        self,
+        run_id: UUID,
+        label: str | None,
+    ) -> ExecutionRun | None:
+        """Update the label for an execution run.
+
+        Args:
+            run_id: The run's UUID
+            label: New label (None to clear)
+
+        Returns:
+            Updated run or None if not found
+        """
+        run = await self.get_by_id(run_id)
+        if run is None:
+            return None
+
+        run.label = label
+        await self.session.flush()
+        return run
+
     async def update_step_evaluation(
         self,
         run_id: UUID,
@@ -678,3 +740,4 @@ class ExecutionRepository:
         step.evaluation_score = evaluation_score
         await self.session.flush()
         return step
+

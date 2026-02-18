@@ -275,6 +275,7 @@ class ExecutionRun(Base):
     )
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     error_message: Mapped[str | None] = mapped_column(Text)
+    label: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
     # Relationships
     version: Mapped["KitVersion"] = relationship(

@@ -6,56 +6,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}CLERK{% endblock %}</title>
 
-    <!-- Google Fonts — Inter + Bodoni Moda SC -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link
-        href="https://fonts.googleapis.com/css2?family=Bodoni+Moda+SC:ital,opsz,wght@0,6..96,400..900;1,6..96,400..900&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap"
-        rel="stylesheet">
+    <!-- Fonts (self-hosted) -->
+    <link rel="stylesheet" href="/static/css/fonts.css">
 
-    <!-- Tailwind CSS (CDN) -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    fontFamily: {
-                        sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
-                        logo: ['Bodoni Moda SC', 'serif'],
-                    },
-                    colors: {
-                        primary: {
-                            DEFAULT: '#130DDD',
-                            foreground: '#ffffff',
-                        },
-                        foreground: '#111418',
-                        muted: {
-                            DEFAULT: '#f4f6f9',
-                            foreground: '#6b7280',
-                        },
-                        border: 'rgba(0,0,0,0.1)',
-                        destructive: {
-                            DEFAULT: '#ef4444',
-                            foreground: '#ffffff',
-                        },
-                    },
-                    borderRadius: {
-                        sm: '0.375rem',
-                        md: '0.625rem',
-                        lg: '0.75rem',
-                        xl: '1rem',
-                        '2xl': '1.25rem',
-                    },
-                }
-            }
-        }
-    </script>
+    <!-- Tailwind CSS (pre-built) -->
+    <link rel="stylesheet" href="/static/css/tailwind.built.css">
 
-    <!-- HTMX -->
-    <script src="https://unpkg.com/htmx.org@2.0.4"
-        integrity="sha384-HGfztofotfshcF7+8n44JQL2oJmowVChPTg48S+jvZoztPfvwD79OC/LTtG6dMp+"
-        crossorigin="anonymous"></script>
-    <script src="https://unpkg.com/htmx-ext-sse@2.2.2/sse.js"></script>
+    <!-- HTMX (self-hosted) -->
+    <script src="/static/js/htmx.min.js"></script>
+    <script src="/static/js/sse.js"></script>
 
     <!-- Custom styles -->
     <link rel="stylesheet" href="/static/css/style.css">
@@ -101,23 +60,23 @@
         {% endfor %}
     </div>
     <script>
-            (function () {
-                var flashes = document.querySelectorAll('#flash-container .flash');
+        (function () {
+            var flashes = document.querySelectorAll('#flash-container .flash');
+            setTimeout(function () {
+                flashes.forEach(function (el) {
+                    el.classList.add('flash-dismiss');
+                });
                 setTimeout(function () {
                     flashes.forEach(function (el) {
-                        el.classList.add('flash-dismiss');
+                        el.classList.add('flash-collapse');
                     });
                     setTimeout(function () {
-                        flashes.forEach(function (el) {
-                            el.classList.add('flash-collapse');
-                        });
-                        setTimeout(function () {
-                            var c = document.getElementById('flash-container');
-                            if (c) c.remove();
-                        }, 350);
-                    }, 450);
-                }, 3000);
-            })();
+                        var c = document.getElementById('flash-container');
+                        if (c) c.remove();
+                    }, 350);
+                }, 450);
+            }, 3000);
+        })();
     </script>
     {% endif %}
 

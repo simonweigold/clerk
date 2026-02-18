@@ -1,0 +1,345 @@
+{% extends "base.html" %}
+
+{% block title %}Execution Detail — {{ kit.name }} — CLERK{% endblock %}
+
+{% block content %}
+<div class="fade-in">
+    <!-- Breadcrumb -->
+    <nav class="text-sm text-muted-foreground mb-6">
+        <a href="/" class="hover:text-foreground transition-colors">Kits</a>
+        <span class="mx-2">/</span>
+        <a href="/kit/{{ kit.slug }}" class="hover:text-foreground transition-colors">{{ kit.name }}</a>
+        <span class="mx-2">/</span>
+        <a href="/kit/{{ kit.slug }}/history" class="hover:text-foreground transition-colors">History</a>
+        <span class="mx-2">/</span>
+        <span class="text-foreground">Detail</span>
+    </nav>
+
+    <!-- Header (populated by JS) -->
+    <div class="flex items-center justify-between mb-8">
+        <div>
+            <div style="display: flex; align-items: center; gap: 0.75rem;">
+                <h1 id="exec-title" class="text-3xl font-bold tracking-tight">Execution Detail</h1>
+                <span id="exec-status-badge"></span>
+            </div>
+            <p id="exec-subtitle" class="text-muted-foreground mt-1"></p>
+        </div>
+        <div class="flex items-center gap-3">
+            <div class="dropdown" style="position: relative; display: inline-block;">
+                <button id="download-btn" class="btn btn-secondary btn-sm" onclick="toggleDownloadMenu()"
+                    style="display: none;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="7 10 12 15 17 10"></polyline>
+                        <line x1="12" y1="15" x2="12" y2="3"></line>
+                    </svg>
+                    Download
+                </button>
+                <div id="download-menu"
+                    style="display: none; position: absolute; right: 0; top: 100%; margin-top: 0.375rem; background: var(--color-card); border: 1px solid var(--color-border); border-radius: var(--radius-md); box-shadow: var(--shadow-lg); z-index: 10; min-width: 160px; overflow: hidden;">
+                    <a id="download-md" href="#" class="block"
+                        style="padding: 0.625rem 1rem; font-size: 0.875rem; text-decoration: none; color: var(--color-foreground); transition: background 0.15s ease;">Markdown
+                        (.md)</a>
+                    <a id="download-json" href="#" class="block"
+                        style="padding: 0.625rem 1rem; font-size: 0.875rem; text-decoration: none; color: var(--color-foreground); border-top: 1px solid var(--color-border); transition: background 0.15s ease;">JSON
+                        (.json)</a>
+                </div>
+            </div>
+            <a href="/kit/{{ kit.slug }}/history" class="btn btn-secondary">Back to History</a>
+        </div>
+    </div>
+
+    <!-- Label editor -->
+    <div id="label-section" class="mb-6" style="display: none;">
+        <div style="display: flex; align-items: center; gap: 0.75rem;">
+            <span id="label-display" class="text-sm text-muted-foreground" style="cursor: pointer;"
+                onclick="startEditLabel()" title="Click to edit label"></span>
+            <button id="label-edit-btn" class="btn btn-ghost btn-sm" onclick="startEditLabel()"
+                style="padding: 0.25rem 0.5rem;">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                </svg>
+            </button>
+        </div>
+        <div id="label-editor" style="display: none;">
+            <div style="display: flex; align-items: center; gap: 0.5rem; margin-top: 0.375rem;">
+                <input id="label-input" type="text" class="input" style="max-width: 320px; font-size: 0.875rem;"
+                    placeholder="Add a label..." maxlength="255">
+                <button class="btn btn-primary btn-sm" onclick="saveLabel()">Save</button>
+                <button class="btn btn-ghost btn-sm" onclick="cancelEditLabel()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Execution metadata -->
+    <div id="exec-meta" class="card mb-8" style="display: none;">
+        <div class="card-body" style="padding: 1rem 1.25rem;">
+            <div id="meta-grid"
+                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 1rem;"></div>
+        </div>
+    </div>
+
+    <!-- Loading state -->
+    <div id="loading-state" class="empty-state">
+        <div style="display: flex; align-items: center; justify-content: center; gap: 0.5rem;">
+            <span class="pulse-dot"></span>
+            <span class="pulse-dot"></span>
+            <span class="pulse-dot"></span>
+        </div>
+        <p class="text-sm mt-3">Loading execution...</p>
+    </div>
+
+    <!-- Error state -->
+    <div id="error-state" class="flash flash-error mb-6" style="display: none;"></div>
+
+    <!-- Step outputs -->
+    <div id="step-stream" class="stream-container" style="display: none;"></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const slug = '{{ kit.slug }}';
+    const runId = '{{ run_id }}';
+    let currentLabel = null;
+
+    document.addEventListener('DOMContentLoaded', loadExecution);
+
+    // Close download menu on outside click
+    document.addEventListener('click', function (e) {
+        const menu = document.getElementById('download-menu');
+        const btn = document.getElementById('download-btn');
+        if (menu && btn && !menu.contains(e.target) && !btn.contains(e.target)) {
+            menu.style.display = 'none';
+        }
+    });
+
+    function loadExecution() {
+        fetch('/api/kits/' + slug + '/executions/' + runId)
+            .then(function (resp) { return resp.json(); })
+            .then(function (data) {
+                document.getElementById('loading-state').style.display = 'none';
+
+                if (data.error) {
+                    const errEl = document.getElementById('error-state');
+                    errEl.textContent = data.error;
+                    errEl.style.display = 'block';
+                    return;
+                }
+
+                renderExecution(data);
+            })
+            .catch(function (err) {
+                document.getElementById('loading-state').style.display = 'none';
+                const errEl = document.getElementById('error-state');
+                errEl.textContent = 'Failed to load execution: ' + err.message;
+                errEl.style.display = 'block';
+            });
+    }
+
+    function renderExecution(data) {
+        // Title and status
+        const kitName = data.kit_name || slug;
+        const startDate = data.started_at ? new Date(data.started_at) : null;
+        const dateStr = startDate ? formatDate(startDate) + ' at ' + formatTime(startDate) : 'Unknown date';
+
+        currentLabel = data.label;
+        document.getElementById('exec-title').textContent = data.label || kitName;
+        document.getElementById('exec-subtitle').textContent = dateStr;
+        document.getElementById('exec-status-badge').innerHTML = getStatusBadge(data.status);
+
+        // Label section
+        const labelSection = document.getElementById('label-section');
+        labelSection.style.display = 'block';
+        updateLabelDisplay();
+
+        // Download links
+        document.getElementById('download-btn').style.display = 'inline-flex';
+        document.getElementById('download-md').href = '/api/kits/' + slug + '/executions/' + runId + '/download?format=md';
+        document.getElementById('download-json').href = '/api/kits/' + slug + '/executions/' + runId + '/download?format=json';
+
+        // Metadata grid
+        const metaGrid = document.getElementById('meta-grid');
+        document.getElementById('exec-meta').style.display = 'block';
+
+        let metaItems = [];
+        metaItems.push({ label: 'Status', value: data.status.charAt(0).toUpperCase() + data.status.slice(1) });
+        metaItems.push({ label: 'Steps', value: data.steps.length.toString() });
+        metaItems.push({ label: 'Storage', value: data.storage_mode });
+
+        if (data.started_at && data.completed_at) {
+            const duration = Math.round((new Date(data.completed_at) - new Date(data.started_at)) / 1000);
+            let durationStr = duration < 60 ? duration + 's' : Math.floor(duration / 60) + 'm ' + (duration % 60) + 's';
+            metaItems.push({ label: 'Duration', value: durationStr });
+        }
+
+        // Total tokens
+        let totalTokens = 0;
+        data.steps.forEach(function (s) { if (s.tokens_used) totalTokens += s.tokens_used; });
+        if (totalTokens > 0) {
+            metaItems.push({ label: 'Total Tokens', value: totalTokens.toLocaleString() });
+        }
+
+        // Model (from first step)
+        if (data.steps.length > 0 && data.steps[0].model_used) {
+            metaItems.push({ label: 'Model', value: data.steps[0].model_used });
+        }
+
+        metaGrid.innerHTML = metaItems.map(function (item) {
+            return '<div>' +
+                '<div class="text-xs text-muted-foreground" style="margin-bottom: 0.25rem;">' + item.label + '</div>' +
+                '<div class="font-medium" style="font-size: 0.9375rem;">' + escapeHtml(item.value) + '</div>' +
+                '</div>';
+        }).join('');
+
+        // Error message
+        if (data.error_message) {
+            metaGrid.innerHTML += '<div style="grid-column: 1 / -1;">' +
+                '<div class="text-xs text-muted-foreground" style="margin-bottom: 0.25rem;">Error</div>' +
+                '<div style="color: #991b1b; font-size: 0.875rem;">' + escapeHtml(data.error_message) + '</div>' +
+                '</div>';
+        }
+
+        // Step outputs
+        const container = document.getElementById('step-stream');
+        container.style.display = 'flex';
+        container.innerHTML = '';
+
+        data.steps.forEach(function (step, idx) {
+            const card = document.createElement('div');
+            card.className = 'step-card fade-in';
+            card.style.animationDelay = (idx * 0.04) + 's';
+
+            const headerLabel = step.display_name
+                ? 'Step ' + step.step_number + ' \u2014 ' + escapeHtml(step.display_name) + ' <span class="text-xs text-muted-foreground">(' + escapeHtml(step.output_id) + ')</span>'
+                : 'Step ' + step.step_number + ' \u2014 ' + escapeHtml(step.output_id);
+
+            let statusHtml = '<span class="badge badge-primary">Done</span>';
+            let metaStr = '';
+            if (step.latency_ms) {
+                metaStr += (step.latency_ms / 1000).toFixed(1) + 's';
+            }
+            if (step.tokens_used) {
+                metaStr += (metaStr ? ' \u00b7 ' : '') + step.tokens_used + ' tokens';
+            }
+            if (step.evaluation_score !== null && step.evaluation_score !== undefined) {
+                metaStr += (metaStr ? ' \u00b7 ' : '') + 'Eval: ' + step.evaluation_score + '/100';
+            }
+            if (metaStr) {
+                statusHtml += '<span class="text-xs text-muted-foreground">' + metaStr + '</span>';
+            }
+
+            let bodyHtml = '';
+
+            // Collapsible prompt
+            if (step.input_text) {
+                bodyHtml += '<details class="mb-3">' +
+                    '<summary class="collapsible-trigger text-xs text-muted-foreground cursor-pointer">Prompt</summary>' +
+                    '<pre class="mt-2 text-xs p-3 rounded-lg" style="background: var(--color-muted); white-space: pre-wrap; word-break: break-word;">' + escapeHtml(step.input_text) + '</pre>' +
+                    '</details>';
+            }
+
+            // Output
+            if (step.output_text) {
+                bodyHtml += '<pre style="white-space: pre-wrap; word-break: break-word;">' + escapeHtml(step.output_text) + '</pre>';
+            } else if (step.output_char_count !== null && step.output_char_count !== undefined) {
+                bodyHtml += '<p class="text-sm text-muted-foreground"><em>Anonymous mode — ' + step.output_char_count + ' characters</em></p>';
+            }
+
+            card.innerHTML =
+                '<div class="step-card-header flex items-center justify-between">' +
+                '<span>' + headerLabel + '</span>' +
+                '<span style="display: flex; align-items: center; gap: 0.5rem;">' + statusHtml + '</span>' +
+                '</div>' +
+                '<div class="step-card-body">' + bodyHtml + '</div>';
+
+            container.appendChild(card);
+        });
+    }
+
+    function toggleDownloadMenu() {
+        const menu = document.getElementById('download-menu');
+        menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+    }
+
+    function updateLabelDisplay() {
+        const display = document.getElementById('label-display');
+        if (currentLabel) {
+            display.innerHTML = '<strong>Label:</strong> ' + escapeHtml(currentLabel);
+        } else {
+            display.innerHTML = '<em>No label — click to add one</em>';
+        }
+    }
+
+    function startEditLabel() {
+        document.getElementById('label-display').style.display = 'none';
+        document.getElementById('label-edit-btn').style.display = 'none';
+        const editor = document.getElementById('label-editor');
+        editor.style.display = 'block';
+        const input = document.getElementById('label-input');
+        input.value = currentLabel || '';
+        input.focus();
+    }
+
+    function cancelEditLabel() {
+        document.getElementById('label-editor').style.display = 'none';
+        document.getElementById('label-display').style.display = 'inline';
+        document.getElementById('label-edit-btn').style.display = 'inline-flex';
+    }
+
+    function saveLabel() {
+        const input = document.getElementById('label-input');
+        const newLabel = input.value.trim();
+
+        fetch('/api/kits/' + slug + '/executions/' + runId + '/label', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ label: newLabel }),
+        })
+            .then(function (resp) { return resp.json(); })
+            .then(function (data) {
+                if (data.ok) {
+                    currentLabel = data.label;
+                    updateLabelDisplay();
+                    // Update title if label changed
+                    if (currentLabel) {
+                        document.getElementById('exec-title').textContent = currentLabel;
+                    }
+                }
+                cancelEditLabel();
+            })
+            .catch(function () {
+                cancelEditLabel();
+            });
+    }
+
+    function getStatusBadge(status) {
+        if (status === 'completed') {
+            return '<span class="badge" style="background: #f0fdf4; color: #166534; border-color: #bbf7d0;">Completed</span>';
+        } else if (status === 'failed') {
+            return '<span class="badge" style="background: #fef2f2; color: #991b1b; border-color: #fecaca;">Failed</span>';
+        } else {
+            return '<span class="badge" style="background: #eff6ff; color: #1e40af; border-color: #bfdbfe;">Running</span>';
+        }
+    }
+
+    function formatDate(d) {
+        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        return months[d.getMonth()] + ' ' + d.getDate() + ', ' + d.getFullYear();
+    }
+
+    function formatTime(d) {
+        return d.getHours().toString().padStart(2, '0') + ':' + d.getMinutes().toString().padStart(2, '0');
+    }
+
+    function escapeHtml(str) {
+        if (!str) return '';
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+    }
+</script>
+{% endblock %}

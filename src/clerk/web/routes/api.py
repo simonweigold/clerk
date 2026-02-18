@@ -224,7 +224,8 @@ async def delete_kit(
 async def add_resource(
     request: Request,
     slug: str,
-    file: UploadFile = File(...),
+    file: UploadFile | None = File(None),
+    text_content: str = Form(""),
     is_dynamic: str = Form(""),
     display_name: str = Form(""),
     user: dict | None = Depends(get_optional_user),
@@ -248,9 +249,21 @@ async def add_resource(
                 get_async_session,
             )
 
-            file_content = await file.read()
-            filename = file.filename or "resource.txt"
-            mime_type = detect_mime_type_from_filename(filename)
+            # Determine source: uploaded file or pasted text
+            if text_content.strip():
+                # Text input path
+                file_content = text_content.encode("utf-8")
+                safe_name = (display_name.strip() or "resource").replace(" ", "_")
+                filename = f"{safe_name}.txt"
+                mime_type = "text/plain"
+            elif file and file.filename:
+                # File upload path
+                file_content = await file.read()
+                filename = file.filename
+                mime_type = detect_mime_type_from_filename(filename)
+            else:
+                _flash(request, "Please upload a file or paste text content.", "error")
+                return RedirectResponse(f"/kit/{slug}", status_code=303)
 
             async with get_async_session() as session:
                 kit_repo = ReasoningKitRepository(session)
@@ -356,10 +369,19 @@ async def add_resource(
                     numbers.append(int(match.group(1)))
             next_num = max(numbers, default=0) + 1
 
-            filename = file.filename or "resource.txt"
-            ext = Path(filename).suffix or ".txt"
+            if text_content.strip():
+                ext = ".txt"
+                content = text_content.encode("utf-8")
+                filename = f"resource_{next_num}.txt"
+            elif file and file.filename:
+                filename = file.filename
+                ext = Path(filename).suffix or ".txt"
+                content = await file.read()
+            else:
+                _flash(request, "Please upload a file or paste text content.", "error")
+                return RedirectResponse(f"/kit/{slug}", status_code=303)
+
             dest = kit_path / f"resource_{next_num}{ext}"
-            content = await file.read()
             dest.write_bytes(content)
 
             _flash(
@@ -462,6 +484,7 @@ async def update_resource(
     number: int,
     display_name: str = Form(""),
     is_dynamic: str = Form(""),
+    text_content: str = Form(""),
     file: UploadFile | None = File(None),
     user: dict | None = Depends(get_optional_user),
 ):
@@ -484,10 +507,14 @@ async def update_resource(
                 get_async_session,
             )
 
-            # Read file content if a new file was uploaded
+            # Determine new content source: pasted text or uploaded file
             new_file_content = None
             new_filename = None
-            if file and file.filename:
+            if text_content.strip():
+                new_file_content = text_content.encode("utf-8")
+                safe_name = (display_name.strip() or f"resource_{number}").replace(" ", "_")
+                new_filename = f"{safe_name}.txt"
+            elif file and file.filename:
                 new_file_content = await file.read()
                 new_filename = file.filename
 

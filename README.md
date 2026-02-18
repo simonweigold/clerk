@@ -153,17 +153,14 @@ CLERK can be connected to other LLMs via MCP. The LLM can create new Reasoning K
 
 
 
-- previewing resources doesnt work --> please fix
-
-- allow resources to be a website
+- I3 allow resources to be a website
 
 - add option to reset password for supabase when signing in
 - when user with mail address already exists in supabase tell the user
 
 - allow resizing of text input fields when editing workflow steps
-- allow resources to be input directly as txt
 
-- when executing a kit, allow user to edit an output (incase it is referenced in future steps)
+- when executing a kit, allow user to edit an output (important in case it is referenced in future steps)
 - when executing a kit, add option to view entire prompt
 
 - save workflow executions to db and allow user to access them again even after quitting

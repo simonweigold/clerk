@@ -336,16 +336,22 @@ textarea.input {
 }
 
 .step-card-body {
-    padding: 1.25rem;
+    padding: 0.75rem 1.25rem 1.25rem;
 }
 
-.step-card-body pre {
+/* ── Content preview (resources & workflow steps) ── */
+.content-preview {
+    border-left: 3px solid rgba(19, 13, 221, 0.25);
+    padding: 0.75rem 1rem;
+    font-family: 'Inter', system-ui, monospace;
+    font-size: 0.875rem;
+    line-height: 1.7;
+    color: var(--color-foreground);
     white-space: pre-wrap;
     word-break: break-word;
-    font-family: 'Inter', system-ui, sans-serif;
-    font-size: 0.9375rem;
-    line-height: 1.7;
-    margin: 0;
+    overflow-y: auto;
+    border-radius: 0 var(--radius-md) var(--radius-md) 0;
+    background: rgba(19, 13, 221, 0.02);
 }
 
 /* ── Loading pulse ── */

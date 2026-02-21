@@ -234,17 +234,24 @@
 
             let bodyHtml = '';
 
-            // Collapsible prompt
+            // Collapsible prompt (chevron toggle)
             if (step.input_text) {
-                bodyHtml += '<details class="mb-3">' +
-                    '<summary class="collapsible-trigger text-xs text-muted-foreground cursor-pointer">Prompt</summary>' +
-                    '<pre class="mt-2 text-xs p-3 rounded-lg" style="background: var(--color-muted); white-space: pre-wrap; word-break: break-word;">' + escapeHtml(step.input_text) + '</pre>' +
-                    '</details>';
+                bodyHtml += '<div class="mb-3">' +
+                    '<button class="btn btn-ghost btn-sm p-1" style="display: inline-flex; align-items: center; gap: 0.375rem;" onclick="togglePromptPreview(this)" aria-expanded="false">' +
+                    '<svg class="prompt-chevron w-4 h-4 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
+                    '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>' +
+                    '</svg>' +
+                    '<span class="text-xs text-muted-foreground">Prompt</span>' +
+                    '</button>' +
+                    '<div class="prompt-preview-content" style="display: none; margin-top: 0.5rem;">' +
+                    '<div class="content-preview text-xs" style="max-height: 24rem; overflow-y: auto;">' + escapeHtml(step.input_text) + '</div>' +
+                    '</div>' +
+                    '</div>';
             }
 
             // Output
             if (step.output_text) {
-                bodyHtml += '<pre style="white-space: pre-wrap; word-break: break-word;">' + escapeHtml(step.output_text) + '</pre>';
+                bodyHtml += '<div class="content-preview">' + escapeHtml(step.output_text) + '</div>';
             } else if (step.output_char_count !== null && step.output_char_count !== undefined) {
                 bodyHtml += '<p class="text-sm text-muted-foreground"><em>Anonymous mode — ' + step.output_char_count + ' characters</em></p>';
             }
@@ -333,6 +340,23 @@
 
     function formatTime(d) {
         return d.getHours().toString().padStart(2, '0') + ':' + d.getMinutes().toString().padStart(2, '0');
+    }
+
+    function togglePromptPreview(btn) {
+        const wrapper = btn.closest('.mb-3');
+        const content = wrapper.querySelector('.prompt-preview-content');
+        const chevron = btn.querySelector('.prompt-chevron');
+        const expanded = btn.getAttribute('aria-expanded') === 'true';
+
+        if (expanded) {
+            content.style.display = 'none';
+            chevron.style.transform = 'rotate(0deg)';
+            btn.setAttribute('aria-expanded', 'false');
+        } else {
+            content.style.display = 'block';
+            chevron.style.transform = 'rotate(90deg)';
+            btn.setAttribute('aria-expanded', 'true');
+        }
     }
 
     function escapeHtml(str) {

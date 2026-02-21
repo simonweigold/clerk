@@ -344,16 +344,24 @@
         if (bodyEl) {
             let html = '';
 
-            // Collapsible prompt preview
+            // Collapsible prompt preview (chevron toggle)
             if (data.prompt_preview) {
-                html += '<details class="mb-3">' +
-                    '<summary class="collapsible-trigger text-xs text-muted-foreground cursor-pointer">Prompt preview</summary>' +
-                    '<pre class="mt-2 text-xs p-3 rounded-lg" style="background: var(--color-muted);">' + escapeHtml(data.prompt_preview) + (data.prompt_preview.length >= 200 ? '...' : '') + '</pre>' +
-                    '</details>';
+                const promptId = 'prompt-preview-' + stepNum;
+                html += '<div class="mb-3">' +
+                    '<button class="btn btn-ghost btn-sm p-1" style="display: inline-flex; align-items: center; gap: 0.375rem;" onclick="togglePromptPreview(this)" aria-expanded="false">' +
+                    '<svg class="prompt-chevron w-4 h-4 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
+                    '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>' +
+                    '</svg>' +
+                    '<span class="text-xs text-muted-foreground">Prompt preview</span>' +
+                    '</button>' +
+                    '<div class="prompt-preview-content" style="display: none; margin-top: 0.5rem;">' +
+                    '<div class="content-preview text-xs" style="max-height: 24rem; overflow-y: auto;">' + escapeHtml(data.prompt_preview) + '</div>' +
+                    '</div>' +
+                    '</div>';
             }
 
             // Output
-            html += '<pre>' + escapeHtml(data.result) + '</pre>';
+            html += '<div class="content-preview">' + escapeHtml(data.result) + '</div>';
             bodyEl.innerHTML = html;
         }
     }
@@ -422,6 +430,23 @@
         const bodyEl = document.getElementById('step-body-' + stepNum);
         if (bodyEl) {
             bodyEl.innerHTML = '<p class="text-sm" style="color: #991b1b;">' + escapeHtml(error) + '</p>';
+        }
+    }
+
+    function togglePromptPreview(btn) {
+        const wrapper = btn.closest('.mb-3');
+        const content = wrapper.querySelector('.prompt-preview-content');
+        const chevron = btn.querySelector('.prompt-chevron');
+        const expanded = btn.getAttribute('aria-expanded') === 'true';
+
+        if (expanded) {
+            content.style.display = 'none';
+            chevron.style.transform = 'rotate(0deg)';
+            btn.setAttribute('aria-expanded', 'false');
+        } else {
+            content.style.display = 'block';
+            chevron.style.transform = 'rotate(90deg)';
+            btn.setAttribute('aria-expanded', 'true');
         }
     }
 

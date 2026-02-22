@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { getKit, deleteKit, addResource, deleteResource, updateResource, addStep, deleteStep, updateStep, type KitDetail, type Resource, type Step } from '../lib/api';
+import { getKit, deleteKit, updateKit, addResource, deleteResource, updateResource, addStep, deleteStep, updateStep, type KitDetail, type Resource, type Step } from '../lib/api';
 import { useAuth } from '../hooks/useAuth';
 import { useToast } from '../hooks/useToast';
 import { PromptTextarea } from '../components/PromptTextarea';
@@ -378,6 +378,26 @@ export default function KitDetailPage() {
     const { addToast } = useToast();
     const navigate = useNavigate();
 
+    const [editingKit, setEditingKit] = useState<'name' | 'description' | null>(null);
+    const [editName, setEditName] = useState('');
+    const [editDescription, setEditDescription] = useState('');
+    const [savingKit, setSavingKit] = useState(false);
+
+    const handleSaveKitDetails = async () => {
+        if (!slug || !kit) return;
+        setSavingKit(true);
+        try {
+            await updateKit(slug, editName, editDescription);
+            addToast('success', 'Kit details updated.');
+            setEditingKit(null);
+            fetchKit();
+        } catch (err) {
+            addToast('error', err instanceof Error ? err.message : 'Update failed.');
+        } finally {
+            setSavingKit(false);
+        }
+    };
+
     const fetchKit = async () => {
         if (!slug) return;
         try {
@@ -439,10 +459,54 @@ export default function KitDetailPage() {
             {/* Header */}
             <div className="flex items-start justify-between mb-8">
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight mb-2">{kit.kit.name}</h1>
-                    {kit.kit.description && (
-                        <p className="text-muted-foreground max-w-xl">{kit.kit.description}</p>
-                    )}
+                    <div className="flex items-center gap-2 mb-2 group min-h-[40px]">
+                        {editingKit === 'name' ? (
+                            <div className="flex items-center gap-2">
+                                <input type="text" className="input text-3xl font-bold tracking-tight py-1 h-auto" value={editName} onChange={(e) => setEditName(e.target.value)} autoFocus />
+                                <button onClick={handleSaveKitDetails} className="btn btn-primary btn-sm" disabled={savingKit}>Save</button>
+                                <button onClick={() => setEditingKit(null)} className="btn btn-ghost btn-sm">Cancel</button>
+                            </div>
+                        ) : (
+                            <>
+                                <h1 className="text-3xl font-bold tracking-tight">{kit.kit.name}</h1>
+                                {kit.is_owner && (
+                                    <button onClick={() => { setEditingKit('name'); setEditName(kit.kit.name); setEditDescription(kit.kit.description || ''); }} className="btn btn-ghost btn-sm opacity-0 group-hover:opacity-100 transition-opacity p-1" title="Edit Title">
+                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                            <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
+                                        </svg>
+                                    </button>
+                                )}
+                            </>
+                        )}
+                    </div>
+
+                    <div className="group flex items-start gap-2 mb-3 min-h-[24px]">
+                        {editingKit === 'description' ? (
+                            <div className="flex-1 space-y-2">
+                                <textarea className="input" rows={3} value={editDescription} onChange={(e) => setEditDescription(e.target.value)} autoFocus />
+                                <div className="flex gap-2">
+                                    <button onClick={handleSaveKitDetails} className="btn btn-primary btn-sm" disabled={savingKit}>Save</button>
+                                    <button onClick={() => setEditingKit(null)} className="btn btn-ghost btn-sm">Cancel</button>
+                                </div>
+                            </div>
+                        ) : (
+                            <>
+                                {(kit.kit.description || kit.is_owner) && (
+                                    <p className={`text-muted-foreground max-w-xl ${!kit.kit.description ? 'italic opacity-50' : ''}`}>
+                                        {kit.kit.description || 'No description provided.'}
+                                    </p>
+                                )}
+                                {kit.is_owner && (
+                                    <button onClick={() => { setEditingKit('description'); setEditName(kit.kit.name); setEditDescription(kit.kit.description || ''); }} className="btn btn-ghost btn-sm opacity-0 group-hover:opacity-100 transition-opacity p-1 mt-0.5" title="Edit Description">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                            <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
+                                        </svg>
+                                    </button>
+                                )}
+                            </>
+                        )}
+                    </div>
+
                     <div className="flex items-center gap-2 mt-3">
                         {kit.kit.version_number && <span className="badge badge-primary">v{kit.kit.version_number}</span>}
                         <span className="badge">{kit.source}</span>
@@ -452,10 +516,7 @@ export default function KitDetailPage() {
                     <Link to={`/kit/${slug}/run`} className="btn btn-primary">Run Kit</Link>
                     {user && <Link to={`/kit/${slug}/history`} className="btn btn-secondary">History</Link>}
                     {kit.is_owner && (
-                        <>
-                            <Link to={`/kit/${slug}/edit`} className="btn btn-ghost">Edit</Link>
-                            <button onClick={handleDelete} className="btn btn-ghost text-destructive">Delete</button>
-                        </>
+                        <button onClick={handleDelete} className="btn btn-ghost text-destructive">Delete</button>
                     )}
                 </div>
             </div>

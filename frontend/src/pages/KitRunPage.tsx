@@ -284,30 +284,18 @@ export default function KitRunPage() {
                 </div>
             )}
 
-            {/* Evaluation prompt */}
-            {evalStep !== null && (
-                <div className="card p-5 mb-6 border-l-4 border-primary">
-                    <h3 className="font-semibold mb-3">Evaluate Step {evalStep}</h3>
-                    <div className="flex items-center gap-4">
-                        <input
-                            type="range"
-                            min={0}
-                            max={100}
-                            value={evalScore}
-                            onChange={(e) => setEvalScore(Number(e.target.value))}
-                            className="flex-1"
-                        />
-                        <span className="font-medium text-sm w-12 text-center">{evalScore}</span>
-                        <button onClick={handleEvalSubmit} className="btn btn-primary btn-sm">Submit</button>
-                    </div>
-                </div>
-            )}
-
             {/* Step outputs */}
             {steps.length > 0 && (
                 <div className="stream-container">
                     {steps.map((step) => (
-                        <StepOutput key={step.step} step={step} />
+                        <StepOutput
+                            key={step.step}
+                            step={step}
+                            isEvaluating={evalStep === step.step}
+                            evalScore={evalScore}
+                            setEvalScore={setEvalScore}
+                            onEvalSubmit={handleEvalSubmit}
+                        />
                     ))}
                 </div>
             )}
@@ -326,7 +314,13 @@ export default function KitRunPage() {
     );
 }
 
-function StepOutput({ step }: { step: StepResult }) {
+function StepOutput({ step, isEvaluating, evalScore, setEvalScore, onEvalSubmit }: {
+    step: StepResult;
+    isEvaluating?: boolean;
+    evalScore?: number;
+    setEvalScore?: (s: number) => void;
+    onEvalSubmit?: () => void;
+}) {
     const [expanded, setExpanded] = useState(false);
 
     const statusBadge = step.status === 'done'
@@ -382,6 +376,23 @@ function StepOutput({ step }: { step: StepResult }) {
                 )}
                 {step.result && (
                     <div className="content-preview" style={{ whiteSpace: 'pre-wrap' }}>{step.result}</div>
+                )}
+                {isEvaluating && (
+                    <div className="card p-5 mt-4 border-l-4 border-primary bg-background">
+                        <h3 className="font-semibold mb-3">Evaluate Step {step.step}</h3>
+                        <div className="flex items-center gap-4">
+                            <input
+                                type="range"
+                                min={0}
+                                max={100}
+                                value={evalScore}
+                                onChange={(e) => setEvalScore?.(Number(e.target.value))}
+                                className="flex-1"
+                            />
+                            <span className="font-medium text-sm w-12 text-center">{evalScore}</span>
+                            <button onClick={onEvalSubmit} className="btn btn-primary btn-sm">Submit</button>
+                        </div>
+                    </div>
                 )}
                 {step.error && (
                     <div className="flash flash-error mt-2 text-sm">{step.error}</div>

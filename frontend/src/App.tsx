@@ -9,7 +9,6 @@ import ResetPasswordPage from './pages/ResetPasswordPage';
 import LogoutPage from './pages/LogoutPage';
 import KitDetailPage from './pages/KitDetailPage';
 import KitCreatePage from './pages/KitCreatePage';
-import KitEditPage from './pages/KitEditPage';
 import KitRunPage from './pages/KitRunPage';
 import KitHistoryPage from './pages/KitHistoryPage';
 import ExecutionDetailPage from './pages/ExecutionDetailPage';
@@ -32,7 +31,6 @@ export default function App() {
               {/* Kit CRUD */}
               <Route path="/kit/new" element={<KitCreatePage />} />
               <Route path="/kit/:slug" element={<KitDetailPage />} />
-              <Route path="/kit/:slug/edit" element={<KitEditPage />} />
 
               {/* Kit Execution */}
               <Route path="/kit/:slug/run" element={<KitRunPage />} />

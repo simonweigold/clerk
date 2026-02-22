@@ -3,6 +3,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { getKit, deleteKit, addResource, deleteResource, updateResource, addStep, deleteStep, updateStep, type KitDetail, type Resource, type Step } from '../lib/api';
 import { useAuth } from '../hooks/useAuth';
 import { useToast } from '../hooks/useToast';
+import { PromptTextarea } from '../components/PromptTextarea';
 
 function ResourceCard({ resource, slug, isOwner, onRefresh }: {
     resource: Resource; slug: string; isOwner: boolean; onRefresh: () => void;
@@ -148,8 +149,9 @@ function ResourceCard({ resource, slug, isOwner, onRefresh }: {
     );
 }
 
-function StepCard({ step, slug, isOwner, onRefresh }: {
+function StepCard({ step, slug, isOwner, onRefresh, resources, steps }: {
     step: Step; slug: string; isOwner: boolean; onRefresh: () => void;
+    resources: Resource[]; steps: Step[];
 }) {
     const { addToast } = useToast();
     const [expanded, setExpanded] = useState(false);
@@ -216,7 +218,7 @@ function StepCard({ step, slug, isOwner, onRefresh }: {
                     </div>
                     <div>
                         <label className="label text-xs">Prompt Template</label>
-                        <textarea className="input" rows={8} value={editPrompt} onChange={(e) => setEditPrompt(e.target.value)} />
+                        <PromptTextarea className="input" rows={8} value={editPrompt} onChange={(e) => setEditPrompt(e.target.value)} resources={resources} steps={steps} />
                     </div>
                     <div className="flex gap-2 pt-1">
                         <button onClick={handleSave} className="btn btn-primary btn-sm" disabled={saving}>{saving ? 'Saving...' : 'Save'}</button>
@@ -325,7 +327,7 @@ function AddResourceForm({ slug, onRefresh }: { slug: string; onRefresh: () => v
     );
 }
 
-function AddStepForm({ slug, onRefresh }: { slug: string; onRefresh: () => void }) {
+function AddStepForm({ slug, onRefresh, resources, steps }: { slug: string; onRefresh: () => void; resources: Resource[]; steps: Step[]; }) {
     const [prompt, setPrompt] = useState('');
     const [displayName, setDisplayName] = useState('');
     const [loading, setLoading] = useState(false);
@@ -355,7 +357,7 @@ function AddStepForm({ slug, onRefresh }: { slug: string; onRefresh: () => void 
             </div>
             <div>
                 <label className="label">Prompt Template</label>
-                <textarea className="input" rows={6} value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder="Enter your LLM prompt..." required />
+                <PromptTextarea className="input" rows={6} value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder="Enter your LLM prompt..." required resources={resources} steps={steps} />
                 <p className="text-xs text-muted-foreground mt-1.5">
                     Use <code className="bg-muted px-1.5 py-0.5 rounded-md text-xs">{'{'}<span>resource_N</span>{'}'}</code> and <code className="bg-muted px-1.5 py-0.5 rounded-md text-xs">{'{'}<span>workflow_N</span>{'}'}</code> for placeholders.
                 </p>
@@ -497,13 +499,13 @@ export default function KitDetailPage() {
                 ) : (
                     <div className="stream-container">
                         {kit.steps.map((s) => (
-                            <StepCard key={s.number} step={s} slug={slug!} isOwner={kit.is_owner} onRefresh={fetchKit} />
+                            <StepCard key={s.number} step={s} slug={slug!} isOwner={kit.is_owner} onRefresh={fetchKit} resources={kit.resources} steps={kit.steps} />
                         ))}
                     </div>
                 )}
                 {kit.is_owner && (
                     <div className="mt-6">
-                        <AddStepForm slug={slug!} onRefresh={fetchKit} />
+                        <AddStepForm slug={slug!} onRefresh={fetchKit} resources={kit.resources} steps={kit.steps} />
                     </div>
                 )}
             </section>

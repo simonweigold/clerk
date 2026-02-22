@@ -1,6 +1,6 @@
-import { useEffect, useState, useCallback } from 'react';
-import { useParams, Link } from 'react-router-dom';
-import { getKit, startExecution, getSSEUrl, submitEvaluation, type Resource } from '../lib/api';
+import { useEffect, useState, useCallback, useRef } from 'react';
+import { useParams, Link, useSearchParams } from 'react-router-dom';
+import { getKit, startExecution, getSSEUrl, submitEvaluation, pauseExecution, resumeExecution, type Resource } from '../lib/api';
 import { useToast } from '../hooks/useToast';
 
 interface StepResult {
@@ -11,18 +11,22 @@ interface StepResult {
     result?: string;
     latency_ms?: number;
     tokens_used?: number;
-    status: 'running' | 'done' | 'error' | 'awaiting-eval';
+    status: 'running' | 'done' | 'error' | 'awaiting-eval' | 'paused';
     error?: string;
 }
 
 export default function KitRunPage() {
     const { slug } = useParams<{ slug: string }>();
+    const [searchParams] = useSearchParams();
+    const resumeRunId = searchParams.get('resume');
+
     const [kitName, setKitName] = useState('');
     const [dynamicResources, setDynamicResources] = useState<Resource[]>([]);
     const [dynamicValues, setDynamicValues] = useState<Record<string, string | File>>({});
     const [dynamicModes, setDynamicModes] = useState<Record<string, 'text' | 'file'>>({});
     const [loading, setLoading] = useState(true);
     const [running, setRunning] = useState(false);
+    const [isPausing, setIsPausing] = useState(false);
     const [evaluate, setEvaluate] = useState(false);
     const [evalMode, setEvalMode] = useState<'transparent' | 'anonymous'>('transparent');
     const [executionId, setExecutionId] = useState<string | null>(null);
@@ -35,6 +39,9 @@ export default function KitRunPage() {
     const [evalScore, setEvalScore] = useState(70);
     const { addToast } = useToast();
 
+    // Auto-start resume if query param is set
+    const hasResumed = useRef(false);
+
     useEffect(() => {
         if (!slug) return;
         getKit(slug)
@@ -46,20 +53,28 @@ export default function KitRunPage() {
             .finally(() => setLoading(false));
     }, [slug]);
 
-    const handleStart = useCallback(async () => {
+    const doExecution = useCallback(async (isResume: boolean = false) => {
         if (!slug) return;
         setRunning(true);
-        setSteps([]);
-        setCompletedSteps(0);
+        if (!isResume) {
+            setSteps([]);
+            setCompletedSteps(0);
+        }
         setDone(false);
         setResultRunId(null);
+        setIsPausing(false);
 
         try {
-            const data = await startExecution(slug, {
-                evaluate,
-                evaluation_mode: evalMode,
-                dynamic_resources: Object.keys(dynamicValues).length > 0 ? dynamicValues : undefined,
-            });
+            let data;
+            if (isResume && resumeRunId) {
+                data = await resumeExecution(slug, resumeRunId);
+            } else {
+                data = await startExecution(slug, {
+                    evaluate,
+                    evaluation_mode: evalMode,
+                    dynamic_resources: Object.keys(dynamicValues).length > 0 ? dynamicValues : undefined,
+                });
+            }
 
             if (data.error) {
                 addToast('error', data.error);
@@ -115,10 +130,13 @@ export default function KitRunPage() {
                 const d = JSON.parse(e.data);
                 setDone(true);
                 setRunning(false);
+                setIsPausing(false);
                 setResultRunId(d.run_id || null);
                 evtSource.close();
                 if (d.status === 'completed') {
                     addToast('success', 'Execution completed.');
+                } else if (d.status === 'paused') {
+                    addToast('success', 'Execution paused.');
                 } else {
                     addToast('error', d.error || 'Execution failed.');
                 }
@@ -126,6 +144,7 @@ export default function KitRunPage() {
 
             evtSource.onerror = () => {
                 setRunning(false);
+                setIsPausing(false);
                 setDone(true);
                 evtSource.close();
                 addToast('error', 'Connection lost.');
@@ -134,8 +153,29 @@ export default function KitRunPage() {
         } catch (err) {
             addToast('error', err instanceof Error ? err.message : 'Execution failed.');
             setRunning(false);
+            setIsPausing(false);
         }
-    }, [slug, evaluate, evalMode, dynamicValues]);
+    }, [slug, evaluate, evalMode, dynamicValues, resumeRunId]);
+
+    const handleStart = useCallback(() => doExecution(false), [doExecution]);
+
+    useEffect(() => {
+        if (!loading && resumeRunId && !hasResumed.current) {
+            hasResumed.current = true;
+            doExecution(true);
+        }
+    }, [loading, resumeRunId, doExecution]);
+
+    const handlePause = async () => {
+        if (!slug || !executionId) return;
+        setIsPausing(true);
+        try {
+            await pauseExecution(slug, executionId);
+        } catch (err) {
+            addToast('error', err instanceof Error ? err.message : 'Failed to pause execution.');
+            setIsPausing(false);
+        }
+    };
 
     const handleEvalSubmit = async () => {
         if (!slug || !executionId || evalStep === null) return;
@@ -177,7 +217,7 @@ export default function KitRunPage() {
             <p className="text-muted-foreground mb-8">Execute this reasoning kit's workflow.</p>
 
             {/* Config */}
-            {!running && !done && (
+            {!running && !done && !resumeRunId && (
                 <div className="card p-6 mb-8 space-y-6">
                     {/* Dynamic resources */}
                     {dynamicResources.length > 0 && (
@@ -276,7 +316,16 @@ export default function KitRunPage() {
                 <div className="mb-8">
                     <div className="flex items-center justify-between text-sm text-muted-foreground mb-2">
                         <span>Progress</span>
-                        <span>{completedSteps} / {totalSteps} steps ({progress}%)</span>
+                        <div className="flex items-center gap-4">
+                            <span>{completedSteps} / {totalSteps} steps ({progress}%)</span>
+                            <button
+                                onClick={handlePause}
+                                disabled={isPausing}
+                                className="btn btn-secondary btn-sm"
+                            >
+                                {isPausing ? 'Pausing...' : 'Pause Execution'}
+                            </button>
+                        </div>
                     </div>
                     <div className="progress-bar">
                         <div className="progress-bar-fill" style={{ width: `${progress}%` }} />
@@ -329,7 +378,9 @@ function StepOutput({ step, isEvaluating, evalScore, setEvalScore, onEvalSubmit 
             ? <span className="badge" style={{ background: '#fef2f2', color: '#991b1b', borderColor: '#fecaca' }}>Error</span>
             : step.status === 'awaiting-eval'
                 ? <span className="badge" style={{ background: '#eff6ff', color: '#1e40af', borderColor: '#bfdbfe' }}>Awaiting Eval</span>
-                : <span className="badge badge-primary">Running</span>;
+                : step.status === 'paused'
+                    ? <span className="badge" style={{ background: '#fffbeb', color: '#b45309', borderColor: '#fde68a' }}>Paused</span>
+                    : <span className="badge badge-primary">Running</span>;
 
     const metaParts: string[] = [];
     if (step.latency_ms) metaParts.push(`${(step.latency_ms / 1000).toFixed(1)}s`);

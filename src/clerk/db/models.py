@@ -253,7 +253,7 @@ class ExecutionRun(Base):
             "storage_mode IN ('transparent', 'anonymous')", name="ck_storage_mode"
         ),
         CheckConstraint(
-            "status IN ('running', 'completed', 'failed')", name="ck_status"
+            "status IN ('running', 'paused', 'completed', 'failed')", name="ck_status"
         ),
     )
 

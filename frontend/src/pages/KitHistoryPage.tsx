@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
-import { listExecutions, type ExecutionRun } from '../lib/api';
+import { useEffect, useState, useCallback } from 'react';
+import { useParams, Link, useNavigate } from 'react-router-dom';
+import { listExecutions, deleteExecution, type ExecutionRun } from '../lib/api';
 import { useToast } from '../hooks/useToast';
 
 function formatDate(d: Date) {
@@ -15,18 +15,21 @@ function formatTime(d: Date) {
 function StatusBadge({ status }: { status: string }) {
     if (status === 'completed') return <span className="badge" style={{ background: '#f0fdf4', color: '#166534', borderColor: '#bbf7d0' }}>Completed</span>;
     if (status === 'failed') return <span className="badge" style={{ background: '#fef2f2', color: '#991b1b', borderColor: '#fecaca' }}>Failed</span>;
-    return <span className="badge" style={{ background: '#eff6ff', color: '#1e40af', borderColor: '#bfdbfe' }}>Running</span>;
+    if (status === 'paused') return <span className="badge" style={{ background: '#fffbeb', color: '#b45309', borderColor: '#fde68a' }}>Paused</span>;
+    return <span className="badge badge-primary">Running</span>;
 }
 
 export default function KitHistoryPage() {
     const { slug } = useParams<{ slug: string }>();
+    const navigate = useNavigate();
     const [runs, setRuns] = useState<ExecutionRun[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const { addToast } = useToast();
 
-    useEffect(() => {
+    const fetchRuns = useCallback(() => {
         if (!slug) return;
+        setLoading(true);
         listExecutions(slug)
             .then((data) => {
                 if ('error' in data && (data as Record<string, unknown>).error) setError((data as Record<string, unknown>).error as string);
@@ -34,7 +37,33 @@ export default function KitHistoryPage() {
             })
             .catch((err) => { setError(err instanceof Error ? err.message : 'Failed.'); addToast('error', 'Failed to load history.'); })
             .finally(() => setLoading(false));
-    }, [slug]);
+    }, [slug, addToast]);
+
+    useEffect(() => {
+        fetchRuns();
+    }, [fetchRuns]);
+
+    const handleDelete = async (e: React.MouseEvent, runId: string) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!slug) return;
+        if (!confirm('Are you sure you want to delete this execution run?')) return;
+
+        try {
+            await deleteExecution(slug, runId);
+            addToast('success', 'Execution deleted.');
+            fetchRuns();
+        } catch (err) {
+            addToast('error', err instanceof Error ? err.message : 'Failed to delete execution.');
+        }
+    };
+
+    const handleResume = (e: React.MouseEvent, runId: string) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!slug) return;
+        navigate(`/kit/${slug}/run?resume=${runId}`);
+    };
 
     return (
         <div className="fade-in">
@@ -76,7 +105,7 @@ export default function KitHistoryPage() {
                             meta.push(dur < 60 ? `${dur}s` : `${Math.floor(dur / 60)}m ${dur % 60}s`);
                         }
                         return (
-                            <Link key={run.id} to={`/kit/${slug}/history/${run.id}`} className="card card-hoverable block" style={{ textDecoration: 'none', color: 'inherit', animationDelay: `${idx * 0.04}s` }}>
+                            <Link key={run.id} to={`/kit/${slug}/history/${run.id}`} className="card card-hoverable block group" style={{ textDecoration: 'none', color: 'inherit', animationDelay: `${idx * 0.04}s` }}>
                                 <div className="flex items-center justify-between p-4">
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-center gap-3 mb-1">
@@ -87,7 +116,28 @@ export default function KitHistoryPage() {
                                             <span>{ds}{ts ? ` at ${ts}` : ''}</span><span>·</span><span>{meta.join(' · ')}</span>
                                         </div>
                                     </div>
-                                    <svg className="w-5 h-5 text-muted-foreground flex-shrink-0 ml-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6" /></svg>
+
+                                    <div className="flex items-center gap-2">
+                                        {run.status === 'paused' && (
+                                            <button
+                                                onClick={(e) => handleResume(e, run.id)}
+                                                className="btn btn-ghost btn-xs text-primary opacity-0 group-hover:opacity-100 transition-opacity"
+                                                title="Resume Execution"
+                                            >
+                                                Resume
+                                            </button>
+                                        )}
+                                        <button
+                                            onClick={(e) => handleDelete(e, run.id)}
+                                            className="btn btn-ghost btn-xs text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                                            title="Delete Execution"
+                                        >
+                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                            </svg>
+                                        </button>
+                                        <svg className="w-5 h-5 text-muted-foreground flex-shrink-0 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6" /></svg>
+                                    </div>
                                 </div>
                             </Link>
                         );

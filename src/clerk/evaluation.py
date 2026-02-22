@@ -285,3 +285,32 @@ async def complete_execution_run(
     async with get_async_session() as session:
         repo = ExecutionRepository(session)
         await repo.complete_run(run_id=run_id, error=error)
+
+
+async def pause_execution_run(run_id: UUID) -> None:
+    """Mark an execution run as paused.
+
+    Args:
+        run_id: The run's UUID
+    """
+    from .db import ExecutionRepository, get_async_session
+
+    async with get_async_session() as session:
+        repo = ExecutionRepository(session)
+        await repo.pause_run(run_id=run_id)
+
+
+async def delete_execution_run(run_id: UUID) -> bool:
+    """Delete an execution run from the database.
+
+    Args:
+        run_id: The run's UUID
+
+    Returns:
+        True if deleted, False if not found
+    """
+    from .db import ExecutionRepository, get_async_session
+
+    async with get_async_session() as session:
+        repo = ExecutionRepository(session)
+        return await repo.delete_run(run_id=run_id)

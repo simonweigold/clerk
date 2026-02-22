@@ -689,6 +689,40 @@ class ExecutionRepository:
         await self.session.flush()
         return run
 
+    async def pause_run(self, run_id: UUID) -> ExecutionRun | None:
+        """Mark a run as paused.
+
+        Args:
+            run_id: The run's UUID
+
+        Returns:
+            Updated run or None if not found
+        """
+        run = await self.get_by_id(run_id)
+        if run is None:
+            return None
+
+        run.status = "paused"
+        await self.session.flush()
+        return run
+
+    async def delete_run(self, run_id: UUID) -> bool:
+        """Delete an execution run and its steps.
+
+        Args:
+            run_id: The run's UUID
+
+        Returns:
+            True if deleted, False if not found
+        """
+        run = await self.get_by_id(run_id)
+        if run is None:
+            return False
+
+        await self.session.delete(run)
+        await self.session.flush()
+        return True
+
     async def update_label(
         self,
         run_id: UUID,

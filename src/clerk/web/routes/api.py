@@ -11,16 +11,14 @@ from pathlib import Path
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Form, Request, UploadFile, File
-from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
+from fastapi.responses import RedirectResponse, StreamingResponse
 
 from ..dependencies import get_optional_user
 
 router = APIRouter()
 
 
-def _templates(request: Request):
-    """Get templates instance from app state."""
-    return request.app.state.templates
+
 
 
 def _flash(request: Request, text: str, type: str = "info") -> None:
@@ -53,7 +51,7 @@ def _check_ownership(
 # =============================================================================
 
 
-@router.post("/kits", response_class=HTMLResponse)
+@router.post("/kits", response_class=RedirectResponse)
 async def create_kit(
     request: Request,
     name: str = Form(...),
@@ -122,7 +120,7 @@ async def create_kit(
             return RedirectResponse("/kit/new", status_code=303)
 
 
-@router.post("/kits/{slug}/update", response_class=HTMLResponse)
+@router.post("/kits/{slug}/update", response_class=RedirectResponse)
 async def update_kit(
     request: Request,
     slug: str,
@@ -167,7 +165,7 @@ async def update_kit(
     return RedirectResponse(f"/kit/{slug}", status_code=303)
 
 
-@router.post("/kits/{slug}/delete", response_class=HTMLResponse)
+@router.post("/kits/{slug}/delete", response_class=RedirectResponse)
 async def delete_kit(
     request: Request,
     slug: str,
@@ -220,7 +218,7 @@ async def delete_kit(
 # =============================================================================
 
 
-@router.post("/kits/{slug}/resources", response_class=HTMLResponse)
+@router.post("/kits/{slug}/resources", response_class=RedirectResponse)
 async def add_resource(
     request: Request,
     slug: str,
@@ -395,7 +393,7 @@ async def add_resource(
     return RedirectResponse(f"/kit/{slug}", status_code=303)
 
 
-@router.post("/kits/{slug}/resources/{number}/delete", response_class=HTMLResponse)
+@router.post("/kits/{slug}/resources/{number}/delete", response_class=RedirectResponse)
 async def delete_resource(
     request: Request,
     slug: str,
@@ -477,7 +475,7 @@ async def delete_resource(
     return RedirectResponse(f"/kit/{slug}", status_code=303)
 
 
-@router.post("/kits/{slug}/resources/{number}/update", response_class=HTMLResponse)
+@router.post("/kits/{slug}/resources/{number}/update", response_class=RedirectResponse)
 async def update_resource(
     request: Request,
     slug: str,
@@ -629,7 +627,7 @@ async def update_resource(
 # =============================================================================
 
 
-@router.post("/kits/{slug}/steps", response_class=HTMLResponse)
+@router.post("/kits/{slug}/steps", response_class=RedirectResponse)
 async def add_step(
     request: Request,
     slug: str,
@@ -734,7 +732,7 @@ async def add_step(
     return RedirectResponse(f"/kit/{slug}", status_code=303)
 
 
-@router.post("/kits/{slug}/steps/{number}/update", response_class=HTMLResponse)
+@router.post("/kits/{slug}/steps/{number}/update", response_class=RedirectResponse)
 async def update_step(
     request: Request,
     slug: str,
@@ -821,7 +819,7 @@ async def update_step(
     return RedirectResponse(f"/kit/{slug}", status_code=303)
 
 
-@router.post("/kits/{slug}/steps/{number}/delete", response_class=HTMLResponse)
+@router.post("/kits/{slug}/steps/{number}/delete", response_class=RedirectResponse)
 async def delete_step(
     request: Request,
     slug: str,
@@ -2050,294 +2048,4 @@ async def get_kit_detail_json(
         "source": source,
         "is_owner": is_owner,
     }
-
-
-# =============================================================================
-# AUTH API (legacy form-based)
-# =============================================================================
-
-
-@router.post("/auth/login", response_class=HTMLResponse)
-async def login(
-    request: Request,
-    email: str = Form(...),
-    password: str = Form(...),
-):
-    """Authenticate with Supabase."""
-    from ...db.config import get_config
-
-    config = get_config()
-    if not config.is_configured:
-        _flash(request, "Supabase is not configured.", "error")
-        return RedirectResponse("/auth/login", status_code=303)
-
-    try:
-        from ...db.config import get_supabase_client
-
-        client = get_supabase_client()
-        response = client.auth.sign_in_with_password(
-            {
-                "email": email,
-                "password": password,
-            }
-        )
-
-        if response.user:
-            request.session["user"] = {
-                "id": str(response.user.id),
-                "email": response.user.email,
-            }
-            _flash(request, "Signed in.", "success")
-            return RedirectResponse("/", status_code=303)
-        else:
-            _flash(request, "Invalid credentials.", "error")
-            return RedirectResponse("/auth/login", status_code=303)
-
-    except Exception as e:
-        error_msg = str(e)
-        if "Invalid login" in error_msg or "invalid" in error_msg.lower():
-            _flash(request, "Invalid email or password.", "error")
-        else:
-            _flash(request, f"Sign in error: {error_msg}", "error")
-        return RedirectResponse("/auth/login", status_code=303)
-
-
-@router.post("/auth/signup", response_class=HTMLResponse)
-async def signup(
-    request: Request,
-    email: str = Form(...),
-    password: str = Form(...),
-):
-    """Register with Supabase."""
-    from ...db.config import get_config
-
-    config = get_config()
-    if not config.is_configured:
-        _flash(request, "Supabase is not configured.", "error")
-        return RedirectResponse("/auth/signup", status_code=303)
-
-    try:
-        from ...db.config import get_supabase_client
-
-        client = get_supabase_client()
-        response = client.auth.sign_up(
-            {
-                "email": email,
-                "password": password,
-            }
-        )
-
-        if response.user:
-            # Check for already-registered user (Supabase returns user
-            # with empty identities list if email is already taken)
-            identities = getattr(response.user, "identities", None)
-            if identities is not None and len(identities) == 0:
-                _flash(
-                    request,
-                    "An account with this email already exists. Try signing in instead.",
-                    "error",
-                )
-                return RedirectResponse("/auth/login", status_code=303)
-
-            _flash(
-                request,
-                "Account created. Please check your email for confirmation.",
-                "success",
-            )
-            return RedirectResponse("/auth/login", status_code=303)
-        else:
-            _flash(request, "Could not create account.", "error")
-            return RedirectResponse("/auth/signup", status_code=303)
-
-    except Exception as e:
-        error_msg = str(e).lower()
-        if "already registered" in error_msg or "already been registered" in error_msg:
-            _flash(
-                request,
-                "An account with this email already exists. Try signing in instead.",
-                "error",
-            )
-            return RedirectResponse("/auth/login", status_code=303)
-        _flash(request, f"Sign up error: {e}", "error")
-        return RedirectResponse("/auth/signup", status_code=303)
-
-
-@router.get("/auth/logout")
-async def logout(request: Request):
-    """Clear session and log out."""
-    request.session.clear()
-    _flash(request, "Signed out.", "info")
-    return RedirectResponse("/", status_code=303)
-
-
-@router.post("/auth/reset-password", response_class=HTMLResponse)
-async def reset_password(
-    request: Request,
-    email: str = Form(...),
-):
-    """Send a password reset email via Supabase."""
-    from ...db.config import get_config
-
-    config = get_config()
-    if not config.is_configured:
-        _flash(request, "Supabase is not configured.", "error")
-        return RedirectResponse("/auth/reset-password", status_code=303)
-
-    try:
-        from ...db.config import get_supabase_client
-
-        client = get_supabase_client()
-        client.auth.reset_password_email(email)
-        _flash(
-            request,
-            "If an account with that email exists, a reset link has been sent.",
-            "success",
-        )
-    except Exception:
-        # Don't reveal whether the email exists
-        _flash(
-            request,
-            "If an account with that email exists, a reset link has been sent.",
-            "success",
-        )
-
-    return RedirectResponse("/auth/login", status_code=303)
-
-
-# =============================================================================
-# SEARCH (HTMX partial)
-# =============================================================================
-
-
-@router.get("/search", response_class=HTMLResponse)
-async def search_kits(
-    request: Request,
-    q: str = "",
-    filter: str = "all",
-    user: dict | None = Depends(get_optional_user),
-):
-    """Search kits and return partial HTML for HTMX swap."""
-    from ...db.config import get_config
-
-    templates = _templates(request)
-    kits = []
-
-    config = get_config()
-
-    # "My Kits" filter — show only kits owned by the logged-in user
-    if filter == "mine" and user:
-        if config.is_database_configured:
-            try:
-                from ...db import ReasoningKitRepository, get_async_session
-
-                async with get_async_session() as session:
-                    repo = ReasoningKitRepository(session)
-                    if q.strip():
-                        db_kits = await repo.search(
-                            q.strip(), include_private=True, owner_id=UUID(user["id"])
-                        )
-                        # Further filter to only owned kits
-                        db_kits = [
-                            k for k in db_kits if str(k.owner_id) == user["id"]
-                        ]
-                    else:
-                        db_kits = await repo.list_by_owner(UUID(user["id"]))
-                    for kit in db_kits:
-                        kits.append(
-                            {
-                                "slug": kit.slug,
-                                "name": kit.name,
-                                "description": kit.description,
-                                "is_public": kit.is_public,
-                                "created_at": kit.created_at,
-                                "updated_at": kit.updated_at,
-                                "owner_id": str(kit.owner_id) if kit.owner_id else None,
-                            }
-                        )
-            except Exception:
-                pass
-
-        return templates.TemplateResponse(
-            request,
-            "partials/kit_list.html",
-            {
-                "kits": kits,
-                "user": user,
-            },
-        )
-
-    # Default: "All Kits" — public kits (with optional search)
-    if config.is_database_configured and q.strip():
-        try:
-            from ...db import ReasoningKitRepository, get_async_session
-
-            async with get_async_session() as session:
-                repo = ReasoningKitRepository(session)
-                db_kits = await repo.search(q.strip())
-                for kit in db_kits:
-                    kits.append(
-                        {
-                            "slug": kit.slug,
-                            "name": kit.name,
-                            "description": kit.description,
-                            "is_public": kit.is_public,
-                            "created_at": kit.created_at,
-                            "updated_at": kit.updated_at,
-                            "owner_id": str(kit.owner_id) if kit.owner_id else None,
-                        }
-                    )
-        except Exception:
-            pass
-    elif not q.strip():
-        # Empty search = show all
-        if config.is_database_configured:
-            try:
-                from ...db import ReasoningKitRepository, get_async_session
-
-                async with get_async_session() as session:
-                    repo = ReasoningKitRepository(session)
-                    db_kits = await repo.list_public()
-                    for kit in db_kits:
-                        kits.append(
-                            {
-                                "slug": kit.slug,
-                                "name": kit.name,
-                                "description": kit.description,
-                                "is_public": kit.is_public,
-                                "created_at": kit.created_at,
-                                "updated_at": kit.updated_at,
-                                "owner_id": str(kit.owner_id) if kit.owner_id else None,
-                            }
-                        )
-            except Exception:
-                pass
-
-        if not kits:
-            try:
-                from ...loader import list_reasoning_kits
-
-                local_kits = list_reasoning_kits("reasoning_kits")
-                for name in sorted(local_kits):
-                    kits.append(
-                        {
-                            "slug": name,
-                            "name": name.replace("-", " ").replace("_", " ").title(),
-                            "description": None,
-                            "is_public": True,
-                            "created_at": None,
-                            "updated_at": None,
-                            "owner_id": None,
-                        }
-                    )
-            except Exception:
-                pass
-
-    return templates.TemplateResponse(
-        request,
-        "partials/kit_list.html",
-        {
-            "kits": kits,
-            "user": user,
-        },
-    )
 

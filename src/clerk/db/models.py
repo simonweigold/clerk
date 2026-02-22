@@ -335,3 +335,38 @@ class StepExecution(Base):
     run: Mapped["ExecutionRun"] = relationship(
         back_populates="step_executions", lazy="selectin"
     )
+
+
+class UserKitBookmark(Base):
+    """A user's bookmark/save of a community kit.
+
+    Allows users to add community kits to their "My Kits" view
+    without being the owner.
+    """
+
+    __tablename__ = "user_kit_bookmarks"
+    __table_args__ = (
+        UniqueConstraint("user_id", "kit_id", name="uq_user_kit_bookmark"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("user_profiles.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    kit_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("reasoning_kits.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=datetime.utcnow
+    )
+
+    # Relationships
+    user: Mapped["UserProfile"] = relationship(lazy="selectin")
+    kit: Mapped["ReasoningKit"] = relationship(lazy="selectin")
+

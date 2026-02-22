@@ -59,6 +59,7 @@ async def index(request: Request, user: dict | None = Depends(get_optional_user)
                             "is_public": kit.is_public,
                             "created_at": kit.created_at,
                             "updated_at": kit.updated_at,
+                            "owner_id": str(kit.owner_id) if kit.owner_id else None,
                         }
                     )
         except Exception:

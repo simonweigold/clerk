@@ -1,0 +1,350 @@
+import { useEffect, useState, useCallback } from 'react';
+import { useParams, Link } from 'react-router-dom';
+import { getKit, startExecution, getSSEUrl, submitEvaluation, type Resource } from '../lib/api';
+import { useToast } from '../hooks/useToast';
+
+interface StepResult {
+    step: number;
+    output_id: string;
+    display_name?: string;
+    prompt_preview?: string;
+    result?: string;
+    latency_ms?: number;
+    tokens_used?: number;
+    status: 'running' | 'done' | 'error' | 'awaiting-eval';
+    error?: string;
+}
+
+export default function KitRunPage() {
+    const { slug } = useParams<{ slug: string }>();
+    const [kitName, setKitName] = useState('');
+    const [dynamicResources, setDynamicResources] = useState<Resource[]>([]);
+    const [dynamicValues, setDynamicValues] = useState<Record<string, string>>({});
+    const [loading, setLoading] = useState(true);
+    const [running, setRunning] = useState(false);
+    const [evaluate, setEvaluate] = useState(false);
+    const [evalMode, setEvalMode] = useState<'transparent' | 'anonymous'>('transparent');
+    const [executionId, setExecutionId] = useState<string | null>(null);
+    const [totalSteps, setTotalSteps] = useState(0);
+    const [completedSteps, setCompletedSteps] = useState(0);
+    const [steps, setSteps] = useState<StepResult[]>([]);
+    const [done, setDone] = useState(false);
+    const [resultRunId, setResultRunId] = useState<string | null>(null);
+    const [evalStep, setEvalStep] = useState<number | null>(null);
+    const [evalScore, setEvalScore] = useState(70);
+    const { addToast } = useToast();
+
+    useEffect(() => {
+        if (!slug) return;
+        getKit(slug)
+            .then((data) => {
+                setKitName(data.kit.name);
+                setDynamicResources(data.resources.filter((r) => r.is_dynamic));
+            })
+            .catch((err) => addToast('error', err instanceof Error ? err.message : 'Failed to load kit.'))
+            .finally(() => setLoading(false));
+    }, [slug]);
+
+    const handleStart = useCallback(async () => {
+        if (!slug) return;
+        setRunning(true);
+        setSteps([]);
+        setCompletedSteps(0);
+        setDone(false);
+        setResultRunId(null);
+
+        try {
+            const data = await startExecution(slug, {
+                evaluate,
+                evaluation_mode: evalMode,
+                dynamic_resources: Object.keys(dynamicValues).length > 0 ? dynamicValues : undefined,
+            });
+
+            if (data.error) {
+                addToast('error', data.error);
+                setRunning(false);
+                return;
+            }
+
+            const execId = data.execution_id;
+            setExecutionId(execId);
+
+            // Connect SSE
+            const evtSource = new EventSource(getSSEUrl(slug, execId));
+
+            evtSource.addEventListener('start', (e) => {
+                const d = JSON.parse(e.data);
+                setTotalSteps(d.total_steps);
+            });
+
+            evtSource.addEventListener('step-start', (e) => {
+                const d = JSON.parse(e.data);
+                setSteps((prev) => [...prev, {
+                    step: d.step,
+                    output_id: d.output_id,
+                    display_name: d.display_name,
+                    status: 'running',
+                }]);
+            });
+
+            evtSource.addEventListener('step-complete', (e) => {
+                const d = JSON.parse(e.data);
+                setSteps((prev) => prev.map((s) =>
+                    s.step === d.step ? { ...s, ...d, status: 'done' } : s
+                ));
+                setCompletedSteps((c) => c + 1);
+            });
+
+            evtSource.addEventListener('step-await-eval', (e) => {
+                const d = JSON.parse(e.data);
+                setSteps((prev) => prev.map((s) =>
+                    s.step === d.step ? { ...s, status: 'awaiting-eval' } : s
+                ));
+                setEvalStep(d.step);
+            });
+
+            evtSource.addEventListener('step-error', (e) => {
+                const d = JSON.parse(e.data);
+                setSteps((prev) => prev.map((s) =>
+                    s.step === d.step ? { ...s, status: 'error', error: d.error } : s
+                ));
+            });
+
+            evtSource.addEventListener('done', (e) => {
+                const d = JSON.parse(e.data);
+                setDone(true);
+                setRunning(false);
+                setResultRunId(d.run_id || null);
+                evtSource.close();
+                if (d.status === 'completed') {
+                    addToast('success', 'Execution completed.');
+                } else {
+                    addToast('error', d.error || 'Execution failed.');
+                }
+            });
+
+            evtSource.onerror = () => {
+                setRunning(false);
+                setDone(true);
+                evtSource.close();
+                addToast('error', 'Connection lost.');
+            };
+
+        } catch (err) {
+            addToast('error', err instanceof Error ? err.message : 'Execution failed.');
+            setRunning(false);
+        }
+    }, [slug, evaluate, evalMode, dynamicValues]);
+
+    const handleEvalSubmit = async () => {
+        if (!slug || !executionId || evalStep === null) return;
+        try {
+            await submitEvaluation(slug, executionId, evalStep, evalScore);
+            setSteps((prev) => prev.map((s) =>
+                s.step === evalStep ? { ...s, status: 'done' } : s
+            ));
+            setEvalStep(null);
+        } catch (err) {
+            addToast('error', err instanceof Error ? err.message : 'Evaluation failed.');
+        }
+    };
+
+    if (loading) {
+        return (
+            <div className="empty-state fade-in">
+                <div className="flex items-center justify-center gap-2">
+                    <span className="pulse-dot" /><span className="pulse-dot" /><span className="pulse-dot" />
+                </div>
+            </div>
+        );
+    }
+
+    const progress = totalSteps > 0 ? Math.round((completedSteps / totalSteps) * 100) : 0;
+
+    return (
+        <div className="fade-in">
+            {/* Breadcrumb */}
+            <nav className="text-sm text-muted-foreground mb-6">
+                <Link to="/" className="hover:text-foreground transition-colors">Kits</Link>
+                <span className="mx-2">/</span>
+                <Link to={`/kit/${slug}`} className="hover:text-foreground transition-colors">{kitName}</Link>
+                <span className="mx-2">/</span>
+                <span className="text-foreground">Run</span>
+            </nav>
+
+            <h1 className="text-3xl font-bold tracking-tight mb-2">Run {kitName}</h1>
+            <p className="text-muted-foreground mb-8">Execute this reasoning kit's workflow.</p>
+
+            {/* Config */}
+            {!running && !done && (
+                <div className="card p-6 mb-8 space-y-6">
+                    {/* Dynamic resources */}
+                    {dynamicResources.length > 0 && (
+                        <div>
+                            <h3 className="font-semibold text-foreground mb-3">Dynamic Resources</h3>
+                            <div className="space-y-4">
+                                {dynamicResources.map((r) => (
+                                    <div key={r.resource_id}>
+                                        <label className="label">{r.display_name || r.filename}</label>
+                                        <textarea
+                                            className="input"
+                                            rows={3}
+                                            placeholder={`Enter content for ${r.display_name || r.filename}...`}
+                                            value={dynamicValues[r.resource_id] || ''}
+                                            onChange={(e) => setDynamicValues((prev) => ({ ...prev, [r.resource_id]: e.target.value }))}
+                                        />
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Evaluation settings */}
+                    <div>
+                        <h3 className="font-semibold text-foreground mb-3">Evaluation</h3>
+                        <label className="flex items-center gap-2 text-sm cursor-pointer mb-3">
+                            <input type="checkbox" checked={evaluate} onChange={(e) => setEvaluate(e.target.checked)} className="rounded" />
+                            Enable step-by-step evaluation
+                        </label>
+                        {evaluate && (
+                            <div className="flex gap-3 ml-6">
+                                <label className="flex items-center gap-1.5 text-sm cursor-pointer">
+                                    <input type="radio" name="evalMode" value="transparent" checked={evalMode === 'transparent'} onChange={() => setEvalMode('transparent')} />
+                                    Transparent
+                                </label>
+                                <label className="flex items-center gap-1.5 text-sm cursor-pointer">
+                                    <input type="radio" name="evalMode" value="anonymous" checked={evalMode === 'anonymous'} onChange={() => setEvalMode('anonymous')} />
+                                    Anonymous
+                                </label>
+                            </div>
+                        )}
+                    </div>
+
+                    <button onClick={handleStart} className="btn btn-primary btn-lg">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <polygon points="5 3 19 12 5 21 5 3" />
+                        </svg>
+                        Start Execution
+                    </button>
+                </div>
+            )}
+
+            {/* Progress bar */}
+            {running && totalSteps > 0 && (
+                <div className="mb-8">
+                    <div className="flex items-center justify-between text-sm text-muted-foreground mb-2">
+                        <span>Progress</span>
+                        <span>{completedSteps} / {totalSteps} steps ({progress}%)</span>
+                    </div>
+                    <div className="progress-bar">
+                        <div className="progress-bar-fill" style={{ width: `${progress}%` }} />
+                    </div>
+                </div>
+            )}
+
+            {/* Evaluation prompt */}
+            {evalStep !== null && (
+                <div className="card p-5 mb-6 border-l-4 border-primary">
+                    <h3 className="font-semibold mb-3">Evaluate Step {evalStep}</h3>
+                    <div className="flex items-center gap-4">
+                        <input
+                            type="range"
+                            min={0}
+                            max={100}
+                            value={evalScore}
+                            onChange={(e) => setEvalScore(Number(e.target.value))}
+                            className="flex-1"
+                        />
+                        <span className="font-medium text-sm w-12 text-center">{evalScore}</span>
+                        <button onClick={handleEvalSubmit} className="btn btn-primary btn-sm">Submit</button>
+                    </div>
+                </div>
+            )}
+
+            {/* Step outputs */}
+            {steps.length > 0 && (
+                <div className="stream-container">
+                    {steps.map((step) => (
+                        <StepOutput key={step.step} step={step} />
+                    ))}
+                </div>
+            )}
+
+            {/* Done actions */}
+            {done && (
+                <div className="flex items-center gap-3 mt-8">
+                    <button onClick={() => { setDone(false); setSteps([]); setCompletedSteps(0); setTotalSteps(0); }} className="btn btn-primary">Run Again</button>
+                    {resultRunId && (
+                        <Link to={`/kit/${slug}/history/${resultRunId}`} className="btn btn-secondary">View Details</Link>
+                    )}
+                    <Link to={`/kit/${slug}`} className="btn btn-ghost">Back to Kit</Link>
+                </div>
+            )}
+        </div>
+    );
+}
+
+function StepOutput({ step }: { step: StepResult }) {
+    const [expanded, setExpanded] = useState(false);
+
+    const statusBadge = step.status === 'done'
+        ? <span className="badge" style={{ background: '#f0fdf4', color: '#166534', borderColor: '#bbf7d0' }}>Done</span>
+        : step.status === 'error'
+            ? <span className="badge" style={{ background: '#fef2f2', color: '#991b1b', borderColor: '#fecaca' }}>Error</span>
+            : step.status === 'awaiting-eval'
+                ? <span className="badge" style={{ background: '#eff6ff', color: '#1e40af', borderColor: '#bfdbfe' }}>Awaiting Eval</span>
+                : <span className="badge badge-primary">Running</span>;
+
+    const metaParts: string[] = [];
+    if (step.latency_ms) metaParts.push(`${(step.latency_ms / 1000).toFixed(1)}s`);
+    if (step.tokens_used) metaParts.push(`${step.tokens_used} tokens`);
+
+    return (
+        <div className="step-card fade-in">
+            <div className="step-card-header flex items-center justify-between">
+                <span>
+                    Step {step.step}
+                    {step.display_name && ` — ${step.display_name}`}
+                    <span className="text-xs text-muted-foreground ml-2">({step.output_id})</span>
+                </span>
+                <span className="flex items-center gap-2">
+                    {statusBadge}
+                    {metaParts.length > 0 && (
+                        <span className="text-xs text-muted-foreground">{metaParts.join(' · ')}</span>
+                    )}
+                </span>
+            </div>
+            <div className="step-card-body">
+                {step.prompt_preview && (
+                    <div className="mb-3">
+                        <button
+                            className="btn btn-ghost btn-sm p-1 flex items-center gap-1.5"
+                            onClick={() => setExpanded(!expanded)}
+                        >
+                            <svg className={`w-4 h-4 transition-transform duration-200 ${expanded ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+                            </svg>
+                            <span className="text-xs text-muted-foreground">Prompt</span>
+                        </button>
+                        {expanded && (
+                            <div className="content-preview text-xs mt-2" style={{ maxHeight: '24rem', overflowY: 'auto' }}>
+                                {step.prompt_preview}
+                            </div>
+                        )}
+                    </div>
+                )}
+                {step.status === 'running' && (
+                    <div className="flex items-center gap-2 py-2">
+                        <span className="pulse-dot" /><span className="pulse-dot" /><span className="pulse-dot" />
+                    </div>
+                )}
+                {step.result && (
+                    <div className="content-preview" style={{ whiteSpace: 'pre-wrap' }}>{step.result}</div>
+                )}
+                {step.error && (
+                    <div className="flash flash-error mt-2 text-sm">{step.error}</div>
+                )}
+            </div>
+        </div>
+    );
+}

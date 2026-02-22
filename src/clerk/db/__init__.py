@@ -15,10 +15,12 @@ from .models import (
     ReasoningKit,
     Resource,
     StepExecution,
+    UserKitBookmark,
     UserProfile,
     WorkflowStep,
 )
 from .repository import (
+    BookmarkRepository,
     ExecutionRepository,
     KitVersionRepository,
     ReasoningKitRepository,
@@ -46,6 +48,7 @@ __all__ = [
     "UserProfile",
     "WorkflowStep",
     # Repositories
+    "BookmarkRepository",
     "ExecutionRepository",
     "KitVersionRepository",
     "ReasoningKitRepository",

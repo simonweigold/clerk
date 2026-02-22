@@ -7,7 +7,7 @@ the repository pattern for clean separation of concerns.
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -17,6 +17,7 @@ from .models import (
     ReasoningKit,
     Resource,
     StepExecution,
+    UserKitBookmark,
     UserProfile,
     WorkflowStep,
 )
@@ -741,3 +742,51 @@ class ExecutionRepository:
         await self.session.flush()
         return step
 
+
+class BookmarkRepository:
+    """Repository for kit bookmark operations."""
+
+    def __init__(self, session: AsyncSession) -> None:
+        self.session = session
+
+    async def toggle(
+        self, user_id: UUID, kit_id: UUID
+    ) -> tuple[bool, UserKitBookmark | None]:
+        """Toggle a bookmark. Returns (is_now_bookmarked, bookmark_or_None)."""
+        stmt = select(UserKitBookmark).where(
+            UserKitBookmark.user_id == user_id,
+            UserKitBookmark.kit_id == kit_id,
+        )
+        result = await self.session.execute(stmt)
+        existing = result.scalar_one_or_none()
+
+        if existing:
+            await self.session.delete(existing)
+            await self.session.flush()
+            return False, None
+
+        bookmark = UserKitBookmark(user_id=user_id, kit_id=kit_id)
+        self.session.add(bookmark)
+        await self.session.flush()
+        return True, bookmark
+
+    async def get_bookmarked_kit_ids(self, user_id: UUID) -> set[UUID]:
+        """Get the set of kit IDs bookmarked by a user."""
+        stmt = select(UserKitBookmark.kit_id).where(
+            UserKitBookmark.user_id == user_id
+        )
+        result = await self.session.execute(stmt)
+        return set(result.scalars().all())
+
+    async def list_bookmarked_kits(
+        self, user_id: UUID
+    ) -> list[ReasoningKit]:
+        """List all kits bookmarked by a user."""
+        stmt = (
+            select(ReasoningKit)
+            .join(UserKitBookmark, UserKitBookmark.kit_id == ReasoningKit.id)
+            .where(UserKitBookmark.user_id == user_id)
+            .order_by(ReasoningKit.name)
+        )
+        result = await self.session.execute(stmt)
+        return list(result.scalars().all())

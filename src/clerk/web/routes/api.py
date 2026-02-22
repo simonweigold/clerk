@@ -1563,7 +1563,497 @@ def _build_json_download(run, kit_name, sorted_steps, step_display_names):
 
 
 # =============================================================================
-# AUTH API
+# JSON API (for React SPA frontend)
+# =============================================================================
+
+
+@router.get("/auth/me")
+async def get_current_user(
+    request: Request,
+    user: dict | None = Depends(get_optional_user),
+):
+    """Return current user and config state for SPA auth."""
+    from ...db.config import get_config
+
+    config = get_config()
+    return {
+        "user": user,
+        "supabase_configured": config.is_configured,
+    }
+
+
+@router.get("/kits")
+async def list_kits_json(
+    request: Request,
+    user: dict | None = Depends(get_optional_user),
+):
+    """List all kits as JSON for the React frontend."""
+    from ...db.config import get_config
+
+    kits = []
+    config = get_config()
+
+    if config.is_database_configured:
+        try:
+            from ...db import BookmarkRepository, ReasoningKitRepository, get_async_session
+
+            async with get_async_session() as session:
+                repo = ReasoningKitRepository(session)
+                db_kits = await repo.list_public()
+
+                # Get bookmarked kit IDs for logged-in user
+                bookmarked_ids: set = set()
+                if user:
+                    bm_repo = BookmarkRepository(session)
+                    bookmarked_ids = await bm_repo.get_bookmarked_kit_ids(UUID(user["id"]))
+
+                for kit in db_kits:
+                    kits.append(
+                        {
+                            "slug": kit.slug,
+                            "name": kit.name,
+                            "description": kit.description,
+                            "is_public": kit.is_public,
+                            "created_at": kit.created_at.isoformat() if kit.created_at else None,
+                            "updated_at": kit.updated_at.isoformat() if kit.updated_at else None,
+                            "owner_id": str(kit.owner_id) if kit.owner_id else None,
+                            "is_bookmarked": kit.id in bookmarked_ids,
+                        }
+                    )
+        except Exception:
+            pass
+
+    if not kits:
+        try:
+            from ...loader import list_reasoning_kits
+
+            local_kits = list_reasoning_kits("reasoning_kits")
+            for name in sorted(local_kits):
+                kits.append(
+                    {
+                        "slug": name,
+                        "name": name.replace("-", " ").replace("_", " ").title(),
+                        "description": None,
+                        "is_public": True,
+                        "created_at": None,
+                        "updated_at": None,
+                        "owner_id": None,
+                        "is_bookmarked": False,
+                    }
+                )
+        except Exception:
+            pass
+
+    return {"kits": kits}
+
+
+@router.get("/kits/search")
+async def search_kits_json(
+    request: Request,
+    q: str = "",
+    filter: str = "all",
+    user: dict | None = Depends(get_optional_user),
+):
+    """Search kits and return JSON for the React frontend."""
+    from ...db.config import get_config
+
+    kits = []
+    config = get_config()
+
+    # "My Kits" filter — owned + bookmarked
+    if filter == "mine" and user:
+        if config.is_database_configured:
+            try:
+                from ...db import BookmarkRepository, ReasoningKitRepository, get_async_session
+
+                async with get_async_session() as session:
+                    repo = ReasoningKitRepository(session)
+                    bm_repo = BookmarkRepository(session)
+                    user_id = UUID(user["id"])
+
+                    bookmarked_ids = await bm_repo.get_bookmarked_kit_ids(user_id)
+
+                    if q.strip():
+                        db_kits = await repo.search(
+                            q.strip(), include_private=True, owner_id=user_id
+                        )
+                        # Keep only owned OR bookmarked kits
+                        db_kits = [
+                            k for k in db_kits
+                            if str(k.owner_id) == user["id"] or k.id in bookmarked_ids
+                        ]
+                    else:
+                        owned = await repo.list_by_owner(user_id)
+                        bookmarked = await bm_repo.list_bookmarked_kits(user_id)
+                        # Merge, avoiding duplicates (owned takes priority)
+                        seen_ids = set()
+                        db_kits = []
+                        for k in owned:
+                            db_kits.append(k)
+                            seen_ids.add(k.id)
+                        for k in bookmarked:
+                            if k.id not in seen_ids:
+                                db_kits.append(k)
+                        db_kits.sort(key=lambda k: k.name)
+
+                    for kit in db_kits:
+                        kits.append(
+                            {
+                                "slug": kit.slug,
+                                "name": kit.name,
+                                "description": kit.description,
+                                "is_public": kit.is_public,
+                                "created_at": kit.created_at.isoformat() if kit.created_at else None,
+                                "updated_at": kit.updated_at.isoformat() if kit.updated_at else None,
+                                "owner_id": str(kit.owner_id) if kit.owner_id else None,
+                                "is_bookmarked": kit.id in bookmarked_ids,
+                            }
+                        )
+            except Exception:
+                pass
+        return {"kits": kits}
+
+    if config.is_database_configured and q.strip():
+        try:
+            from ...db import BookmarkRepository, ReasoningKitRepository, get_async_session
+
+            async with get_async_session() as session:
+                repo = ReasoningKitRepository(session)
+                db_kits = await repo.search(q.strip())
+
+                bookmarked_ids: set = set()
+                if user:
+                    bm_repo = BookmarkRepository(session)
+                    bookmarked_ids = await bm_repo.get_bookmarked_kit_ids(UUID(user["id"]))
+
+                for kit in db_kits:
+                    kits.append(
+                        {
+                            "slug": kit.slug,
+                            "name": kit.name,
+                            "description": kit.description,
+                            "is_public": kit.is_public,
+                            "created_at": kit.created_at.isoformat() if kit.created_at else None,
+                            "updated_at": kit.updated_at.isoformat() if kit.updated_at else None,
+                            "owner_id": str(kit.owner_id) if kit.owner_id else None,
+                            "is_bookmarked": kit.id in bookmarked_ids,
+                        }
+                    )
+        except Exception:
+            pass
+    elif not q.strip():
+        # Empty search = return all (delegate to list endpoint logic)
+        result = await list_kits_json(request, user)
+        return result
+
+    return {"kits": kits}
+
+
+@router.post("/kits/{slug}/bookmark")
+async def toggle_bookmark_json(
+    request: Request,
+    slug: str,
+    user: dict | None = Depends(get_optional_user),
+):
+    """Toggle bookmark on a kit. Returns the new bookmark state."""
+    if not user:
+        return {"ok": False, "error": "Login required"}
+
+    from ...db.config import get_config
+
+    config = get_config()
+    if not config.is_database_configured:
+        return {"ok": False, "error": "Database not configured"}
+
+    try:
+        from ...db import BookmarkRepository, ReasoningKitRepository, get_async_session
+
+        async with get_async_session() as session:
+            repo = ReasoningKitRepository(session)
+            kit = await repo.get_by_slug(slug)
+            if not kit:
+                return {"ok": False, "error": "Kit not found"}
+
+            bm_repo = BookmarkRepository(session)
+            is_bookmarked, _ = await bm_repo.toggle(UUID(user["id"]), kit.id)
+            await session.commit()
+
+            return {"ok": True, "is_bookmarked": is_bookmarked}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+# =============================================================================
+# JSON AUTH API (for React SPA)
+# =============================================================================
+
+
+@router.post("/auth/json/login")
+async def login_json(request: Request):
+    """JSON login for SPA — accepts JSON body, returns JSON."""
+    try:
+        body = await request.json()
+    except Exception:
+        return {"ok": False, "error": "Invalid JSON body"}
+
+    email = body.get("email", "")
+    password = body.get("password", "")
+    if not email or not password:
+        return {"ok": False, "error": "Email and password are required."}
+
+    from ...db.config import get_config
+
+    config = get_config()
+    if not config.is_configured:
+        return {"ok": False, "error": "Supabase is not configured."}
+
+    try:
+        from ...db.config import get_supabase_client
+
+        client = get_supabase_client()
+        response = client.auth.sign_in_with_password(
+            {"email": email, "password": password}
+        )
+
+        if response.user:
+            request.session["user"] = {
+                "id": str(response.user.id),
+                "email": response.user.email,
+            }
+            return {
+                "ok": True,
+                "user": {
+                    "id": str(response.user.id),
+                    "email": response.user.email,
+                },
+            }
+        else:
+            return {"ok": False, "error": "Invalid credentials."}
+
+    except Exception as e:
+        error_msg = str(e)
+        if "Invalid login" in error_msg or "invalid" in error_msg.lower():
+            return {"ok": False, "error": "Invalid email or password."}
+        return {"ok": False, "error": f"Sign in error: {error_msg}"}
+
+
+@router.post("/auth/json/signup")
+async def signup_json(request: Request):
+    """JSON signup for SPA — accepts JSON body, returns JSON."""
+    try:
+        body = await request.json()
+    except Exception:
+        return {"ok": False, "error": "Invalid JSON body"}
+
+    email = body.get("email", "")
+    password = body.get("password", "")
+    if not email or not password:
+        return {"ok": False, "error": "Email and password are required."}
+
+    from ...db.config import get_config
+
+    config = get_config()
+    if not config.is_configured:
+        return {"ok": False, "error": "Supabase is not configured."}
+
+    try:
+        from ...db.config import get_supabase_client
+
+        client = get_supabase_client()
+        response = client.auth.sign_up({"email": email, "password": password})
+
+        if response.user:
+            identities = getattr(response.user, "identities", None)
+            if identities is not None and len(identities) == 0:
+                return {
+                    "ok": False,
+                    "error": "An account with this email already exists. Try signing in instead.",
+                }
+            return {
+                "ok": True,
+                "message": "Account created. Please check your email for confirmation.",
+            }
+        else:
+            return {"ok": False, "error": "Could not create account."}
+
+    except Exception as e:
+        error_msg = str(e).lower()
+        if "already registered" in error_msg or "already been registered" in error_msg:
+            return {
+                "ok": False,
+                "error": "An account with this email already exists. Try signing in instead.",
+            }
+        return {"ok": False, "error": f"Sign up error: {e}"}
+
+
+@router.post("/auth/json/logout")
+async def logout_json(request: Request):
+    """JSON logout for SPA."""
+    request.session.clear()
+    return {"ok": True}
+
+
+@router.post("/auth/json/reset-password")
+async def reset_password_json(request: Request):
+    """JSON password reset for SPA."""
+    try:
+        body = await request.json()
+    except Exception:
+        return {"ok": False, "error": "Invalid JSON body"}
+
+    email = body.get("email", "")
+    if not email:
+        return {"ok": False, "error": "Email is required."}
+
+    from ...db.config import get_config
+
+    config = get_config()
+    if not config.is_configured:
+        return {"ok": False, "error": "Supabase is not configured."}
+
+    try:
+        from ...db.config import get_supabase_client
+
+        client = get_supabase_client()
+        client.auth.reset_password_email(email)
+    except Exception:
+        pass
+
+    # Don't reveal whether the email exists
+    return {
+        "ok": True,
+        "message": "If an account with that email exists, a reset link has been sent.",
+    }
+
+
+# =============================================================================
+# JSON KIT DETAIL API (for React SPA)
+# =============================================================================
+
+
+@router.get("/kits/{slug}/detail")
+async def get_kit_detail_json(
+    request: Request,
+    slug: str,
+    user: dict | None = Depends(get_optional_user),
+):
+    """Get full kit detail as JSON for the React frontend."""
+    from ...db.config import get_config
+
+    config = get_config()
+    kit_data = None
+    resources = []
+    steps = []
+    source = "local"
+    is_owner = False
+
+    if config.is_database_configured:
+        try:
+            from ...db import ReasoningKitRepository, get_async_session
+
+            async with get_async_session() as session:
+                repo = ReasoningKitRepository(session)
+                db_kit = await repo.get_by_slug(slug)
+                if db_kit:
+                    version = db_kit.current_version
+                    kit_data = {
+                        "id": str(db_kit.id),
+                        "name": db_kit.name,
+                        "slug": db_kit.slug,
+                        "description": db_kit.description,
+                        "is_public": db_kit.is_public,
+                        "created_at": db_kit.created_at.isoformat() if db_kit.created_at else None,
+                        "version_number": version.version_number if version else None,
+                    }
+                    source = "database"
+                    is_owner = (
+                        user is not None
+                        and db_kit.owner_id is not None
+                        and str(db_kit.owner_id) == user["id"]
+                    )
+
+                    if version:
+                        for r in sorted(version.resources, key=lambda x: x.resource_number):
+                            resources.append(
+                                {
+                                    "number": r.resource_number,
+                                    "resource_id": r.resource_id,
+                                    "filename": r.filename,
+                                    "display_name": r.display_name,
+                                    "is_dynamic": getattr(r, "is_dynamic", False),
+                                    "extracted_text": r.extracted_text,
+                                    "file_size_bytes": r.file_size_bytes,
+                                    "mime_type": r.mime_type,
+                                }
+                            )
+                        for s in sorted(version.workflow_steps, key=lambda x: x.step_number):
+                            steps.append(
+                                {
+                                    "number": s.step_number,
+                                    "output_id": s.output_id,
+                                    "prompt_template": s.prompt_template,
+                                    "display_name": s.display_name,
+                                }
+                            )
+        except Exception:
+            pass
+
+    if not kit_data:
+        # Fall back to local filesystem
+        try:
+            from ...loader import load_reasoning_kit
+            from ...cli import resolve_kit_path
+
+            kit_path = resolve_kit_path(slug, "reasoning_kits")
+            kit = load_reasoning_kit(kit_path)
+            kit_data = {
+                "id": slug,
+                "name": kit.name,
+                "slug": slug,
+                "description": "",
+                "is_public": True,
+                "created_at": None,
+                "version_number": None,
+            }
+            source = "local"
+            for key in sorted(kit.resources.keys(), key=int):
+                r = kit.resources[key]
+                resources.append(
+                    {
+                        "number": int(key),
+                        "resource_id": r.resource_id,
+                        "filename": r.file,
+                        "display_name": getattr(r, "display_name", None),
+                        "is_dynamic": getattr(r, "is_dynamic", False),
+                        "extracted_text": r.content,
+                        "file_size_bytes": len(r.content.encode()) if r.content else 0,
+                        "mime_type": "text/plain",
+                    }
+                )
+            for key in sorted(kit.workflow.keys(), key=int):
+                s = kit.workflow[key]
+                steps.append(
+                    {
+                        "number": int(key),
+                        "output_id": s.output_id,
+                        "prompt_template": s.prompt,
+                        "display_name": getattr(s, "display_name", None),
+                    }
+                )
+        except Exception:
+            return {"error": f"Kit '{slug}' not found."}
+
+    return {
+        "kit": kit_data,
+        "resources": resources,
+        "steps": steps,
+        "source": source,
+        "is_owner": is_owner,
+    }
+
+
+# =============================================================================
+# AUTH API (legacy form-based)
 # =============================================================================
 
 
@@ -1723,6 +2213,7 @@ async def reset_password(
 async def search_kits(
     request: Request,
     q: str = "",
+    filter: str = "all",
     user: dict | None = Depends(get_optional_user),
 ):
     """Search kits and return partial HTML for HTMX swap."""
@@ -1732,6 +2223,50 @@ async def search_kits(
     kits = []
 
     config = get_config()
+
+    # "My Kits" filter — show only kits owned by the logged-in user
+    if filter == "mine" and user:
+        if config.is_database_configured:
+            try:
+                from ...db import ReasoningKitRepository, get_async_session
+
+                async with get_async_session() as session:
+                    repo = ReasoningKitRepository(session)
+                    if q.strip():
+                        db_kits = await repo.search(
+                            q.strip(), include_private=True, owner_id=UUID(user["id"])
+                        )
+                        # Further filter to only owned kits
+                        db_kits = [
+                            k for k in db_kits if str(k.owner_id) == user["id"]
+                        ]
+                    else:
+                        db_kits = await repo.list_by_owner(UUID(user["id"]))
+                    for kit in db_kits:
+                        kits.append(
+                            {
+                                "slug": kit.slug,
+                                "name": kit.name,
+                                "description": kit.description,
+                                "is_public": kit.is_public,
+                                "created_at": kit.created_at,
+                                "updated_at": kit.updated_at,
+                                "owner_id": str(kit.owner_id) if kit.owner_id else None,
+                            }
+                        )
+            except Exception:
+                pass
+
+        return templates.TemplateResponse(
+            request,
+            "partials/kit_list.html",
+            {
+                "kits": kits,
+                "user": user,
+            },
+        )
+
+    # Default: "All Kits" — public kits (with optional search)
     if config.is_database_configured and q.strip():
         try:
             from ...db import ReasoningKitRepository, get_async_session
@@ -1748,6 +2283,7 @@ async def search_kits(
                             "is_public": kit.is_public,
                             "created_at": kit.created_at,
                             "updated_at": kit.updated_at,
+                            "owner_id": str(kit.owner_id) if kit.owner_id else None,
                         }
                     )
         except Exception:
@@ -1770,6 +2306,7 @@ async def search_kits(
                                 "is_public": kit.is_public,
                                 "created_at": kit.created_at,
                                 "updated_at": kit.updated_at,
+                                "owner_id": str(kit.owner_id) if kit.owner_id else None,
                             }
                         )
             except Exception:
@@ -1789,6 +2326,7 @@ async def search_kits(
                             "is_public": True,
                             "created_at": None,
                             "updated_at": None,
+                            "owner_id": None,
                         }
                     )
             except Exception:
@@ -1799,5 +2337,7 @@ async def search_kits(
         "partials/kit_list.html",
         {
             "kits": kits,
+            "user": user,
         },
     )
+

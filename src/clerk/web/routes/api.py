@@ -11,39 +11,30 @@ from pathlib import Path
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Form, Request, UploadFile, File
-from fastapi.responses import RedirectResponse, StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 
 from ..dependencies import get_optional_user
 
 router = APIRouter()
 
 
-
-
-
-def _flash(request: Request, text: str, type: str = "info") -> None:
-    """Add a flash message to the session."""
-    if "flash" not in request.session:
-        request.session["flash"] = []
-    request.session["flash"].append({"text": text, "type": type})
-
-
-def _require_auth(request: Request, user: dict | None) -> RedirectResponse | None:
-    """Return a redirect if user is not logged in, else None."""
+def _check_auth(user: dict | None) -> JSONResponse | None:
+    """Return a 401 JSON response if user is not logged in, else None."""
     if not user:
-        _flash(request, "Sign in to manage kits.", "error")
-        return RedirectResponse("/auth/login", status_code=303)
+        return JSONResponse({"ok": False, "error": "Sign in to manage kits."}, status_code=401)
     return None
 
 
-def _check_ownership(
-    request: Request, db_kit, user: dict | None, slug: str
-) -> RedirectResponse | None:
-    """Return a redirect if user doesn't own the kit, else None."""
+def _check_kit_ownership(db_kit, user: dict | None) -> JSONResponse | None:
+    """Return a 403 JSON response if user doesn't own the kit, else None."""
     if db_kit.owner_id and (not user or str(db_kit.owner_id) != user["id"]):
-        _flash(request, "You don't have permission to modify this kit.", "error")
-        return RedirectResponse(f"/kit/{slug}", status_code=303)
+        return JSONResponse(
+            {"ok": False, "error": "You don't have permission to modify this kit."},
+            status_code=403,
+        )
     return None
+
+
 
 
 # =============================================================================
@@ -51,25 +42,31 @@ def _check_ownership(
 # =============================================================================
 
 
-@router.post("/kits", response_class=RedirectResponse)
+@router.post("/kits")
 async def create_kit(
     request: Request,
-    name: str = Form(...),
-    description: str = Form(""),
     user: dict | None = Depends(get_optional_user),
 ):
-    """Create a new reasoning kit."""
-    redirect = _require_auth(request, user)
-    if redirect:
-        return redirect
+    """Create a new reasoning kit. Accepts JSON body {name, description}."""
+    auth_err = _check_auth(user)
+    if auth_err:
+        return auth_err
 
-    from ...db.config import get_config
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"ok": False, "error": "Invalid JSON body"}, status_code=400)
 
-    # Generate slug
+    name = body.get("name", "").strip()
+    description = body.get("description", "").strip()
+    if not name:
+        return JSONResponse({"ok": False, "error": "Kit name is required."}, status_code=400)
+
     slug = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
     if not slug:
-        _flash(request, "Invalid kit name.", "error")
-        return RedirectResponse("/kit/new", status_code=303)
+        return JSONResponse({"ok": False, "error": "Invalid kit name."}, status_code=400)
+
+    from ...db.config import get_config
 
     config = get_config()
     if config.is_database_configured:
@@ -81,13 +78,12 @@ async def create_kit(
             async with get_async_session() as session:
                 repo = ReasoningKitRepository(session)
 
-                # Check if slug already exists
                 existing = await repo.get_by_slug(slug)
                 if existing:
-                    _flash(
-                        request, f"A kit with slug '{slug}' already exists.", "error"
+                    return JSONResponse(
+                        {"ok": False, "error": f"A kit with slug '{slug}' already exists."},
+                        status_code=409,
                     )
-                    return RedirectResponse("/kit/new", status_code=303)
 
                 kit = await repo.create(
                     slug=slug,
@@ -97,41 +93,42 @@ async def create_kit(
                     is_public=True,
                 )
 
-            _flash(request, f"Kit '{name}' created.", "success")
-            return RedirectResponse(f"/kit/{slug}", status_code=303)
+            return {"ok": True, "slug": slug}
 
         except Exception as e:
-            _flash(request, f"Error creating kit: {e}", "error")
-            return RedirectResponse("/kit/new", status_code=303)
+            return JSONResponse({"ok": False, "error": f"Error creating kit: {e}"}, status_code=500)
     else:
-        # Local filesystem
         try:
             kit_path = Path("reasoning_kits") / slug
             if kit_path.exists():
-                _flash(request, f"Kit '{slug}' already exists.", "error")
-                return RedirectResponse("/kit/new", status_code=303)
-
+                return JSONResponse(
+                    {"ok": False, "error": f"Kit '{slug}' already exists."},
+                    status_code=409,
+                )
             kit_path.mkdir(parents=True)
-            _flash(request, f"Kit '{name}' created.", "success")
-            return RedirectResponse(f"/kit/{slug}", status_code=303)
-
+            return {"ok": True, "slug": slug}
         except Exception as e:
-            _flash(request, f"Error creating kit: {e}", "error")
-            return RedirectResponse("/kit/new", status_code=303)
+            return JSONResponse({"ok": False, "error": f"Error creating kit: {e}"}, status_code=500)
 
 
-@router.post("/kits/{slug}/update", response_class=RedirectResponse)
+@router.put("/kits/{slug}")
 async def update_kit(
     request: Request,
     slug: str,
-    name: str = Form(...),
-    description: str = Form(""),
     user: dict | None = Depends(get_optional_user),
 ):
-    """Update a reasoning kit."""
-    redirect = _require_auth(request, user)
-    if redirect:
-        return redirect
+    """Update a reasoning kit. Accepts JSON body {name, description}."""
+    auth_err = _check_auth(user)
+    if auth_err:
+        return auth_err
+
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"ok": False, "error": "Invalid JSON body"}, status_code=400)
+
+    name = body.get("name", "").strip()
+    description = body.get("description", "").strip()
 
     from ...db.config import get_config
 
@@ -145,12 +142,11 @@ async def update_kit(
                 db_kit = await repo.get_by_slug(slug)
 
                 if not db_kit:
-                    _flash(request, f"Kit '{slug}' not found.", "error")
-                    return RedirectResponse("/", status_code=303)
+                    return JSONResponse({"ok": False, "error": f"Kit '{slug}' not found."}, status_code=404)
 
-                redirect = _check_ownership(request, db_kit, user, slug)
-                if redirect:
-                    return redirect
+                own_err = _check_kit_ownership(db_kit, user)
+                if own_err:
+                    return own_err
 
                 await repo.update(
                     kit_id=db_kit.id,
@@ -158,23 +154,23 @@ async def update_kit(
                     description=description or None,
                 )
 
-            _flash(request, "Kit updated.", "success")
+            return {"ok": True}
         except Exception as e:
-            _flash(request, f"Error updating kit: {e}", "error")
+            return JSONResponse({"ok": False, "error": f"Error updating kit: {e}"}, status_code=500)
 
-    return RedirectResponse(f"/kit/{slug}", status_code=303)
+    return JSONResponse({"ok": False, "error": "Database not configured"}, status_code=500)
 
 
-@router.post("/kits/{slug}/delete", response_class=RedirectResponse)
+@router.delete("/kits/{slug}")
 async def delete_kit(
     request: Request,
     slug: str,
     user: dict | None = Depends(get_optional_user),
 ):
     """Delete a reasoning kit."""
-    redirect = _require_auth(request, user)
-    if redirect:
-        return redirect
+    auth_err = _check_auth(user)
+    if auth_err:
+        return auth_err
 
     from ...db.config import get_config
 
@@ -187,30 +183,27 @@ async def delete_kit(
                 repo = ReasoningKitRepository(session)
                 db_kit = await repo.get_by_slug(slug)
 
-                if db_kit:
-                    redirect = _check_ownership(request, db_kit, user, slug)
-                    if redirect:
-                        return redirect
+                if not db_kit:
+                    return JSONResponse({"ok": False, "error": f"Kit '{slug}' not found."}, status_code=404)
 
-                    await repo.delete(db_kit.id)
-                    _flash(request, f"Kit '{slug}' deleted.", "success")
-                else:
-                    _flash(request, f"Kit '{slug}' not found.", "error")
+                own_err = _check_kit_ownership(db_kit, user)
+                if own_err:
+                    return own_err
 
+                await repo.delete(db_kit.id)
+
+            return {"ok": True}
         except Exception as e:
-            _flash(request, f"Error deleting kit: {e}", "error")
+            return JSONResponse({"ok": False, "error": f"Error deleting kit: {e}"}, status_code=500)
     else:
-        # Local filesystem
         import shutil
 
         kit_path = Path("reasoning_kits") / slug
         if kit_path.exists():
             shutil.rmtree(kit_path)
-            _flash(request, f"Kit '{slug}' deleted.", "success")
+            return {"ok": True}
         else:
-            _flash(request, f"Kit '{slug}' not found.", "error")
-
-    return RedirectResponse("/", status_code=303)
+            return JSONResponse({"ok": False, "error": f"Kit '{slug}' not found."}, status_code=404)
 
 
 # =============================================================================
@@ -218,7 +211,7 @@ async def delete_kit(
 # =============================================================================
 
 
-@router.post("/kits/{slug}/resources", response_class=RedirectResponse)
+@router.post("/kits/{slug}/resources")
 async def add_resource(
     request: Request,
     slug: str,
@@ -228,10 +221,10 @@ async def add_resource(
     display_name: str = Form(""),
     user: dict | None = Depends(get_optional_user),
 ):
-    """Add a resource to a kit (creates a new version)."""
-    redirect = _require_auth(request, user)
-    if redirect:
-        return redirect
+    """Add a resource to a kit (creates a new version). Returns JSON."""
+    auth_err = _check_auth(user)
+    if auth_err:
+        return auth_err
 
     from ...db.config import get_config
 
@@ -247,21 +240,20 @@ async def add_resource(
                 get_async_session,
             )
 
-            # Determine source: uploaded file or pasted text
             if text_content.strip():
-                # Text input path
                 file_content = text_content.encode("utf-8")
                 safe_name = (display_name.strip() or "resource").replace(" ", "_")
                 filename = f"{safe_name}.txt"
                 mime_type = "text/plain"
             elif file and file.filename:
-                # File upload path
                 file_content = await file.read()
                 filename = file.filename
                 mime_type = detect_mime_type_from_filename(filename)
             else:
-                _flash(request, "Please upload a file or paste text content.", "error")
-                return RedirectResponse(f"/kit/{slug}", status_code=303)
+                return JSONResponse(
+                    {"ok": False, "error": "Please upload a file or paste text content."},
+                    status_code=400,
+                )
 
             async with get_async_session() as session:
                 kit_repo = ReasoningKitRepository(session)
@@ -269,26 +261,22 @@ async def add_resource(
                 db_kit = await kit_repo.get_by_slug(slug)
 
                 if not db_kit:
-                    _flash(request, f"Kit '{slug}' not found.", "error")
-                    return RedirectResponse(f"/kit/{slug}", status_code=303)
+                    return JSONResponse({"ok": False, "error": f"Kit '{slug}' not found."}, status_code=404)
 
-                redirect = _check_ownership(request, db_kit, user, slug)
-                if redirect:
-                    return redirect
+                own_err = _check_kit_ownership(db_kit, user)
+                if own_err:
+                    return own_err
 
-                # Determine resource number
                 resource_number = 1
                 if db_kit.current_version:
                     resource_number = len(db_kit.current_version.resources) + 1
 
-                # Create new version
                 commit_msg = f"Added resource: {filename}"
                 version = await version_repo.create(
                     kit_id=db_kit.id,
                     commit_message=commit_msg,
                 )
 
-                # Copy existing resources from previous version
                 if db_kit.current_version:
                     old_version = db_kit.current_version
                     for r in old_version.resources:
@@ -311,13 +299,9 @@ async def add_resource(
                             display_name=s.display_name,
                         )
 
-                # Upload file to storage
                 storage = StorageService(use_service_key=True)
                 import tempfile
-
-                with tempfile.NamedTemporaryFile(
-                    delete=False, suffix=Path(filename).suffix
-                ) as tmp:
+                with tempfile.NamedTemporaryFile(delete=False, suffix=Path(filename).suffix) as tmp:
                     tmp.write(file_content)
                     tmp_path = Path(tmp.name)
 
@@ -331,7 +315,6 @@ async def add_resource(
                 finally:
                     tmp_path.unlink(missing_ok=True)
 
-                # Extract text
                 extracted = extract_text_from_bytes(file_content, mime_type)
 
                 await version_repo.add_resource(
@@ -346,19 +329,16 @@ async def add_resource(
                     display_name=display_name.strip() or None,
                 )
 
-            _flash(request, f"Resource '{filename}' added.", "success")
+            return {"ok": True}
 
         except Exception as e:
-            _flash(request, f"Error adding resource: {e}", "error")
+            return JSONResponse({"ok": False, "error": f"Error adding resource: {e}"}, status_code=500)
     else:
-        # Local filesystem
         try:
             kit_path = Path("reasoning_kits") / slug
             if not kit_path.exists():
-                _flash(request, f"Kit '{slug}' not found.", "error")
-                return RedirectResponse(f"/kit/{slug}", status_code=303)
+                return JSONResponse({"ok": False, "error": f"Kit '{slug}' not found."}, status_code=404)
 
-            # Find next resource number
             existing = list(kit_path.glob("resource_*.*"))
             numbers = []
             for f in existing:
@@ -370,55 +350,47 @@ async def add_resource(
             if text_content.strip():
                 ext = ".txt"
                 content = text_content.encode("utf-8")
-                filename = f"resource_{next_num}.txt"
             elif file and file.filename:
-                filename = file.filename
-                ext = Path(filename).suffix or ".txt"
+                ext = Path(file.filename).suffix or ".txt"
                 content = await file.read()
             else:
-                _flash(request, "Please upload a file or paste text content.", "error")
-                return RedirectResponse(f"/kit/{slug}", status_code=303)
+                return JSONResponse(
+                    {"ok": False, "error": "Please upload a file or paste text content."},
+                    status_code=400,
+                )
 
             dest = kit_path / f"resource_{next_num}{ext}"
             dest.write_bytes(content)
 
-            _flash(
-                request,
-                f"Resource '{filename}' added as resource_{next_num}.",
-                "success",
-            )
+            return {"ok": True}
         except Exception as e:
-            _flash(request, f"Error adding resource: {e}", "error")
-
-    return RedirectResponse(f"/kit/{slug}", status_code=303)
+            return JSONResponse({"ok": False, "error": f"Error adding resource: {e}"}, status_code=500)
 
 
-@router.post("/kits/{slug}/resources/{number}/delete", response_class=RedirectResponse)
+@router.delete("/kits/{slug}/resources/{number}")
 async def delete_resource(
     request: Request,
     slug: str,
     number: int,
     user: dict | None = Depends(get_optional_user),
 ):
-    """Delete a resource from a kit."""
-    redirect = _require_auth(request, user)
-    if redirect:
-        return redirect
+    """Delete a resource from a kit. Returns JSON."""
+    auth_err = _check_auth(user)
+    if auth_err:
+        return auth_err
 
     from ...db.config import get_config
 
     config = get_config()
     if not config.is_database_configured:
-        # Local filesystem
         kit_path = Path("reasoning_kits") / slug
         matches = list(kit_path.glob(f"resource_{number}.*"))
         if matches:
             matches[0].unlink()
-            _flash(request, f"Resource {number} deleted.", "success")
+            return {"ok": True}
         else:
-            _flash(request, f"Resource {number} not found.", "error")
+            return JSONResponse({"ok": False, "error": f"Resource {number} not found."}, status_code=404)
     else:
-        # Database: create new version without this resource
         try:
             from ...db import (
                 KitVersionRepository,
@@ -432,19 +404,17 @@ async def delete_resource(
                 db_kit = await kit_repo.get_by_slug(slug)
 
                 if not db_kit or not db_kit.current_version:
-                    _flash(request, "Kit or version not found.", "error")
-                    return RedirectResponse(f"/kit/{slug}", status_code=303)
+                    return JSONResponse({"ok": False, "error": "Kit or version not found."}, status_code=404)
 
-                redirect = _check_ownership(request, db_kit, user, slug)
-                if redirect:
-                    return redirect
+                own_err = _check_kit_ownership(db_kit, user)
+                if own_err:
+                    return own_err
 
                 version = await version_repo.create(
                     kit_id=db_kit.id,
                     commit_message=f"Deleted resource {number}",
                 )
 
-                # Copy resources except deleted one
                 for r in db_kit.current_version.resources:
                     if r.resource_number != number:
                         await version_repo.add_resource(
@@ -459,7 +429,6 @@ async def delete_resource(
                             display_name=r.display_name,
                         )
 
-                # Copy all steps
                 for s in db_kit.current_version.workflow_steps:
                     await version_repo.add_workflow_step(
                         version_id=version.id,
@@ -468,14 +437,12 @@ async def delete_resource(
                         display_name=s.display_name,
                     )
 
-            _flash(request, f"Resource {number} deleted.", "success")
+            return {"ok": True}
         except Exception as e:
-            _flash(request, f"Error: {e}", "error")
-
-    return RedirectResponse(f"/kit/{slug}", status_code=303)
+            return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
 
 
-@router.post("/kits/{slug}/resources/{number}/update", response_class=RedirectResponse)
+@router.post("/kits/{slug}/resources/{number}/update")
 async def update_resource(
     request: Request,
     slug: str,
@@ -486,10 +453,10 @@ async def update_resource(
     file: UploadFile | None = File(None),
     user: dict | None = Depends(get_optional_user),
 ):
-    """Update a resource in a kit (creates a new version)."""
-    redirect = _require_auth(request, user)
-    if redirect:
-        return redirect
+    """Update a resource in a kit (creates a new version). Returns JSON."""
+    auth_err = _check_auth(user)
+    if auth_err:
+        return auth_err
 
     from ...db.config import get_config
 
@@ -505,7 +472,6 @@ async def update_resource(
                 get_async_session,
             )
 
-            # Determine new content source: pasted text or uploaded file
             new_file_content = None
             new_filename = None
             if text_content.strip():
@@ -522,39 +488,31 @@ async def update_resource(
                 db_kit = await kit_repo.get_by_slug(slug)
 
                 if not db_kit or not db_kit.current_version:
-                    _flash(request, "Kit or version not found.", "error")
-                    return RedirectResponse(f"/kit/{slug}", status_code=303)
+                    return JSONResponse({"ok": False, "error": "Kit or version not found."}, status_code=404)
 
-                redirect = _check_ownership(request, db_kit, user, slug)
-                if redirect:
-                    return redirect
+                own_err = _check_kit_ownership(db_kit, user)
+                if own_err:
+                    return own_err
 
                 version = await version_repo.create(
                     kit_id=db_kit.id,
                     commit_message=f"Updated resource {number}",
                 )
 
-                # Copy resources, replacing the updated one
                 for r in db_kit.current_version.resources:
                     if r.resource_number == number:
-                        # Updated resource
                         res_display_name = display_name.strip() or None
                         res_is_dynamic = bool(is_dynamic)
 
-                        # If a new file was uploaded, handle storage
                         if new_file_content and new_filename:
                             mime_type = detect_mime_type_from_filename(new_filename)
                             extracted = extract_text_from_bytes(
                                 new_file_content, mime_type
                             )
 
-                            # Upload new file
                             storage = StorageService(use_service_key=True)
                             import tempfile
-
-                            with tempfile.NamedTemporaryFile(
-                                delete=False, suffix=Path(new_filename).suffix
-                            ) as tmp:
+                            with tempfile.NamedTemporaryFile(delete=False, suffix=Path(new_filename).suffix) as tmp:
                                 tmp.write(new_file_content)
                                 tmp_path = Path(tmp.name)
 
@@ -580,7 +538,6 @@ async def update_resource(
                                 display_name=res_display_name,
                             )
                         else:
-                            # Keep existing file, just update metadata
                             await version_repo.add_resource(
                                 version_id=version.id,
                                 resource_number=r.resource_number,
@@ -593,7 +550,6 @@ async def update_resource(
                                 display_name=res_display_name,
                             )
                     else:
-                        # Copy unchanged resource
                         await version_repo.add_resource(
                             version_id=version.id,
                             resource_number=r.resource_number,
@@ -606,7 +562,6 @@ async def update_resource(
                             display_name=r.display_name,
                         )
 
-                # Copy all steps
                 for s in db_kit.current_version.workflow_steps:
                     await version_repo.add_workflow_step(
                         version_id=version.id,
@@ -615,30 +570,38 @@ async def update_resource(
                         display_name=s.display_name,
                     )
 
-            _flash(request, f"Resource {number} updated.", "success")
+            return {"ok": True}
         except Exception as e:
-            _flash(request, f"Error updating resource: {e}", "error")
+            return JSONResponse({"ok": False, "error": f"Error updating resource: {e}"}, status_code=500)
 
-    return RedirectResponse(f"/kit/{slug}", status_code=303)
-
+    return JSONResponse({"ok": False, "error": "Database not configured"}, status_code=500)
 
 # =============================================================================
 # STEP MANAGEMENT
 # =============================================================================
 
 
-@router.post("/kits/{slug}/steps", response_class=RedirectResponse)
+@router.post("/kits/{slug}/steps")
 async def add_step(
     request: Request,
     slug: str,
-    prompt: str = Form(...),
-    display_name: str = Form(""),
     user: dict | None = Depends(get_optional_user),
 ):
-    """Add a workflow step to a kit."""
-    redirect = _require_auth(request, user)
-    if redirect:
-        return redirect
+    """Add a workflow step to a kit. Accepts JSON body {prompt, display_name}. Returns JSON."""
+    auth_err = _check_auth(user)
+    if auth_err:
+        return auth_err
+
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"ok": False, "error": "Invalid JSON body"}, status_code=400)
+
+    prompt = body.get("prompt", "")
+    display_name = body.get("display_name", "")
+
+    if not prompt:
+        return JSONResponse({"ok": False, "error": "Prompt is required."}, status_code=400)
 
     from ...db.config import get_config
 
@@ -657,12 +620,11 @@ async def add_step(
                 db_kit = await kit_repo.get_by_slug(slug)
 
                 if not db_kit:
-                    _flash(request, f"Kit '{slug}' not found.", "error")
-                    return RedirectResponse(f"/kit/{slug}", status_code=303)
+                    return JSONResponse({"ok": False, "error": f"Kit '{slug}' not found."}, status_code=404)
 
-                redirect = _check_ownership(request, db_kit, user, slug)
-                if redirect:
-                    return redirect
+                own_err = _check_kit_ownership(db_kit, user)
+                if own_err:
+                    return own_err
 
                 step_number = 1
                 if db_kit.current_version:
@@ -673,7 +635,6 @@ async def add_step(
                     commit_message=f"Added step {step_number}",
                 )
 
-                # Copy existing resources and steps
                 if db_kit.current_version:
                     for r in db_kit.current_version.resources:
                         await version_repo.add_resource(
@@ -695,7 +656,6 @@ async def add_step(
                             display_name=s.display_name,
                         )
 
-                # Add new step
                 await version_repo.add_workflow_step(
                     version_id=version.id,
                     step_number=step_number,
@@ -703,17 +663,15 @@ async def add_step(
                     display_name=display_name.strip() or None,
                 )
 
-            _flash(request, f"Step {step_number} added.", "success")
+            return {"ok": True}
 
         except Exception as e:
-            _flash(request, f"Error adding step: {e}", "error")
+            return JSONResponse({"ok": False, "error": f"Error adding step: {e}"}, status_code=500)
     else:
-        # Local filesystem
         try:
             kit_path = Path("reasoning_kits") / slug
             if not kit_path.exists():
-                _flash(request, f"Kit '{slug}' not found.", "error")
-                return RedirectResponse(f"/kit/{slug}", status_code=303)
+                return JSONResponse({"ok": False, "error": f"Kit '{slug}' not found."}, status_code=404)
 
             existing = list(kit_path.glob("instruction_*.txt"))
             numbers = []
@@ -725,26 +683,40 @@ async def add_step(
 
             dest = kit_path / f"instruction_{next_num}.txt"
             dest.write_text(prompt)
-            _flash(request, f"Step {next_num} added.", "success")
+            return {"ok": True}
         except Exception as e:
-            _flash(request, f"Error adding step: {e}", "error")
-
-    return RedirectResponse(f"/kit/{slug}", status_code=303)
+            return JSONResponse({"ok": False, "error": f"Error adding step: {e}"}, status_code=500)
 
 
-@router.post("/kits/{slug}/steps/{number}/update", response_class=RedirectResponse)
+@router.post("/kits/{slug}/steps/{number}/update")
 async def update_step(
     request: Request,
     slug: str,
     number: int,
-    prompt: str = Form(...),
-    display_name: str = Form(""),
     user: dict | None = Depends(get_optional_user),
+    # Note: frontend sends FormData for updates here, checking request type
 ):
-    """Update a workflow step."""
-    redirect = _require_auth(request, user)
-    if redirect:
-        return redirect
+    """Update a workflow step. Supports JSON or FormData. Returns JSON."""
+    auth_err = _check_auth(user)
+    if auth_err:
+        return auth_err
+
+    # Handle both FormData and JSON for smooth frontend migration
+    content_type = request.headers.get("content-type", "")
+    if "multipart/form-data" in content_type or "application/x-www-form-urlencoded" in content_type:
+        form = await request.form()
+        prompt = form.get("prompt", "")
+        display_name = form.get("display_name", "")
+    else:
+        try:
+            body = await request.json()
+            prompt = body.get("prompt", "")
+            display_name = body.get("display_name", "")
+        except Exception:
+            return JSONResponse({"ok": False, "error": "Invalid request body"}, status_code=400)
+
+    if not prompt:
+        return JSONResponse({"ok": False, "error": "Prompt is required."}, status_code=400)
 
     from ...db.config import get_config
 
@@ -763,19 +735,17 @@ async def update_step(
                 db_kit = await kit_repo.get_by_slug(slug)
 
                 if not db_kit or not db_kit.current_version:
-                    _flash(request, "Kit or version not found.", "error")
-                    return RedirectResponse(f"/kit/{slug}", status_code=303)
+                    return JSONResponse({"ok": False, "error": "Kit or version not found."}, status_code=404)
 
-                redirect = _check_ownership(request, db_kit, user, slug)
-                if redirect:
-                    return redirect
+                own_err = _check_kit_ownership(db_kit, user)
+                if own_err:
+                    return own_err
 
                 version = await version_repo.create(
                     kit_id=db_kit.id,
                     commit_message=f"Updated step {number}",
                 )
 
-                # Copy resources
                 for r in db_kit.current_version.resources:
                     await version_repo.add_resource(
                         version_id=version.id,
@@ -789,7 +759,6 @@ async def update_step(
                         display_name=r.display_name,
                     )
 
-                # Copy steps, replacing the updated one
                 for s in db_kit.current_version.workflow_steps:
                     template = prompt if s.step_number == number else s.prompt_template
                     step_display = (
@@ -804,32 +773,29 @@ async def update_step(
                         display_name=step_display,
                     )
 
-            _flash(request, f"Step {number} updated.", "success")
+            return {"ok": True}
         except Exception as e:
-            _flash(request, f"Error: {e}", "error")
+            return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
     else:
-        # Local filesystem
         step_file = Path("reasoning_kits") / slug / f"instruction_{number}.txt"
         if step_file.exists():
             step_file.write_text(prompt)
-            _flash(request, f"Step {number} updated.", "success")
+            return {"ok": True}
         else:
-            _flash(request, f"Step {number} not found.", "error")
-
-    return RedirectResponse(f"/kit/{slug}", status_code=303)
+            return JSONResponse({"ok": False, "error": f"Step {number} not found."}, status_code=404)
 
 
-@router.post("/kits/{slug}/steps/{number}/delete", response_class=RedirectResponse)
+@router.delete("/kits/{slug}/steps/{number}")
 async def delete_step(
     request: Request,
     slug: str,
     number: int,
     user: dict | None = Depends(get_optional_user),
 ):
-    """Delete a workflow step."""
-    redirect = _require_auth(request, user)
-    if redirect:
-        return redirect
+    """Delete a workflow step. Returns JSON."""
+    auth_err = _check_auth(user)
+    if auth_err:
+        return auth_err
 
     from ...db.config import get_config
 
@@ -838,9 +804,9 @@ async def delete_step(
         step_file = Path("reasoning_kits") / slug / f"instruction_{number}.txt"
         if step_file.exists():
             step_file.unlink()
-            _flash(request, f"Step {number} deleted.", "success")
+            return {"ok": True}
         else:
-            _flash(request, f"Step {number} not found.", "error")
+            return JSONResponse({"ok": False, "error": f"Step {number} not found."}, status_code=404)
     else:
         try:
             from ...db import (
@@ -855,19 +821,17 @@ async def delete_step(
                 db_kit = await kit_repo.get_by_slug(slug)
 
                 if not db_kit or not db_kit.current_version:
-                    _flash(request, "Kit or version not found.", "error")
-                    return RedirectResponse(f"/kit/{slug}", status_code=303)
+                    return JSONResponse({"ok": False, "error": "Kit or version not found."}, status_code=404)
 
-                redirect = _check_ownership(request, db_kit, user, slug)
-                if redirect:
-                    return redirect
+                own_err = _check_kit_ownership(db_kit, user)
+                if own_err:
+                    return own_err
 
                 version = await version_repo.create(
                     kit_id=db_kit.id,
                     commit_message=f"Deleted step {number}",
                 )
 
-                # Copy resources
                 for r in db_kit.current_version.resources:
                     await version_repo.add_resource(
                         version_id=version.id,
@@ -881,7 +845,6 @@ async def delete_step(
                         display_name=r.display_name,
                     )
 
-                # Copy steps except deleted one
                 for s in db_kit.current_version.workflow_steps:
                     if s.step_number != number:
                         await version_repo.add_workflow_step(
@@ -891,11 +854,9 @@ async def delete_step(
                             display_name=s.display_name,
                         )
 
-            _flash(request, f"Step {number} deleted.", "success")
+            return {"ok": True}
         except Exception as e:
-            _flash(request, f"Error: {e}", "error")
-
-    return RedirectResponse(f"/kit/{slug}", status_code=303)
+            return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
 
 
 # =============================================================================
@@ -1786,7 +1747,7 @@ async def toggle_bookmark_json(
 # =============================================================================
 
 
-@router.post("/auth/json/login")
+@router.post("/auth/login")
 async def login_json(request: Request):
     """JSON login for SPA — accepts JSON body, returns JSON."""
     try:
@@ -1835,7 +1796,7 @@ async def login_json(request: Request):
         return {"ok": False, "error": f"Sign in error: {error_msg}"}
 
 
-@router.post("/auth/json/signup")
+@router.post("/auth/signup")
 async def signup_json(request: Request):
     """JSON signup for SPA — accepts JSON body, returns JSON."""
     try:
@@ -1884,14 +1845,14 @@ async def signup_json(request: Request):
         return {"ok": False, "error": f"Sign up error: {e}"}
 
 
-@router.post("/auth/json/logout")
+@router.post("/auth/logout")
 async def logout_json(request: Request):
     """JSON logout for SPA."""
     request.session.clear()
     return {"ok": True}
 
 
-@router.post("/auth/json/reset-password")
+@router.post("/auth/reset-password")
 async def reset_password_json(request: Request):
     """JSON password reset for SPA."""
     try:

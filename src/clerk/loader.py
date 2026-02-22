@@ -5,6 +5,7 @@ from pathlib import Path
 from uuid import UUID
 
 from .db import (
+    KitVersionRepository,
     ReasoningKitRepository,
     StorageService,
     get_async_session,
@@ -131,11 +132,12 @@ def list_reasoning_kits(base_path: str | Path = "reasoning_kits") -> list[str]:
 # =============================================================================
 
 
-async def load_reasoning_kit_from_db(slug: str) -> LoadedKit:
+async def load_reasoning_kit_from_db(slug: str, version_id: UUID | None = None) -> LoadedKit:
     """Load a reasoning kit from the database by slug.
 
     Args:
         slug: The kit's URL-friendly slug
+        version_id: Optional specific version ID to load instead of current_version
 
     Returns:
         A LoadedKit containing the ReasoningKit and database metadata
@@ -150,13 +152,21 @@ async def load_reasoning_kit_from_db(slug: str) -> LoadedKit:
         if db_kit is None:
             raise FileNotFoundError(f"Reasoning kit not found: {slug}")
 
-        if db_kit.current_version is None:
-            raise FileNotFoundError(f"Reasoning kit '{slug}' has no published version")
+        target_version = None
+        if version_id:
+            version_repo = KitVersionRepository(session)
+            target_version = await version_repo.get_by_id(version_id)
+            if not target_version or target_version.kit_id != db_kit.id:
+                raise FileNotFoundError(f"Reasoning kit version '{version_id}' not found for kit '{slug}'")
+        else:
+            target_version = db_kit.current_version
+            if target_version is None:
+                raise FileNotFoundError(f"Reasoning kit '{slug}' has no published version")
 
-        kit = await _convert_db_kit_to_model(db_kit, db_kit.current_version)
+        kit = await _convert_db_kit_to_model(db_kit, target_version)
         return LoadedKit(
             kit=kit,
-            version_id=db_kit.current_version.id,
+            version_id=target_version.id,
             kit_id=db_kit.id,
         )
 

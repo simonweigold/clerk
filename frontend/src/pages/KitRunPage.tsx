@@ -34,6 +34,7 @@ export default function KitRunPage() {
     const [completedSteps, setCompletedSteps] = useState(0);
     const [steps, setSteps] = useState<StepResult[]>([]);
     const [done, setDone] = useState(false);
+    const [isRunPaused, setIsRunPaused] = useState(false);
     const [resultRunId, setResultRunId] = useState<string | null>(null);
     const [evalStep, setEvalStep] = useState<number | null>(null);
     const [evalScore, setEvalScore] = useState(70);
@@ -61,6 +62,7 @@ export default function KitRunPage() {
             setCompletedSteps(0);
         }
         setDone(false);
+        setIsRunPaused(false);
         setResultRunId(null);
         setIsPausing(false);
 
@@ -136,6 +138,7 @@ export default function KitRunPage() {
                 if (d.status === 'completed') {
                     addToast('success', 'Execution completed.');
                 } else if (d.status === 'paused') {
+                    setIsRunPaused(true);
                     addToast('success', 'Execution paused.');
                 } else {
                     addToast('error', d.error || 'Execution failed.');
@@ -352,7 +355,14 @@ export default function KitRunPage() {
             {/* Done actions */}
             {done && (
                 <div className="flex items-center gap-3 mt-8">
-                    <button onClick={() => { setDone(false); setSteps([]); setCompletedSteps(0); setTotalSteps(0); }} className="btn btn-primary">Run Again</button>
+                    {isRunPaused ? (
+                        <a href={`/kit/${slug}/run?resume=${resultRunId}`} className="btn btn-primary shadow-sm flex items-center gap-2">
+                            <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                            Resume Execution
+                        </a>
+                    ) : (
+                        <button onClick={() => { setDone(false); setSteps([]); setCompletedSteps(0); setTotalSteps(0); }} className="btn btn-primary">Run Again</button>
+                    )}
                     {resultRunId && (
                         <Link to={`/kit/${slug}/history/${resultRunId}`} className="btn btn-secondary">View Details</Link>
                     )}

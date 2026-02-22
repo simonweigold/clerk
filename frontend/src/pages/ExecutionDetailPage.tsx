@@ -101,6 +101,12 @@ export default function ExecutionDetailPage() {
                     <p className="text-muted-foreground mt-1">{sd ? fmt(sd) : 'Unknown date'}</p>
                 </div>
                 <div className="flex items-center gap-3">
+                    {data.status === 'paused' && (
+                        <Link to={`/kit/${slug}/run?resume=${runId}`} className="btn btn-primary btn-sm flex items-center gap-1.5 shadow-sm">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                            Resume Execution
+                        </Link>
+                    )}
                     <a href={getDownloadUrl(slug!, runId!, 'md')} className="btn btn-secondary btn-sm">↓ MD</a>
                     <a href={getDownloadUrl(slug!, runId!, 'json')} className="btn btn-secondary btn-sm">↓ JSON</a>
                     <Link to={`/kit/${slug}/history`} className="btn btn-secondary">Back to History</Link>

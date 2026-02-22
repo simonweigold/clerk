@@ -1005,13 +1005,20 @@ async def start_execution(
 async def resume_execution(
     request: Request,
     slug: str,
-    run_id: str,
     user: dict | None = Depends(get_optional_user),
 ):
     """Resume a paused kit execution. Returns an execution_id for SSE streaming.
 
     Accepts JSON body: {"run_id": str}
     """
+    try:
+        body = await request.json()
+        run_id = body.get("run_id")
+        if not run_id:
+            return {"error": "run_id is required"}
+    except Exception:
+        return {"error": "Invalid request body"}
+
     import uuid as _uuid
     from ...db.config import get_config
 
@@ -1145,7 +1152,23 @@ async def execute_kit_stream(
                 persist = False
 
         # Send initial event
-        yield f"event: start\ndata: {json.dumps({'kit_name': kit.name, 'total_steps': len(kit.workflow)})}\n\n"
+        past_steps = []
+        if exec_state.get("db_run_id") and exec_state.get("resume_outputs"):
+            resume_step = exec_state.get("resume_step", 1) or 1
+            for step_key in sorted(kit.workflow.keys(), key=int):
+                step_num = int(step_key)
+                if step_num < resume_step:
+                    step = kit.workflow[step_key]
+                    output_text = exec_state["resume_outputs"].get(step.output_id, "")
+                    past_steps.append({
+                        "step": step_num,
+                        "output_id": step.output_id,
+                        "display_name": step.display_name,
+                        "status": "done",
+                        "result": output_text,
+                    })
+        
+        yield f"event: start\ndata: {json.dumps({'kit_name': kit.name, 'total_steps': len(kit.workflow), 'past_steps': past_steps})}\n\n"
 
         # Execute step by step
         from langchain_openai import ChatOpenAI

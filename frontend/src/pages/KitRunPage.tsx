@@ -93,6 +93,10 @@ export default function KitRunPage() {
             evtSource.addEventListener('start', (e) => {
                 const d = JSON.parse(e.data);
                 setTotalSteps(d.total_steps);
+                if (d.past_steps && d.past_steps.length > 0) {
+                    setSteps(d.past_steps);
+                    setCompletedSteps(d.past_steps.length);
+                }
             });
 
             evtSource.addEventListener('step-start', (e) => {

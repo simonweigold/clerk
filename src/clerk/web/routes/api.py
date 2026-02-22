@@ -887,14 +887,45 @@ async def start_execution(
     from ...db.config import get_config
 
     # Parse config
-    try:
-        body = await request.json()
-    except Exception:
-        body = {}
+    content_type = request.headers.get("content-type", "")
+    
+    evaluate = False
+    evaluation_mode = "transparent"
+    dynamic_resources = {}
 
-    evaluate = body.get("evaluate", False)
-    evaluation_mode = body.get("evaluation_mode", "transparent")
-    dynamic_resources = body.get("dynamic_resources", {})
+    if "multipart/form-data" in content_type:
+        form = await request.form()
+        evaluate = str(form.get("evaluate", "")).lower() == "true"
+        evaluation_mode = str(form.get("evaluation_mode", "transparent"))
+        
+        try:
+            from ...db import detect_mime_type_from_filename, extract_text_from_bytes
+        except ImportError:
+            pass  # Fallback logic if needed, but db should be available
+            
+        for key, value in form.multi_items():
+            if key.startswith("dynamic_resource_text_"):
+                res_id = key.replace("dynamic_resource_text_", "")
+                dynamic_resources[res_id] = str(value)
+            elif key.startswith("dynamic_resource_file_"):
+                res_id = key.replace("dynamic_resource_file_", "")
+                if hasattr(value, "filename") and value.filename:
+                    file_bytes = await value.read()
+                    try:
+                        from ...db import detect_mime_type_from_filename, extract_text_from_bytes
+                        mime_type = detect_mime_type_from_filename(value.filename)
+                        extracted = extract_text_from_bytes(file_bytes, mime_type)
+                        dynamic_resources[res_id] = extracted
+                    except ImportError:
+                        pass
+    else:
+        try:
+            body = await request.json()
+            evaluate = body.get("evaluate", False)
+            evaluation_mode = body.get("evaluation_mode", "transparent")
+            dynamic_resources = body.get("dynamic_resources", {})
+        except Exception:
+            pass
 
     # Load kit
     kit = None
@@ -1067,7 +1098,7 @@ async def execute_kit_stream(
                         pass
 
                 # Send step-complete event
-                yield f"event: step-complete\ndata: {json.dumps({'step': step_num, 'output_id': step.output_id, 'display_name': step.display_name, 'prompt_preview': prompt[:200], 'result': result, 'latency_ms': latency_ms, 'tokens_used': tokens_used})}\n\n"
+                yield f"event: step-complete\ndata: {json.dumps({'step': step_num, 'output_id': step.output_id, 'display_name': step.display_name, 'prompt_preview': prompt, 'result': result, 'latency_ms': latency_ms, 'tokens_used': tokens_used})}\n\n"
 
                 # Evaluation pause: wait for user score
                 if evaluate and eval_event:

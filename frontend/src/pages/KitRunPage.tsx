@@ -19,7 +19,8 @@ export default function KitRunPage() {
     const { slug } = useParams<{ slug: string }>();
     const [kitName, setKitName] = useState('');
     const [dynamicResources, setDynamicResources] = useState<Resource[]>([]);
-    const [dynamicValues, setDynamicValues] = useState<Record<string, string>>({});
+    const [dynamicValues, setDynamicValues] = useState<Record<string, string | File>>({});
+    const [dynamicModes, setDynamicModes] = useState<Record<string, 'text' | 'file'>>({});
     const [loading, setLoading] = useState(true);
     const [running, setRunning] = useState(false);
     const [evaluate, setEvaluate] = useState(false);
@@ -184,15 +185,56 @@ export default function KitRunPage() {
                             <h3 className="font-semibold text-foreground mb-3">Dynamic Resources</h3>
                             <div className="space-y-4">
                                 {dynamicResources.map((r) => (
-                                    <div key={r.resource_id}>
-                                        <label className="label">{r.display_name || r.filename}</label>
-                                        <textarea
-                                            className="input"
-                                            rows={3}
-                                            placeholder={`Enter content for ${r.display_name || r.filename}...`}
-                                            value={dynamicValues[r.resource_id] || ''}
-                                            onChange={(e) => setDynamicValues((prev) => ({ ...prev, [r.resource_id]: e.target.value }))}
-                                        />
+                                    <div key={r.resource_id} className="space-y-2">
+                                        <div className="flex items-center justify-between">
+                                            <label className="label mb-0">{r.display_name || r.filename}</label>
+                                            <div className="flex gap-2">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setDynamicModes(prev => ({ ...prev, [r.resource_id]: 'text' }));
+                                                        setDynamicValues(prev => ({ ...prev, [r.resource_id]: '' }));
+                                                    }}
+                                                    className={`btn btn-xs ${dynamicModes[r.resource_id] !== 'file' ? 'btn-primary' : 'btn-ghost'}`}
+                                                >
+                                                    Text Input
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setDynamicModes(prev => ({ ...prev, [r.resource_id]: 'file' }));
+                                                        setDynamicValues(prev => {
+                                                            const newVals = { ...prev };
+                                                            delete newVals[r.resource_id];
+                                                            return newVals;
+                                                        });
+                                                    }}
+                                                    className={`btn btn-xs ${dynamicModes[r.resource_id] === 'file' ? 'btn-primary' : 'btn-ghost'}`}
+                                                >
+                                                    File Upload
+                                                </button>
+                                            </div>
+                                        </div>
+                                        {dynamicModes[r.resource_id] === 'file' ? (
+                                            <input
+                                                type="file"
+                                                className="input"
+                                                onChange={(e) => {
+                                                    const file = e.target.files?.[0];
+                                                    if (file) {
+                                                        setDynamicValues((prev) => ({ ...prev, [r.resource_id]: file }));
+                                                    }
+                                                }}
+                                            />
+                                        ) : (
+                                            <textarea
+                                                className="input"
+                                                rows={3}
+                                                placeholder={`Enter content for ${r.display_name || r.filename}...`}
+                                                value={(dynamicValues[r.resource_id] as string) || ''}
+                                                onChange={(e) => setDynamicValues((prev) => ({ ...prev, [r.resource_id]: e.target.value }))}
+                                            />
+                                        )}
                                     </div>
                                 ))}
                             </div>
@@ -327,7 +369,7 @@ function StepOutput({ step }: { step: StepResult }) {
                             <span className="text-xs text-muted-foreground">Prompt</span>
                         </button>
                         {expanded && (
-                            <div className="content-preview text-xs mt-2" style={{ maxHeight: '24rem', overflowY: 'auto' }}>
+                            <div className="content-preview text-xs mt-2" style={{ maxHeight: '40rem', overflowY: 'auto', whiteSpace: 'pre-wrap' }}>
                                 {step.prompt_preview}
                             </div>
                         )}

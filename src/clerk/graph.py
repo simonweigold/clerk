@@ -7,7 +7,8 @@ from pathlib import Path
 from typing import Annotated, Any, TypedDict
 from uuid import UUID
 
-from langchain_openai import ChatOpenAI
+from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+from langchain_core.vectorstores import InMemoryVectorStore
 from langgraph.graph import StateGraph, END
 
 from .evaluation import (
@@ -19,6 +20,8 @@ from .evaluation import (
     save_step_to_db,
     update_step_evaluation_in_db,
 )
+from .embeddings import CachedEmbeddings
+from .db.config import get_async_session_factory
 from .models import Evaluation, ReasoningKit
 
 
@@ -101,25 +104,154 @@ def create_initial_state(
     )
 
 
+def chunk_text(text: str, max_size: int = 2000, overlap: int = 200) -> list[str]:
+    """Split text into chunks of maximum size with some overlap.
+    
+    Tries to split by paragraphs (\\n\\n) first, then falls back to lines (\\n),
+    and finally chunks by character count if necessary.
+    """
+    if len(text) <= max_size:
+        return [text]
+        
+    chunks = []
+    paragraphs = text.split("\n\n")
+    
+    current_chunk = ""
+    for p in paragraphs:
+        if len(current_chunk) + len(p) + 2 <= max_size:
+            current_chunk += p + "\n\n"
+        else:
+            if current_chunk:
+                chunks.append(current_chunk.strip())
+                # Start new chunk with overlap from previous chunk
+                overlap_text = current_chunk[-overlap:] if len(current_chunk) > overlap else current_chunk
+                current_chunk = overlap_text + p + "\n\n"
+            else:
+                # Paragraph is larger than max_size, need to split by line or chars
+                lines = p.split("\n")
+                for line in lines:
+                    if len(current_chunk) + len(line) + 1 <= max_size:
+                        current_chunk += line + "\n"
+                    else:
+                        if current_chunk:
+                            chunks.append(current_chunk.strip())
+                            overlap_text = current_chunk[-overlap:] if len(current_chunk) > overlap else current_chunk
+                            current_chunk = overlap_text + line + "\n"
+                        else:
+                            # Line is larger than max_size, split by chars
+                            for i in range(0, len(line), max_size - overlap):
+                                chunk_part = line[i:i + max_size]
+                                chunks.append(chunk_part)
+                            # Handle overlap for the last part
+                            if chunks:
+                                current_chunk = chunks[-1][-overlap:] if len(chunks[-1]) > overlap else chunks[-1]
+                            
+    if current_chunk and current_chunk.strip():
+        chunks.append(current_chunk.strip())
+        
+    return chunks
+
+
+def extract_search_query(text: str) -> str:
+    """Remove all {placeholders} from text to create a clean search query."""
+    return re.sub(r"\{(\w+)\}", "", text).strip()
+
+
 def resolve_placeholders(
-    text: str, resources: dict[str, str], outputs: dict[str, str]
+    text: str, resources: dict[str, str], outputs: dict[str, str],
+    resource_size_threshold: int = 4000, max_chunks: int = 4
 ) -> str:
-    """Resolve {placeholder} references in text.
+    """Resolve {placeholder} references in text, using RAG for large resources.
 
     Args:
         text: Text with placeholders like {resource_1} or {workflow_1}
         resources: Dict of resource_id -> content
         outputs: Dict of output_id -> result
+        resource_size_threshold: Character threshold to trigger RAG
+        max_chunks: Maximum number of chunks to retrieve for large resources
 
     Returns:
         Text with all placeholders resolved
     """
-    # Find all placeholders
     placeholders = re.findall(r"\{(\w+)\}", text)
+    if not placeholders:
+        return text
+
+    # Extract clean search query from prompt to use for RAG
+    search_query = extract_search_query(text)
+    
+    # We load embeddings lazily to avoid unnecessary initialization
+    embeddings = None
 
     for placeholder in placeholders:
         if placeholder in resources:
-            text = text.replace(f"{{{placeholder}}}", resources[placeholder])
+            content = resources[placeholder]
+            
+            # If resource is large, use simple RAG
+            if len(content) > resource_size_threshold and search_query:
+                try:
+                    if embeddings is None:
+                        embeddings = OpenAIEmbeddings()
+                        
+                    chunks = chunk_text(content)
+                    vectorstore = InMemoryVectorStore.from_texts(chunks, embeddings)
+                    results = vectorstore.similarity_search(search_query, k=max_chunks)
+                    
+                    # Combine relevant chunks
+                    relevant_content = "\n\n... [Context skipped] ...\n\n".join([doc.page_content for doc in results])
+                    text = text.replace(f"{{{placeholder}}}", relevant_content)
+                    print(f"RAG triggered for {placeholder}: chunked {len(content)} chars into {len(chunks)} parts, retrieved {len(results)} chunks.")
+                except Exception as e:
+                    print(f"Warning: RAG failed for {placeholder}, falling back to full text. Error: {e}")
+                    text = text.replace(f"{{{placeholder}}}", content)
+            else:
+                text = text.replace(f"{{{placeholder}}}", content)
+                
+        elif placeholder in outputs:
+            text = text.replace(f"{{{placeholder}}}", outputs[placeholder])
+
+    return text
+
+
+async def aresolve_placeholders(
+    text: str, resources: dict[str, str], outputs: dict[str, str],
+    resource_size_threshold: int = 4000, max_chunks: int = 4
+) -> str:
+    """Async version of resolve_placeholders for non-blocking execution."""
+    placeholders = re.findall(r"\{(\w+)\}", text)
+    if not placeholders:
+        return text
+
+    search_query = extract_search_query(text)
+    embeddings = None
+
+    for placeholder in placeholders:
+        if placeholder in resources:
+            content = resources[placeholder]
+            
+            if len(content) > resource_size_threshold and search_query:
+                try:
+                    if embeddings is None:
+                        base_embeddings = OpenAIEmbeddings()
+                        session_factory = get_async_session_factory()
+                        # Wrap the OpenAI embeddings with our database cache handler
+                        embeddings = CachedEmbeddings(
+                            underlying_embeddings=base_embeddings, 
+                            session_factory=session_factory
+                        )
+                        
+                    chunks = chunk_text(content)
+                    vectorstore = await InMemoryVectorStore.afrom_texts(chunks, embeddings)
+                    results = await vectorstore.asimilarity_search(search_query, k=max_chunks)
+                    
+                    relevant_content = "\n\n... [Context skipped] ...\n\n".join([doc.page_content for doc in results])
+                    text = text.replace(f"{{{placeholder}}}", relevant_content)
+                except Exception as e:
+                    print(f"Warning: async RAG failed for {placeholder}, falling back to full text. Error: {e}")
+                    text = text.replace(f"{{{placeholder}}}", content)
+            else:
+                text = text.replace(f"{{{placeholder}}}", content)
+                
         elif placeholder in outputs:
             text = text.replace(f"{{{placeholder}}}", outputs[placeholder])
 
@@ -469,7 +601,7 @@ async def run_reasoning_kit_async(
         step = kit.workflow[step_key]
         step_num = int(step_key)
 
-        prompt = resolve_placeholders(step.prompt, resources, outputs)
+        prompt = await aresolve_placeholders(step.prompt, resources, outputs)
         start_time = time.time()
 
         try:

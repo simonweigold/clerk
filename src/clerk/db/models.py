@@ -15,6 +15,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+from pgvector.sqlalchemy import Vector
 
 
 class Base(DeclarativeBase):
@@ -369,4 +370,20 @@ class UserKitBookmark(Base):
     # Relationships
     user: Mapped["UserProfile"] = relationship(lazy="selectin")
     kit: Mapped["ReasoningKit"] = relationship(lazy="selectin")
+
+
+class EmbeddingCache(Base):
+    """System-wide cache for text embeddings.
+    
+    Stores the OpenAI embeddings for chunks of text to avoid recomputing
+    them across different runs or users.
+    """
+
+    __tablename__ = "embedding_cache"
+
+    text_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
+    embedding: Mapped[list[float]] = mapped_column(Vector(1536), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=datetime.utcnow
+    )
 

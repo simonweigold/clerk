@@ -25,6 +25,8 @@ dependencies = [
     "python-multipart>=0.0.12",
     "itsdangerous>=2.2.0",
     "sse-starlette>=2.1.0",
+    "pgvector>=0.3.6",
+    "langchain-postgres>=0.0.17",
 ]
 
 [project.scripts]

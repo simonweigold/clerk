@@ -11,7 +11,8 @@ function ResourceCard({ resource, slug, isOwner, onRefresh }: {
     const [expanded, setExpanded] = useState(false);
     const [editing, setEditing] = useState(false);
     const [editDisplayName, setEditDisplayName] = useState(resource.display_name || '');
-    const [editDynamic, setEditDynamic] = useState(resource.is_dynamic || false);
+    const getInitialMode = () => resource.is_dynamic ? 'dynamic' : (resource.mime_type === 'text/plain' || resource.filename?.endsWith('.txt') ? 'text' : 'file');
+    const [editMode, setEditMode] = useState<'file' | 'text' | 'dynamic'>(getInitialMode);
     const [editFile, setEditFile] = useState<File | null>(null);
     const [editText, setEditText] = useState('');
     const [saving, setSaving] = useState(false);
@@ -32,9 +33,14 @@ function ResourceCard({ resource, slug, isOwner, onRefresh }: {
         try {
             const fd = new FormData();
             fd.append('display_name', editDisplayName);
-            if (editDynamic) fd.append('is_dynamic', 'on');
-            if (editFile) fd.append('file', editFile);
-            else if (editText.trim()) fd.append('text_content', editText);
+            if (editMode === 'dynamic') {
+                fd.append('is_dynamic', 'on');
+                if (editText.trim()) fd.append('text_content', editText);
+            } else if (editMode === 'file' && editFile) {
+                fd.append('file', editFile);
+            } else if (editMode === 'text' && editText.trim()) {
+                fd.append('text_content', editText);
+            }
             await updateResource(slug, resource.number, fd);
             addToast('success', 'Resource updated.');
             setEditing(false);
@@ -54,14 +60,16 @@ function ResourceCard({ resource, slug, isOwner, onRefresh }: {
                     {resource.is_dynamic && <span className="badge badge-primary">Dynamic</span>}
                 </span>
                 <span className="flex items-center gap-2">
-                    {resource.file_size_bytes && (
-                        <span className="text-xs text-muted-foreground">
-                            {(resource.file_size_bytes / 1024).toFixed(1)} KB
-                        </span>
-                    )}
                     {isOwner && (
                         <>
-                            <button onClick={() => { setEditing(!editing); setEditDisplayName(resource.display_name || ''); setEditDynamic(resource.is_dynamic || false); setEditFile(null); setEditText(''); }} className="btn btn-ghost btn-sm" title="Edit">
+                            <button onClick={() => {
+                                setEditing(!editing);
+                                setEditDisplayName(resource.display_name || '');
+                                const mode = getInitialMode();
+                                setEditMode(mode);
+                                setEditFile(null);
+                                setEditText((mode === 'dynamic' || mode === 'text') && resource.extracted_text ? resource.extracted_text : '');
+                            }} className="btn btn-ghost btn-sm" title="Edit">
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                     <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
                                 </svg>
@@ -76,23 +84,42 @@ function ResourceCard({ resource, slug, isOwner, onRefresh }: {
                 </span>
             </div>
             {editing && (
-                <div className="step-card-body space-y-3 border-t border-border pt-3">
+                <div className="step-card-body space-y-4 border-t border-border pt-3">
+                    <div className="flex gap-2">
+                        <button type="button" onClick={() => { setEditMode('file'); setEditText(''); setEditFile(null); }} className={`btn btn-sm ${editMode === 'file' ? 'btn-primary' : 'btn-ghost'}`}>File Upload</button>
+                        <button type="button" onClick={() => { setEditMode('text'); setEditText(''); setEditFile(null); }} className={`btn btn-sm ${editMode === 'text' ? 'btn-primary' : 'btn-ghost'}`}>Text Input</button>
+                        <button type="button" onClick={() => { setEditMode('dynamic'); setEditText(resource.is_dynamic && resource.extracted_text ? resource.extracted_text : ''); setEditFile(null); }} className={`btn btn-sm ${editMode === 'dynamic' ? 'btn-primary' : 'btn-ghost'}`}>Dynamic Resource</button>
+                    </div>
+
                     <div>
                         <label className="label text-xs">Display Name</label>
                         <input type="text" className="input" value={editDisplayName} onChange={(e) => setEditDisplayName(e.target.value)} placeholder="Readable name" />
                     </div>
-                    <label className="flex items-center gap-2 text-sm cursor-pointer">
-                        <input type="checkbox" checked={editDynamic} onChange={(e) => setEditDynamic(e.target.checked)} className="rounded" />
-                        Dynamic resource
-                    </label>
-                    <div>
-                        <label className="label text-xs">Replace file <span className="text-muted-foreground font-normal">(optional)</span></label>
-                        <input type="file" className="input text-sm" onChange={(e) => { setEditFile(e.target.files?.[0] || null); setEditText(''); }} />
-                    </div>
-                    <div>
-                        <label className="label text-xs">Or paste new text <span className="text-muted-foreground font-normal">(optional)</span></label>
-                        <textarea className="input text-sm" rows={3} value={editText} onChange={(e) => { setEditText(e.target.value); setEditFile(null); }} placeholder="Replace content with text..." />
-                    </div>
+
+                    {editMode === 'file' && (
+                        <div>
+                            <label className="label text-xs">Replace file <span className="text-muted-foreground font-normal">(optional)</span></label>
+                            <input type="file" className="input text-sm" onChange={(e) => setEditFile(e.target.files?.[0] || null)} />
+                        </div>
+                    )}
+
+                    {editMode === 'text' && (
+                        <div>
+                            <label className="label text-xs">Replace content with text <span className="text-muted-foreground font-normal">(optional)</span></label>
+                            <textarea className="input text-sm" rows={4} value={editText} onChange={(e) => setEditText(e.target.value)} placeholder="Paste new text content..." />
+                        </div>
+                    )}
+
+                    {editMode === 'dynamic' && (
+                        <div className="text-sm text-muted-foreground space-y-2">
+                            <p className="text-xs">Dynamic resources let users provide custom input when running the kit. The value will be replaced at execution time.</p>
+                            <div>
+                                <label className="label text-xs">Update Default Content <span className="text-muted-foreground font-normal">(optional)</span></label>
+                                <textarea className="input text-sm" rows={3} value={editText} onChange={(e) => setEditText(e.target.value)} placeholder="Default or placeholder text..." />
+                            </div>
+                        </div>
+                    )}
+
                     <div className="flex gap-2 pt-1">
                         <button onClick={handleSave} className="btn btn-primary btn-sm" disabled={saving}>{saving ? 'Saving...' : 'Save'}</button>
                         <button onClick={() => setEditing(false)} className="btn btn-ghost btn-sm">Cancel</button>

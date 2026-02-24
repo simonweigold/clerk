@@ -55,15 +55,11 @@ export default function KitHistoryPage() {
         if (!slug || !deleteTargetId) return;
         setIsDeleting(true);
 
-        // Optimistic UI update: remove from list immediately
-        setRuns((prev) => prev.filter((r) => r.id !== deleteTargetId));
-
         try {
             await deleteExecution(slug, deleteTargetId);
+            setRuns((prev) => prev.filter((r) => r.id !== deleteTargetId));
             addToast('success', 'Execution deleted.');
         } catch (err) {
-            // Revert optimistic update by refetching
-            fetchRuns();
             addToast('error', err instanceof Error ? err.message : 'Failed to delete execution.');
         } finally {
             setIsDeleting(false);

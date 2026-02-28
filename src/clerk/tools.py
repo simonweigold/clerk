@@ -145,3 +145,52 @@ register_tool(
         execute=_read_url,
     )
 )
+
+
+async def _jina_reader(args: dict[str, Any]) -> str:
+    """Fetch a URL using Jina Reader API to bypass bot protection and return Markdown.
+
+    Uses httpx to hit https://r.jina.ai/{url}.
+    """
+    import httpx
+
+    url = args.get("url", "")
+    if not url:
+        return "Error: No URL provided."
+
+    jina_url = f"https://r.jina.ai/{url}"
+
+    try:
+        async with httpx.AsyncClient(
+            follow_redirects=True, timeout=60.0, verify=False
+        ) as client:
+            resp = await client.get(
+                jina_url, headers={"User-Agent": "CLERK/1.0", "Accept": "text/markdown"}
+            )
+            resp.raise_for_status()
+            return resp.text
+
+    except httpx.HTTPStatusError as e:
+        return f"Error: Jina Reader returned HTTP {e.response.status_code}. Response: {e.response.text[:200]}"
+    except Exception as e:
+        return f"Error: Could not fetch URL via Jina Reader: {e}"
+
+
+register_tool(
+    ToolDefinition(
+        name="jina_reader",
+        description="Read the content of a strict or JS-heavy website using Jina Reader API. "
+        "Bypasses bot protections (like Cloudflare) and returns clean Markdown. Use this when read_url fails.",
+        parameters={
+            "type": "object",
+            "properties": {
+                "url": {
+                    "type": "string",
+                    "description": "The URL of the website to read.",
+                },
+            },
+            "required": ["url"],
+        },
+        execute=_jina_reader,
+    )
+)

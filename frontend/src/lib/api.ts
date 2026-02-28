@@ -112,10 +112,24 @@ export interface Step {
     display_name?: string;
 }
 
+export interface Tool {
+    tool_id: string; // e.g., "tool_1"
+    tool_name: string; // "read_url"
+    display_name?: string;
+    configuration?: string;
+}
+
+export interface AvailableTool {
+    name: string;
+    description: string;
+    parameters: Record<string, unknown>;
+}
+
 export interface KitDetail {
     kit: Kit;
     resources: Resource[];
     steps: Step[];
+    tools: Tool[];
     source: string;
     is_owner: boolean;
 }
@@ -191,6 +205,58 @@ export async function updateResource(
 
 export async function deleteResource(slug: string, number: number): Promise<{ ok: boolean }> {
     const res = await fetch(`${API_BASE}/kits/${slug}/resources/${number}`, { method: 'DELETE' });
+    return handleResponse(res);
+}
+
+// ─── Tools ───────────────────────────────────────────────────────────────────
+
+export async function getAvailableTools(): Promise<{ tools: AvailableTool[] }> {
+    const res = await fetch(`${API_BASE}/tools/available`);
+    return handleResponse(res);
+}
+
+export async function addTool(
+    slug: string,
+    toolName: string,
+    displayName?: string,
+    configuration?: string
+): Promise<{ ok: boolean }> {
+    const payload: any = { tool_name: toolName };
+    if (displayName) payload.display_name = displayName;
+    if (configuration) payload.configuration = configuration;
+
+    const res = await fetch(`${API_BASE}/kits/${slug}/tools`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+    });
+    return handleResponse(res);
+}
+
+export async function updateTool(
+    slug: string,
+    number: number,
+    displayName?: string,
+    configuration?: string
+): Promise<{ ok: boolean }> {
+    const payload: any = {};
+    if (displayName) payload.display_name = displayName;
+    if (configuration) payload.configuration = configuration;
+
+    const res = await fetch(`${API_BASE}/kits/${slug}/tools/${number}/update`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+    });
+    return handleResponse(res);
+}
+
+export async function deleteTool(slug: string, number: number): Promise<{ ok: boolean }> {
+    const res = await fetch(`${API_BASE}/kits/${slug}/tools/${number}`, { method: 'DELETE' });
     return handleResponse(res);
 }
 

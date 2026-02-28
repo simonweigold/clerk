@@ -74,6 +74,10 @@ def create_app() -> FastAPI:
     @app.get("/{full_path:path}")
     async def spa_fallback(request: Request, full_path: str) -> FileResponse:
         """Serve React SPA for client-side routing."""
+        # Never intercept API routes — let FastAPI handle them
+        if full_path.startswith("api/"):
+            from fastapi.responses import JSONResponse
+            return JSONResponse({"error": "Not found"}, status_code=404)
         # Check if a specific file exists in dist
         file_path = SPA_DIR / full_path
         if full_path and file_path.is_file():

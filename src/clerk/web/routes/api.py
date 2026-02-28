@@ -436,6 +436,14 @@ async def delete_resource(
                         prompt_template=s.prompt_template,
                         display_name=s.display_name,
                     )
+                for t in db_kit.current_version.tools:
+                    await version_repo.add_tool(
+                        version_id=version.id,
+                        tool_number=t.tool_number,
+                        tool_name=t.tool_name,
+                        display_name=t.display_name,
+                        configuration=t.configuration,
+                    )
 
             return {"ok": True}
         except Exception as e:
@@ -569,6 +577,14 @@ async def update_resource(
                         prompt_template=s.prompt_template,
                         display_name=s.display_name,
                     )
+                for t in db_kit.current_version.tools:
+                    await version_repo.add_tool(
+                        version_id=version.id,
+                        tool_number=t.tool_number,
+                        tool_name=t.tool_name,
+                        display_name=t.display_name,
+                        configuration=t.configuration,
+                    )
 
             return {"ok": True}
         except Exception as e:
@@ -654,6 +670,14 @@ async def add_step(
                             step_number=s.step_number,
                             prompt_template=s.prompt_template,
                             display_name=s.display_name,
+                        )
+                    for t in db_kit.current_version.tools:
+                        await version_repo.add_tool(
+                            version_id=version.id,
+                            tool_number=t.tool_number,
+                            tool_name=t.tool_name,
+                            display_name=t.display_name,
+                            configuration=t.configuration,
                         )
 
                 await version_repo.add_workflow_step(
@@ -772,6 +796,14 @@ async def update_step(
                         prompt_template=template,
                         display_name=step_display,
                     )
+                for t in db_kit.current_version.tools:
+                    await version_repo.add_tool(
+                        version_id=version.id,
+                        tool_number=t.tool_number,
+                        tool_name=t.tool_name,
+                        display_name=t.display_name,
+                        configuration=t.configuration,
+                    )
 
             return {"ok": True}
         except Exception as e:
@@ -853,10 +885,318 @@ async def delete_step(
                             prompt_template=s.prompt_template,
                             display_name=s.display_name,
                         )
+                for t in db_kit.current_version.tools:
+                    await version_repo.add_tool(
+                        version_id=version.id,
+                        tool_number=t.tool_number,
+                        tool_name=t.tool_name,
+                        display_name=t.display_name,
+                        configuration=t.configuration,
+                    )
 
             return {"ok": True}
         except Exception as e:
             return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
+
+
+# =============================================================================
+# TOOL MANAGEMENT
+# =============================================================================
+
+
+@router.get("/tools/available")
+async def list_available_tools(
+    request: Request,
+    user: dict | None = Depends(get_optional_user),
+):
+    """List all globally available tools from the registry."""
+    from ...tools import list_tools
+
+    tools = list_tools()
+    return {
+        "tools": [
+            {
+                "name": t.name,
+                "description": t.description,
+                "parameters": t.parameters,
+            }
+            for t in tools
+        ]
+    }
+
+
+@router.post("/kits/{slug}/tools")
+async def add_tool(
+    request: Request,
+    slug: str,
+    user: dict | None = Depends(get_optional_user),
+):
+    """Add a tool to a kit (from global registry). Accepts JSON body {tool_name, display_name}. Returns JSON."""
+    auth_err = _check_auth(user)
+    if auth_err:
+        return auth_err
+
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"ok": False, "error": "Invalid JSON body"}, status_code=400)
+
+    tool_name = body.get("tool_name", "")
+    display_name = body.get("display_name", "")
+    configuration = body.get("configuration")
+
+    if not tool_name:
+        return JSONResponse({"ok": False, "error": "tool_name is required."}, status_code=400)
+
+    # Verify tool exists in global registry
+    from ...tools import get_tool as get_global_tool
+
+    if get_global_tool(tool_name) is None:
+        return JSONResponse(
+            {"ok": False, "error": f"Tool '{tool_name}' is not available."},
+            status_code=400,
+        )
+
+    from ...db.config import get_config
+
+    config = get_config()
+    if config.is_database_configured:
+        try:
+            from ...db import (
+                KitVersionRepository,
+                ReasoningKitRepository,
+                get_async_session,
+            )
+
+            async with get_async_session() as session:
+                kit_repo = ReasoningKitRepository(session)
+                version_repo = KitVersionRepository(session)
+                db_kit = await kit_repo.get_by_slug(slug)
+
+                if not db_kit:
+                    return JSONResponse({"ok": False, "error": f"Kit '{slug}' not found."}, status_code=404)
+
+                own_err = _check_kit_ownership(db_kit, user)
+                if own_err:
+                    return own_err
+
+                tool_number = 1
+                if db_kit.current_version:
+                    tool_number = len(db_kit.current_version.tools) + 1
+
+                version = await version_repo.create(
+                    kit_id=db_kit.id,
+                    commit_message=f"Added tool {tool_name}",
+                )
+
+                if db_kit.current_version:
+                    for r in db_kit.current_version.resources:
+                        await version_repo.add_resource(
+                            version_id=version.id,
+                            resource_number=r.resource_number,
+                            filename=r.filename,
+                            storage_path=r.storage_path,
+                            mime_type=r.mime_type,
+                            extracted_text=r.extracted_text,
+                            file_size_bytes=r.file_size_bytes,
+                            is_dynamic=getattr(r, "is_dynamic", False),
+                            display_name=r.display_name,
+                        )
+                    for s in db_kit.current_version.workflow_steps:
+                        await version_repo.add_workflow_step(
+                            version_id=version.id,
+                            step_number=s.step_number,
+                            prompt_template=s.prompt_template,
+                            display_name=s.display_name,
+                        )
+                    for t in db_kit.current_version.tools:
+                        await version_repo.add_tool(
+                            version_id=version.id,
+                            tool_number=t.tool_number,
+                            tool_name=t.tool_name,
+                            display_name=t.display_name,
+                            configuration=t.configuration,
+                        )
+
+                await version_repo.add_tool(
+                    version_id=version.id,
+                    tool_number=tool_number,
+                    tool_name=tool_name,
+                    display_name=display_name.strip() or None,
+                    configuration=configuration,
+                )
+
+            return {"ok": True}
+
+        except Exception as e:
+            return JSONResponse({"ok": False, "error": f"Error adding tool: {e}"}, status_code=500)
+
+    return JSONResponse({"ok": False, "error": "Database not configured"}, status_code=500)
+
+
+@router.post("/kits/{slug}/tools/{number}/update")
+async def update_tool(
+    request: Request,
+    slug: str,
+    number: int,
+    user: dict | None = Depends(get_optional_user),
+):
+    """Update a tool in a kit (creates a new version). Returns JSON."""
+    auth_err = _check_auth(user)
+    if auth_err:
+        return auth_err
+
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"ok": False, "error": "Invalid JSON body"}, status_code=400)
+
+    display_name = body.get("display_name")
+    configuration = body.get("configuration")
+
+    from ...db.config import get_config
+
+    config = get_config()
+    if config.is_database_configured:
+        try:
+            from ...db import (
+                KitVersionRepository,
+                ReasoningKitRepository,
+                get_async_session,
+            )
+
+            async with get_async_session() as session:
+                kit_repo = ReasoningKitRepository(session)
+                version_repo = KitVersionRepository(session)
+                db_kit = await kit_repo.get_by_slug(slug)
+
+                if not db_kit or not db_kit.current_version:
+                    return JSONResponse({"ok": False, "error": "Kit or version not found."}, status_code=404)
+
+                own_err = _check_kit_ownership(db_kit, user)
+                if own_err:
+                    return own_err
+
+                version = await version_repo.create(
+                    kit_id=db_kit.id,
+                    commit_message=f"Updated tool {number}",
+                )
+
+                for r in db_kit.current_version.resources:
+                    await version_repo.add_resource(
+                        version_id=version.id,
+                        resource_number=r.resource_number,
+                        filename=r.filename,
+                        storage_path=r.storage_path,
+                        mime_type=r.mime_type,
+                        extracted_text=r.extracted_text,
+                        file_size_bytes=r.file_size_bytes,
+                        is_dynamic=getattr(r, "is_dynamic", False),
+                        display_name=r.display_name,
+                    )
+
+                for s in db_kit.current_version.workflow_steps:
+                    await version_repo.add_workflow_step(
+                        version_id=version.id,
+                        step_number=s.step_number,
+                        prompt_template=s.prompt_template,
+                        display_name=s.display_name,
+                    )
+
+                for t in db_kit.current_version.tools:
+                    t_display = display_name.strip() if t.tool_number == number and display_name is not None else t.display_name
+                    t_config = configuration if t.tool_number == number and configuration is not None else t.configuration
+                    await version_repo.add_tool(
+                        version_id=version.id,
+                        tool_number=t.tool_number,
+                        tool_name=t.tool_name,
+                        display_name=t_display,
+                        configuration=t_config,
+                    )
+
+            return {"ok": True}
+        except Exception as e:
+            return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
+
+    return JSONResponse({"ok": False, "error": "Database not configured"}, status_code=500)
+
+
+@router.delete("/kits/{slug}/tools/{number}")
+async def delete_tool(
+    request: Request,
+    slug: str,
+    number: int,
+    user: dict | None = Depends(get_optional_user),
+):
+    """Delete a tool from a kit. Returns JSON."""
+    auth_err = _check_auth(user)
+    if auth_err:
+        return auth_err
+
+    from ...db.config import get_config
+
+    config = get_config()
+    if not config.is_database_configured:
+        return JSONResponse({"ok": False, "error": "Database not configured"}, status_code=500)
+
+    try:
+        from ...db import (
+            KitVersionRepository,
+            ReasoningKitRepository,
+            get_async_session,
+        )
+
+        async with get_async_session() as session:
+            kit_repo = ReasoningKitRepository(session)
+            version_repo = KitVersionRepository(session)
+            db_kit = await kit_repo.get_by_slug(slug)
+
+            if not db_kit or not db_kit.current_version:
+                return JSONResponse({"ok": False, "error": "Kit or version not found."}, status_code=404)
+
+            own_err = _check_kit_ownership(db_kit, user)
+            if own_err:
+                return own_err
+
+            version = await version_repo.create(
+                kit_id=db_kit.id,
+                commit_message=f"Deleted tool {number}",
+            )
+
+            for r in db_kit.current_version.resources:
+                await version_repo.add_resource(
+                    version_id=version.id,
+                    resource_number=r.resource_number,
+                    filename=r.filename,
+                    storage_path=r.storage_path,
+                    mime_type=r.mime_type,
+                    extracted_text=r.extracted_text,
+                    file_size_bytes=r.file_size_bytes,
+                    is_dynamic=getattr(r, "is_dynamic", False),
+                    display_name=r.display_name,
+                )
+
+            for s in db_kit.current_version.workflow_steps:
+                await version_repo.add_workflow_step(
+                    version_id=version.id,
+                    step_number=s.step_number,
+                    prompt_template=s.prompt_template,
+                    display_name=s.display_name,
+                )
+
+            for t in db_kit.current_version.tools:
+                if t.tool_number != number:
+                    await version_repo.add_tool(
+                        version_id=version.id,
+                        tool_number=t.tool_number,
+                        tool_name=t.tool_name,
+                        display_name=t.display_name,
+                        configuration=t.configuration,
+                    )
+
+        return {"ok": True}
+    except Exception as e:
+        return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
 
 
 # =============================================================================
@@ -1172,11 +1512,23 @@ async def execute_kit_stream(
 
         # Execute step by step
         from langchain_openai import ChatOpenAI
+        from langchain_core.messages import HumanMessage, ToolMessage
 
         llm = ChatOpenAI(model=DEFAULT_MODEL, temperature=0)
         resources = {r.resource_id: r.content for r in kit.resources.values()}
         outputs: dict[str, str] = exec_state.get("resume_outputs") or {}
         resume_step = exec_state.get("resume_step", 1) or 1
+
+        # Build tool data from kit
+        kit_tools = {
+            k: {
+                "tool_name": v.tool_name,
+                "tool_id": v.tool_id,
+                "display_name": v.display_name,
+                "configuration": v.configuration,
+            }
+            for k, v in kit.tools.items()
+        }
 
         for step_key in sorted(kit.workflow.keys(), key=int):
             step = kit.workflow[step_key]
@@ -1203,11 +1555,59 @@ async def execute_kit_stream(
             # Resolve placeholders
             prompt = resolve_placeholders(step.prompt, resources, outputs)
 
-            # Execute LLM call
+            # Check for tool references and prepare tool-aware LLM
+            from ...graph import extract_tool_refs, remove_tool_placeholders
+            from ...tools import get_tool as get_tool_def
+
+            openai_tools = extract_tool_refs(step.prompt, kit_tools)
+            clean_prompt = remove_tool_placeholders(prompt, kit_tools)
+
+            # Execute LLM call (with or without tools)
             start_time = time.time()
             try:
-                response = await llm.ainvoke(prompt)
-                result = str(response.content)
+                if openai_tools:
+                    # Tool-aware execution: bind tools and handle call loop
+                    llm_with_tools = llm.bind_tools(
+                        [t["function"] for t in openai_tools]
+                    )
+                    messages = [HumanMessage(content=clean_prompt)]
+                    response = await llm_with_tools.ainvoke(messages)
+                    messages.append(response)
+
+                    # Tool-call loop: execute tools, feed back, repeat
+                    max_tool_rounds = 5
+                    for _ in range(max_tool_rounds):
+                        if not response.tool_calls:
+                            break
+
+                        # Execute each tool call
+                        for tool_call in response.tool_calls:
+                            tool_def = get_tool_def(tool_call["name"])
+                            if tool_def:
+                                try:
+                                    tool_result = await tool_def.execute(tool_call["args"])
+                                except Exception as te:
+                                    tool_result = f"Error executing tool: {te}"
+                            else:
+                                tool_result = f"Unknown tool: {tool_call['name']}"
+
+                            messages.append(
+                                ToolMessage(
+                                    content=tool_result,
+                                    tool_call_id=tool_call["id"],
+                                )
+                            )
+
+                        # Get LLM response with tool results
+                        response = await llm_with_tools.ainvoke(messages)
+                        messages.append(response)
+
+                    result = str(response.content)
+                else:
+                    # Standard execution without tools
+                    response = await llm.ainvoke(clean_prompt)
+                    result = str(response.content)
+
                 latency_ms = int((time.time() - start_time) * 1000)
 
                 # Get token usage
@@ -1225,7 +1625,7 @@ async def execute_kit_stream(
                         await save_step_to_db(
                             run_id=db_run_id,
                             step_number=step_num,
-                            prompt=prompt,
+                            prompt=clean_prompt,
                             output=result,
                             mode=evaluation_mode if evaluate else "transparent",
                             model_used=DEFAULT_MODEL,
@@ -1236,7 +1636,7 @@ async def execute_kit_stream(
                         pass
 
                 # Send step-complete event
-                yield f"event: step-complete\ndata: {json.dumps({'step': step_num, 'output_id': step.output_id, 'display_name': step.display_name, 'prompt_preview': prompt, 'result': result, 'latency_ms': latency_ms, 'tokens_used': tokens_used})}\n\n"
+                yield f"event: step-complete\ndata: {json.dumps({'step': step_num, 'output_id': step.output_id, 'display_name': step.display_name, 'prompt_preview': clean_prompt, 'result': result, 'latency_ms': latency_ms, 'tokens_used': tokens_used})}\n\n"
 
                 # Check for pause right after step completion before evaluation
                 if exec_state.get("pause_requested"):
@@ -2159,6 +2559,7 @@ async def get_kit_detail_json(
     kit_data = None
     resources = []
     steps = []
+    tools = []
     source = "local"
     is_owner = False
 
@@ -2208,6 +2609,16 @@ async def get_kit_detail_json(
                                     "output_id": s.output_id,
                                     "prompt_template": s.prompt_template,
                                     "display_name": s.display_name,
+                                }
+                            )
+                        for t in sorted(version.tools, key=lambda x: x.tool_number):
+                            tools.append(
+                                {
+                                    "number": t.tool_number,
+                                    "tool_name": t.tool_name,
+                                    "tool_id": t.tool_id,
+                                    "display_name": t.display_name,
+                                    "configuration": t.configuration,
                                 }
                             )
         except Exception:
@@ -2262,6 +2673,7 @@ async def get_kit_detail_json(
         "kit": kit_data,
         "resources": resources,
         "steps": steps,
+        "tools": tools,
         "source": source,
         "is_owner": is_owner,
     }

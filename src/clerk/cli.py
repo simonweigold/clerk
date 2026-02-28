@@ -588,6 +588,13 @@ def _print_db_kit_info(info: dict) -> None:
         print(f"\nWorkflow Steps ({len(version['workflow_steps'])}):")
         for s in version["workflow_steps"]:
             print(f"  {s['number']}. {s['output_id']}")
+
+        tools = version.get("tools", [])
+        if tools:
+            print(f"\nTools ({len(tools)}):")
+            for t in tools:
+                display = f" ({t['display_name']})" if t.get("display_name") else ""
+                print(f"  {t['number']}. {t['tool_name']}{display}")
     else:
         print("\nNo published version available")
 

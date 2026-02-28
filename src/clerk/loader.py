@@ -12,7 +12,7 @@ from .db import (
 )
 from .db.models import KitVersion
 from .db.models import ReasoningKit as DBReasoningKit
-from .models import ReasoningKit, Resource, WorkflowStep
+from .models import ReasoningKit, Resource, Tool, WorkflowStep
 
 
 class LoadedKit:
@@ -221,11 +221,23 @@ async def _convert_db_kit_to_model(
         )
         workflow[str(db_step.step_number)] = step
 
+    # Load tools
+    tools: dict[str, Tool] = {}
+    for db_tool in version.tools:
+        tool = Tool(
+            tool_name=db_tool.tool_name,
+            tool_id=f"tool_{db_tool.tool_number}",
+            display_name=db_tool.display_name,
+            configuration=db_tool.configuration,
+        )
+        tools[str(db_tool.tool_number)] = tool
+
     return ReasoningKit(
         name=db_kit.name,
         path=f"db://{db_kit.slug}",  # Special path indicating database source
         resources=resources,
         workflow=workflow,
+        tools=tools,
     )
 
 
@@ -289,6 +301,14 @@ async def get_kit_info_from_db(slug: str) -> dict | None:
                         "output_id": s.output_id,
                     }
                     for s in version.workflow_steps
+                ],
+                "tools": [
+                    {
+                        "number": t.tool_number,
+                        "tool_name": t.tool_name,
+                        "display_name": t.display_name,
+                    }
+                    for t in version.tools
                 ],
             }
 

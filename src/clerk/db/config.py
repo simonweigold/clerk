@@ -85,9 +85,11 @@ def get_supabase_client(use_service_key: bool = False) -> Client:
     )
 
 
-# Global engine cache
+# Global engine cache with loop tracking
 _engine: AsyncEngine | None = None
+_engine_loop = None
 _engine_direct: AsyncEngine | None = None
+_engine_direct_loop = None
 
 
 def get_async_engine(direct: bool = False) -> AsyncEngine:
@@ -100,7 +102,13 @@ def get_async_engine(direct: bool = False) -> AsyncEngine:
     Returns:
         Async SQLAlchemy engine
     """
-    global _engine, _engine_direct
+    global _engine, _engine_loop, _engine_direct, _engine_direct_loop
+    import asyncio
+
+    try:
+        current_loop = asyncio.get_running_loop()
+    except RuntimeError:
+        current_loop = None
 
     config = get_config()
     config.validate_database()
@@ -114,6 +122,9 @@ def get_async_engine(direct: bool = False) -> AsyncEngine:
     }
 
     if direct:
+        if _engine_direct is not None and _engine_direct_loop is not current_loop:
+            _engine_direct = None
+            
         if not config.database_url_direct:
             # Fall back to regular URL if direct not specified
             url = cast(str, config.database_url)
@@ -127,8 +138,12 @@ def get_async_engine(direct: bool = False) -> AsyncEngine:
                 pool_recycle=300,
                 connect_args=connect_args,
             )
+            _engine_direct_loop = current_loop
         return _engine_direct
     else:
+        if _engine is not None and _engine_loop is not current_loop:
+            _engine = None
+            
         if _engine is None:
             _engine = create_async_engine(
                 cast(str, config.database_url),
@@ -138,6 +153,7 @@ def get_async_engine(direct: bool = False) -> AsyncEngine:
                 max_overflow=10,
                 connect_args=connect_args,
             )
+            _engine_loop = current_loop
         return _engine
 
 

@@ -22,6 +22,15 @@ class WorkflowStep(BaseModel):
     display_name: str | None = None  # Optional custom display name
 
 
+class Tool(BaseModel):
+    """A tool in a reasoning kit."""
+
+    tool_name: str  # Global registry name
+    tool_id: str  # e.g. "tool_1"
+    display_name: str | None = None  # Optional custom display name
+    configuration: str | None = None  # Optional JSON config overrides
+
+
 class ReasoningKit(BaseModel):
     """A complete reasoning kit with resources and workflow."""
 
@@ -29,6 +38,7 @@ class ReasoningKit(BaseModel):
     path: str
     resources: dict[str, Resource]
     workflow: dict[str, WorkflowStep]
+    tools: dict[str, Tool] = {}  # tool_number -> Tool
 
 
 class StepEvaluation(BaseModel):

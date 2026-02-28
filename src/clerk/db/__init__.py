@@ -15,6 +15,7 @@ from .models import (
     ReasoningKit,
     Resource,
     StepExecution,
+    Tool,
     UserKitBookmark,
     UserProfile,
     WorkflowStep,
@@ -45,6 +46,7 @@ __all__ = [
     "ReasoningKit",
     "Resource",
     "StepExecution",
+    "Tool",
     "UserProfile",
     "WorkflowStep",
     # Repositories

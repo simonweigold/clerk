@@ -155,6 +155,12 @@ class KitVersion(Base):
         lazy="selectin",
         order_by="WorkflowStep.step_number",
     )
+    tools: Mapped[list["Tool"]] = relationship(
+        back_populates="version",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+        order_by="Tool.tool_number",
+    )
     execution_runs: Mapped[list["ExecutionRun"]] = relationship(
         back_populates="version", lazy="selectin"
     )
@@ -239,6 +245,47 @@ class WorkflowStep(Base):
     def output_id(self) -> str:
         """Get the output_id for this step."""
         return f"workflow_{self.step_number}"
+
+
+class Tool(Base):
+    """A tool assignment in a kit version.
+
+    References a tool from the global registry by name. The tool can be
+    referenced in workflow steps using {tool_N} placeholders. When referenced,
+    the execution engine includes the tool in the LLM call and handles
+    the function-call loop.
+    """
+
+    __tablename__ = "tools"
+    __table_args__ = (
+        UniqueConstraint("version_id", "tool_number", name="uq_tool_number"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    version_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("kit_versions.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    tool_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    tool_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    display_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    configuration: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=datetime.utcnow
+    )
+
+    # Relationships
+    version: Mapped["KitVersion"] = relationship(
+        back_populates="tools", lazy="selectin"
+    )
+
+    @property
+    def tool_id(self) -> str:
+        """Get the tool_id for placeholder resolution."""
+        return f"tool_{self.tool_number}"
 
 
 class ExecutionRun(Base):

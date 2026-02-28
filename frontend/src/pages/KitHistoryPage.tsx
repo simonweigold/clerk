@@ -25,6 +25,8 @@ export default function KitHistoryPage() {
     const [runs, setRuns] = useState<ExecutionRun[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
+    const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+    const [isDeleting, setIsDeleting] = useState(false);
     const { addToast } = useToast();
 
     const fetchRuns = useCallback(() => {
@@ -43,18 +45,25 @@ export default function KitHistoryPage() {
         fetchRuns();
     }, [fetchRuns]);
 
-    const handleDelete = async (e: React.MouseEvent, runId: string) => {
+    const handleDeleteClick = (e: React.MouseEvent, runId: string) => {
         e.preventDefault();
         e.stopPropagation();
-        if (!slug) return;
-        if (!confirm('Are you sure you want to delete this execution run?')) return;
+        setDeleteTargetId(runId);
+    };
+
+    const confirmDelete = async () => {
+        if (!slug || !deleteTargetId) return;
+        setIsDeleting(true);
 
         try {
-            await deleteExecution(slug, runId);
+            await deleteExecution(slug, deleteTargetId);
+            setRuns((prev) => prev.filter((r) => r.id !== deleteTargetId));
             addToast('success', 'Execution deleted.');
-            fetchRuns();
         } catch (err) {
             addToast('error', err instanceof Error ? err.message : 'Failed to delete execution.');
+        } finally {
+            setIsDeleting(false);
+            setDeleteTargetId(null);
         }
     };
 
@@ -128,7 +137,7 @@ export default function KitHistoryPage() {
                                             </button>
                                         )}
                                         <button
-                                            onClick={(e) => handleDelete(e, run.id)}
+                                            onClick={(e) => handleDeleteClick(e, run.id)}
                                             className="btn btn-ghost btn-xs text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
                                             title="Delete Execution"
                                         >
@@ -142,6 +151,34 @@ export default function KitHistoryPage() {
                             </Link>
                         );
                     })}
+                </div>
+            )}
+
+            {/* Custom Delete Confirmation Modal */}
+            {deleteTargetId && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm fade-in">
+                    <div className="card p-6 max-w-md w-full shadow-lg">
+                        <h2 className="text-xl font-bold mb-2">Delete Execution</h2>
+                        <p className="text-muted-foreground mb-6">
+                            Are you sure you want to delete this execution run? This action cannot be undone.
+                        </p>
+                        <div className="flex justify-end gap-3">
+                            <button
+                                className="btn btn-ghost"
+                                onClick={() => setDeleteTargetId(null)}
+                                disabled={isDeleting}
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                className="btn btn-destructive"
+                                onClick={confirmDelete}
+                                disabled={isDeleting}
+                            >
+                                {isDeleting ? 'Deleting...' : 'Delete'}
+                            </button>
+                        </div>
+                    </div>
                 </div>
             )}
         </div>

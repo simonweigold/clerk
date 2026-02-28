@@ -15,6 +15,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+from pgvector.sqlalchemy import Vector
 
 
 class Base(DeclarativeBase):
@@ -185,6 +186,8 @@ class Resource(Base):
     storage_path: Mapped[str] = mapped_column(String(512), nullable=False)
     extracted_text: Mapped[str | None] = mapped_column(Text)
     file_size_bytes: Mapped[int | None] = mapped_column(Integer)
+    is_dynamic: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    display_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=datetime.utcnow
     )
@@ -222,6 +225,7 @@ class WorkflowStep(Base):
     )
     step_number: Mapped[int] = mapped_column(Integer, nullable=False)
     prompt_template: Mapped[str] = mapped_column(Text, nullable=False)
+    display_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=datetime.utcnow
     )
@@ -249,7 +253,7 @@ class ExecutionRun(Base):
             "storage_mode IN ('transparent', 'anonymous')", name="ck_storage_mode"
         ),
         CheckConstraint(
-            "status IN ('running', 'completed', 'failed')", name="ck_status"
+            "status IN ('running', 'paused', 'completed', 'failed')", name="ck_status"
         ),
     )
 
@@ -272,6 +276,7 @@ class ExecutionRun(Base):
     )
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     error_message: Mapped[str | None] = mapped_column(Text)
+    label: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
     # Relationships
     version: Mapped["KitVersion"] = relationship(
@@ -331,3 +336,54 @@ class StepExecution(Base):
     run: Mapped["ExecutionRun"] = relationship(
         back_populates="step_executions", lazy="selectin"
     )
+
+
+class UserKitBookmark(Base):
+    """A user's bookmark/save of a community kit.
+
+    Allows users to add community kits to their "My Kits" view
+    without being the owner.
+    """
+
+    __tablename__ = "user_kit_bookmarks"
+    __table_args__ = (
+        UniqueConstraint("user_id", "kit_id", name="uq_user_kit_bookmark"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("user_profiles.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    kit_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("reasoning_kits.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=datetime.utcnow
+    )
+
+    # Relationships
+    user: Mapped["UserProfile"] = relationship(lazy="selectin")
+    kit: Mapped["ReasoningKit"] = relationship(lazy="selectin")
+
+
+class EmbeddingCache(Base):
+    """System-wide cache for text embeddings.
+    
+    Stores the OpenAI embeddings for chunks of text to avoid recomputing
+    them across different runs or users.
+    """
+
+    __tablename__ = "embedding_cache"
+
+    text_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
+    embedding: Mapped[list[float]] = mapped_column(Vector(1536), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=datetime.utcnow
+    )
+

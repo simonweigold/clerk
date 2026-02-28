@@ -5,6 +5,7 @@ from pathlib import Path
 from uuid import UUID
 
 from .db import (
+    KitVersionRepository,
     ReasoningKitRepository,
     StorageService,
     get_async_session,
@@ -46,16 +47,21 @@ def load_reasoning_kit(kit_path: str | Path) -> ReasoningKit:
     if not kit_path.exists():
         raise FileNotFoundError(f"Reasoning kit not found: {kit_path}")
 
-    # Auto-discover resources (resource_*.*)
+    # Auto-discover resources (resource_*.* and dynamic_resource_*.*)
     resources: dict[str, Resource] = {}
     resource_files = sorted(kit_path.glob("resource_*.*"))
-    for idx, resource_file in enumerate(resource_files, start=1):
-        # Extract resource_id from filename (e.g., resource_1.txt -> resource_1)
-        resource_id = resource_file.stem
+    dynamic_resource_files = sorted(kit_path.glob("dynamic_resource_*.*"))
+    all_resource_files = resource_files + dynamic_resource_files
+    for idx, resource_file in enumerate(all_resource_files, start=1):
+        is_dynamic = resource_file.name.startswith("dynamic_resource_")
+        # Extract resource_id from filename
+        # dynamic_resource_1.txt -> resource_1, resource_1.txt -> resource_1
+        resource_id = resource_file.stem.replace("dynamic_", "")
         resource = Resource(
             file=resource_file.name,
             resource_id=resource_id,
-            content=resource_file.read_text(),
+            content="" if is_dynamic else resource_file.read_text(),
+            is_dynamic=is_dynamic,
         )
         resources[str(idx)] = resource
 
@@ -126,11 +132,12 @@ def list_reasoning_kits(base_path: str | Path = "reasoning_kits") -> list[str]:
 # =============================================================================
 
 
-async def load_reasoning_kit_from_db(slug: str) -> LoadedKit:
+async def load_reasoning_kit_from_db(slug: str, version_id: UUID | None = None) -> LoadedKit:
     """Load a reasoning kit from the database by slug.
 
     Args:
         slug: The kit's URL-friendly slug
+        version_id: Optional specific version ID to load instead of current_version
 
     Returns:
         A LoadedKit containing the ReasoningKit and database metadata
@@ -145,13 +152,21 @@ async def load_reasoning_kit_from_db(slug: str) -> LoadedKit:
         if db_kit is None:
             raise FileNotFoundError(f"Reasoning kit not found: {slug}")
 
-        if db_kit.current_version is None:
-            raise FileNotFoundError(f"Reasoning kit '{slug}' has no published version")
+        target_version = None
+        if version_id:
+            version_repo = KitVersionRepository(session)
+            target_version = await version_repo.get_by_id(version_id)
+            if not target_version or target_version.kit_id != db_kit.id:
+                raise FileNotFoundError(f"Reasoning kit version '{version_id}' not found for kit '{slug}'")
+        else:
+            target_version = db_kit.current_version
+            if target_version is None:
+                raise FileNotFoundError(f"Reasoning kit '{slug}' has no published version")
 
-        kit = await _convert_db_kit_to_model(db_kit, db_kit.current_version)
+        kit = await _convert_db_kit_to_model(db_kit, target_version)
         return LoadedKit(
             kit=kit,
-            version_id=db_kit.current_version.id,
+            version_id=target_version.id,
             kit_id=db_kit.id,
         )
 
@@ -173,17 +188,25 @@ async def _convert_db_kit_to_model(
     # Load resources
     resources: dict[str, Resource] = {}
     for db_resource in version.resources:
-        # Download content from storage
-        try:
-            content = storage.download_resource_text(db_resource.storage_path)
-        except Exception:
-            # If download fails, use extracted text as fallback
-            content = db_resource.extracted_text or ""
+        is_dynamic = getattr(db_resource, "is_dynamic", False)
+
+        # Dynamic resources have no pre-loaded content
+        if is_dynamic:
+            content = ""
+        else:
+            # Download content from storage
+            try:
+                content = storage.download_resource_text(db_resource.storage_path)
+            except Exception:
+                # If download fails, use extracted text as fallback
+                content = db_resource.extracted_text or ""
 
         resource = Resource(
             file=db_resource.filename,
             resource_id=db_resource.resource_id,
             content=content,
+            is_dynamic=is_dynamic,
+            display_name=db_resource.display_name,
         )
         resources[str(db_resource.resource_number)] = resource
 
@@ -194,6 +217,7 @@ async def _convert_db_kit_to_model(
             file=f"instruction_{db_step.step_number}.txt",
             output_id=db_step.output_id,
             prompt=db_step.prompt_template,
+            display_name=db_step.display_name,
         )
         workflow[str(db_step.step_number)] = step
 
@@ -255,6 +279,7 @@ async def get_kit_info_from_db(slug: str) -> dict | None:
                         "filename": r.filename,
                         "mime_type": r.mime_type,
                         "file_size_bytes": r.file_size_bytes,
+                        "is_dynamic": getattr(r, "is_dynamic", False),
                     }
                     for r in version.resources
                 ],

@@ -19,6 +19,14 @@ dependencies = [
     # Text extraction
     "pypdf>=5.1.0",
     "openpyxl>=3.1.5",
+    # Web UI
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.32.0",
+    "python-multipart>=0.0.12",
+    "itsdangerous>=2.2.0",
+    "sse-starlette>=2.1.0",
+    "pgvector>=0.3.6",
+    "langchain-postgres>=0.0.17",
 ]
 
 [project.scripts]

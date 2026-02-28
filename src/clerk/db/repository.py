@@ -7,7 +7,7 @@ the repository pattern for clean separation of concerns.
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -17,6 +17,7 @@ from .models import (
     ReasoningKit,
     Resource,
     StepExecution,
+    UserKitBookmark,
     UserProfile,
     WorkflowStep,
 )
@@ -429,6 +430,8 @@ class KitVersionRepository:
         mime_type: str | None = None,
         extracted_text: str | None = None,
         file_size_bytes: int | None = None,
+        is_dynamic: bool = False,
+        display_name: str | None = None,
     ) -> Resource:
         """Add a resource to a version.
 
@@ -440,6 +443,8 @@ class KitVersionRepository:
             mime_type: MIME type of the file
             extracted_text: Extracted text content for search
             file_size_bytes: File size in bytes
+            is_dynamic: Whether the resource is user-supplied at execution time
+            display_name: Optional custom display name
 
         Returns:
             Created resource
@@ -452,6 +457,8 @@ class KitVersionRepository:
             mime_type=mime_type,
             extracted_text=extracted_text,
             file_size_bytes=file_size_bytes,
+            is_dynamic=is_dynamic,
+            display_name=display_name,
         )
         self.session.add(resource)
         await self.session.flush()
@@ -462,6 +469,7 @@ class KitVersionRepository:
         version_id: UUID,
         step_number: int,
         prompt_template: str,
+        display_name: str | None = None,
     ) -> WorkflowStep:
         """Add a workflow step to a version.
 
@@ -469,6 +477,7 @@ class KitVersionRepository:
             version_id: The version's UUID
             step_number: The step number (1, 2, 3, ...)
             prompt_template: The instruction prompt template
+            display_name: Optional custom display name
 
         Returns:
             Created workflow step
@@ -477,6 +486,7 @@ class KitVersionRepository:
             version_id=version_id,
             step_number=step_number,
             prompt_template=prompt_template,
+            display_name=display_name,
         )
         self.session.add(step)
         await self.session.flush()
@@ -496,12 +506,20 @@ class ExecutionRepository:
             run_id: The run's UUID
 
         Returns:
-            Execution run with step executions loaded
+            Execution run with step executions and version loaded
         """
         stmt = (
             select(ExecutionRun)
             .where(ExecutionRun.id == run_id)
-            .options(selectinload(ExecutionRun.step_executions))
+            .options(
+                selectinload(ExecutionRun.step_executions),
+                selectinload(ExecutionRun.version).selectinload(
+                    KitVersion.kit
+                ),
+                selectinload(ExecutionRun.version).selectinload(
+                    KitVersion.workflow_steps
+                ),
+            )
         )
         result = await self.session.execute(stmt)
         return result.scalar_one_or_none()
@@ -520,6 +538,38 @@ class ExecutionRepository:
             .where(ExecutionRun.version_id == version_id)
             .order_by(ExecutionRun.started_at.desc())
         )
+        result = await self.session.execute(stmt)
+        return list(result.scalars().all())
+
+    async def list_for_kit(
+        self,
+        kit_id: UUID,
+        user_id: UUID | None = None,
+        limit: int = 100,
+    ) -> list[ExecutionRun]:
+        """List execution runs for a kit (across all versions).
+
+        Args:
+            kit_id: The kit's UUID
+            user_id: If provided, only return runs by this user
+            limit: Maximum number of runs to return
+
+        Returns:
+            List of execution runs ordered by start time descending
+        """
+        stmt = (
+            select(ExecutionRun)
+            .join(KitVersion, ExecutionRun.version_id == KitVersion.id)
+            .where(KitVersion.kit_id == kit_id)
+            .options(
+                selectinload(ExecutionRun.step_executions),
+                selectinload(ExecutionRun.version),
+            )
+            .order_by(ExecutionRun.started_at.desc())
+            .limit(limit)
+        )
+        if user_id is not None:
+            stmt = stmt.where(ExecutionRun.user_id == user_id)
         result = await self.session.execute(stmt)
         return list(result.scalars().all())
 
@@ -639,6 +689,62 @@ class ExecutionRepository:
         await self.session.flush()
         return run
 
+    async def pause_run(self, run_id: UUID) -> ExecutionRun | None:
+        """Mark a run as paused.
+
+        Args:
+            run_id: The run's UUID
+
+        Returns:
+            Updated run or None if not found
+        """
+        run = await self.get_by_id(run_id)
+        if run is None:
+            return None
+
+        run.status = "paused"
+        await self.session.flush()
+        return run
+
+    async def delete_run(self, run_id: UUID) -> bool:
+        """Delete an execution run and its steps.
+
+        Args:
+            run_id: The run's UUID
+
+        Returns:
+            True if deleted, False if not found
+        """
+        run = await self.get_by_id(run_id)
+        if run is None:
+            return False
+
+        await self.session.delete(run)
+        await self.session.flush()
+        return True
+
+    async def update_label(
+        self,
+        run_id: UUID,
+        label: str | None,
+    ) -> ExecutionRun | None:
+        """Update the label for an execution run.
+
+        Args:
+            run_id: The run's UUID
+            label: New label (None to clear)
+
+        Returns:
+            Updated run or None if not found
+        """
+        run = await self.get_by_id(run_id)
+        if run is None:
+            return None
+
+        run.label = label
+        await self.session.flush()
+        return run
+
     async def update_step_evaluation(
         self,
         run_id: UUID,
@@ -669,3 +775,52 @@ class ExecutionRepository:
         step.evaluation_score = evaluation_score
         await self.session.flush()
         return step
+
+
+class BookmarkRepository:
+    """Repository for kit bookmark operations."""
+
+    def __init__(self, session: AsyncSession) -> None:
+        self.session = session
+
+    async def toggle(
+        self, user_id: UUID, kit_id: UUID
+    ) -> tuple[bool, UserKitBookmark | None]:
+        """Toggle a bookmark. Returns (is_now_bookmarked, bookmark_or_None)."""
+        stmt = select(UserKitBookmark).where(
+            UserKitBookmark.user_id == user_id,
+            UserKitBookmark.kit_id == kit_id,
+        )
+        result = await self.session.execute(stmt)
+        existing = result.scalar_one_or_none()
+
+        if existing:
+            await self.session.delete(existing)
+            await self.session.flush()
+            return False, None
+
+        bookmark = UserKitBookmark(user_id=user_id, kit_id=kit_id)
+        self.session.add(bookmark)
+        await self.session.flush()
+        return True, bookmark
+
+    async def get_bookmarked_kit_ids(self, user_id: UUID) -> set[UUID]:
+        """Get the set of kit IDs bookmarked by a user."""
+        stmt = select(UserKitBookmark.kit_id).where(
+            UserKitBookmark.user_id == user_id
+        )
+        result = await self.session.execute(stmt)
+        return set(result.scalars().all())
+
+    async def list_bookmarked_kits(
+        self, user_id: UUID
+    ) -> list[ReasoningKit]:
+        """List all kits bookmarked by a user."""
+        stmt = (
+            select(ReasoningKit)
+            .join(UserKitBookmark, UserKitBookmark.kit_id == ReasoningKit.id)
+            .where(UserKitBookmark.user_id == user_id)
+            .order_by(ReasoningKit.name)
+        )
+        result = await self.session.execute(stmt)
+        return list(result.scalars().all())

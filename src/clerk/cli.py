@@ -343,6 +343,29 @@ def main() -> None:
     )
 
     # =========================================================================
+    # WEB COMMAND
+    # =========================================================================
+    web_parser = subparsers.add_parser("web", help="Start the CLERK web UI server")
+    web_parser.add_argument(
+        "--host",
+        type=str,
+        default="127.0.0.1",
+        help="Host to bind to (default: 127.0.0.1)",
+    )
+    web_parser.add_argument(
+        "--port",
+        type=int,
+        default=8000,
+        help="Port to listen on (default: 8000)",
+    )
+    web_parser.add_argument(
+        "--reload",
+        action="store_true",
+        default=False,
+        help="Enable auto-reload on code changes (development mode)",
+    )
+
+    # =========================================================================
     # PARSE AND DISPATCH
     # =========================================================================
     args = parser.parse_args()
@@ -359,6 +382,8 @@ def main() -> None:
         _cmd_sync(args)
     elif args.command == "kit":
         _cmd_kit(args)
+    elif args.command == "web":
+        _cmd_web(args)
     else:
         parser.print_help()
 
@@ -447,6 +472,34 @@ def _cmd_run(args: argparse.Namespace) -> None:
                 # No database configured, use local
                 kit_path = resolve_kit_path(args.kit, args.base_path)
                 kit = load_reasoning_kit(kit_path)
+
+        # Prompt for dynamic resources
+        dynamic_resources = [r for r in kit.resources.values() if r.is_dynamic]
+        if dynamic_resources:
+            print(
+                f"\nThis kit has {len(dynamic_resources)} dynamic resource(s) that require user input.\n"
+            )
+            for resource in dynamic_resources:
+                while True:
+                    file_path = input(
+                        f"  Enter file path for {resource.resource_id} ({resource.file}): "
+                    ).strip()
+                    if not file_path:
+                        print("    File path cannot be empty. Please try again.")
+                        continue
+                    path = Path(file_path)
+                    if not path.exists():
+                        print(f"    File not found: {path}. Please try again.")
+                        continue
+                    try:
+                        resource.content = path.read_text()
+                        print(
+                            f"    Loaded {len(resource.content)} characters from {path.name}"
+                        )
+                        break
+                    except Exception as e:
+                        print(f"    Error reading file: {e}. Please try again.")
+            print()
 
         run_reasoning_kit(
             kit,
@@ -1308,6 +1361,42 @@ def _kit_delete_step(args: argparse.Namespace) -> None:
     except Exception as e:
         print(f"Error deleting step: {e}")
         sys.exit(1)
+
+
+# =============================================================================
+# WEB COMMAND
+# =============================================================================
+
+
+def _cmd_web(args: argparse.Namespace) -> None:
+    """Start the CLERK web UI server."""
+    try:
+        import uvicorn
+    except ImportError as e:
+        print(f"Error: Web dependencies not installed: {e}")
+        print("Install them with: uv sync")
+        sys.exit(1)
+
+    print(f"Starting CLERK web UI at http://{args.host}:{args.port}")
+    if args.reload:
+        print("Auto-reload enabled — watching for file changes...")
+        uvicorn.run(
+            "clerk.web.app:create_app",
+            factory=True,
+            host=args.host,
+            port=args.port,
+            log_level="info",
+            reload=True,
+        )
+    else:
+        from .web.app import create_app
+
+        uvicorn.run(
+            create_app(),
+            host=args.host,
+            port=args.port,
+            log_level="info",
+        )
 
 
 if __name__ == "__main__":

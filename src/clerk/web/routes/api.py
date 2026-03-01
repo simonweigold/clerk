@@ -1586,7 +1586,8 @@ async def execute_kit_stream(
                             tool_def = get_tool_def(tool_call["name"])
                             if tool_def:
                                 try:
-                                    tool_result = await tool_def.execute(tool_call["args"])
+                                    user_id = exec_state.get("user_id")
+                                    tool_result = await tool_def.execute(tool_call["args"], user_id=user_id)
                                 except Exception as te:
                                     tool_result = f"Error executing tool: {te}"
                             else:
@@ -2681,4 +2682,115 @@ async def get_kit_detail_json(
         "source": source,
         "is_owner": is_owner,
     }
+
+# ---------------------------------------------------------------------------
+# MCP Config (Per-User Credentials)
+# ---------------------------------------------------------------------------
+
+
+@router.get("/mcp/config")
+async def get_mcp_configs(user: dict | None = Depends(get_optional_user)):
+    """Get all user-specific MCP server configurations."""
+    from ...db.config import get_config
+    if not get_config().is_database_configured:
+        return JSONResponse({"ok": False, "error": "Database not configured"}, status_code=500)
+
+    try:
+        from ...db import get_async_session
+        from ...db.models import McpServerConfig
+        from sqlalchemy import select
+
+        async with get_async_session() as session:
+            if not user or "id" not in user:
+                return {"ok": True, "configs": []}
+                
+            stmt = select(McpServerConfig).where(McpServerConfig.user_id == user["id"])
+            result = await session.execute(stmt)
+            configs = result.scalars().all()
+            
+            return {
+                "ok": True,
+                "configs": [
+                    {
+                        "server_name": c.server_name,
+                        "env_vars": c.env_vars,
+                    }
+                    for c in configs
+                ]
+            }
+    except Exception as e:
+        return JSONResponse({"ok": False, "error": f"Error fetching MCP configs: {e}"}, status_code=500)
+
+
+@router.put("/mcp/config/{server_name}")
+async def update_mcp_config(request: Request, server_name: str, user: dict | None = Depends(get_optional_user)):
+    """Update or create a user-specific MCP server configuration."""
+    from ...db.config import get_config
+    if not get_config().is_database_configured:
+        return JSONResponse({"ok": False, "error": "Database not configured"}, status_code=500)
+
+    try:
+        data = await request.json()
+        env_vars = data.get("env_vars", {})
+        
+        from ...db import get_async_session
+        from ...db.models import McpServerConfig
+        from sqlalchemy import select
+        
+        async with get_async_session() as session:
+            if not user or "id" not in user:
+                return JSONResponse({"ok": False, "error": "Unauthorized"}, status_code=401)
+                
+            stmt = select(McpServerConfig).where(
+                McpServerConfig.user_id == user["id"],
+                McpServerConfig.server_name == server_name
+            )
+            result = await session.execute(stmt)
+            config = result.scalar_one_or_none()
+            
+            if config:
+                config.env_vars = env_vars
+            else:
+                config = McpServerConfig(
+                    user_id=user["id"],
+                    server_name=server_name,
+                    env_vars=env_vars
+                )
+                session.add(config)
+                
+            await session.commit()
+            return {"ok": True}
+    except Exception as e:
+        return JSONResponse({"ok": False, "error": f"Error updating MCP config: {e}"}, status_code=500)
+
+
+@router.delete("/mcp/config/{server_name}")
+async def delete_mcp_config(server_name: str, user: dict | None = Depends(get_optional_user)):
+    """Delete a user-specific MCP server configuration."""
+    from ...db.config import get_config
+    if not get_config().is_database_configured:
+        return JSONResponse({"ok": False, "error": "Database not configured"}, status_code=500)
+
+    try:
+        from ...db import get_async_session
+        from ...db.models import McpServerConfig
+        from sqlalchemy import select
+        
+        async with get_async_session() as session:
+            if not user or "id" not in user:
+                return JSONResponse({"ok": False, "error": "Unauthorized"}, status_code=401)
+                
+            stmt = select(McpServerConfig).where(
+                McpServerConfig.user_id == user["id"],
+                McpServerConfig.server_name == server_name
+            )
+            result = await session.execute(stmt)
+            config = result.scalar_one_or_none()
+            
+            if config:
+                await session.delete(config)
+                await session.commit()
+            return {"ok": True}
+    except Exception as e:
+        return JSONResponse({"ok": False, "error": f"Error deleting MCP config: {e}"}, status_code=500)
 

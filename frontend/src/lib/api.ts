@@ -423,7 +423,30 @@ export async function updateExecutionLabel(
     });
     return handleResponse(res);
 }
-
 export function getDownloadUrl(slug: string, runId: string, format: 'md' | 'json'): string {
     return `${API_BASE}/kits/${slug}/executions/${runId}/download?format=${format}`;
 }
+
+// ---------------------------------------------------------------------------
+// MCP Server Configurations
+// ---------------------------------------------------------------------------
+
+export interface McpConfig {
+    server_name: string;
+    env_vars: Record<string, string>;
+}
+
+export async function getMcpConfigs(): Promise<{ configs: McpConfig[] }> {
+    const res = await fetch(`${API_BASE}/mcp/config`);
+    return handleResponse(res);
+}
+
+export async function updateMcpConfig(server_name: string, env_vars: Record<string, string>): Promise<{ ok: boolean }> {
+    const res = await fetch(`${API_BASE}/mcp/config/${server_name}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ env_vars }),
+    });
+    return handleResponse(res);
+}
+

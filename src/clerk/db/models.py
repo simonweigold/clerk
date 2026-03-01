@@ -13,7 +13,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
 )
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from pgvector.sqlalchemy import Vector
 
@@ -434,4 +434,38 @@ class EmbeddingCache(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=datetime.utcnow
     )
+
+
+class McpServerConfig(Base):
+    """User-specific configuration for an MCP server.
+
+    Stores credentials and environment variables required to run an
+    MCP server (like Airtable API keys) for a specific user.
+    """
+
+    __tablename__ = "mcp_server_configs"
+    __table_args__ = (
+        UniqueConstraint("user_id", "server_name", name="uq_user_mcp_config"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("user_profiles.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    server_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    env_vars: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=datetime.utcnow
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+    # Relationships
+    user: Mapped["UserProfile"] = relationship(lazy="selectin")
+
 

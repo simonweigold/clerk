@@ -12,6 +12,7 @@ import KitCreatePage from './pages/KitCreatePage';
 import KitRunPage from './pages/KitRunPage';
 import KitHistoryPage from './pages/KitHistoryPage';
 import ExecutionDetailPage from './pages/ExecutionDetailPage';
+import SettingsPage from './pages/SettingsPage';
 
 export default function App() {
   return (
@@ -36,6 +37,9 @@ export default function App() {
               <Route path="/kit/:slug/run" element={<KitRunPage />} />
               <Route path="/kit/:slug/history" element={<KitHistoryPage />} />
               <Route path="/kit/:slug/history/:runId" element={<ExecutionDetailPage />} />
+
+              {/* Settings */}
+              <Route path="/settings" element={<SettingsPage />} />
             </Route>
           </Routes>
         </AuthProvider>

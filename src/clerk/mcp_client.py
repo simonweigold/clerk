@@ -77,11 +77,59 @@ async def init_mcp_servers(config_path: str = "mcp_servers.json") -> None:
                 logger.info(f"Registering MCP tool from {name}: {tool.name}")
                 
                 # We create a closure to capture the session and tool_name properly.
-                def make_execute(s: ClientSession, t_name: str) -> Any:
-                    async def execute_tool(args_dict: dict[str, Any]) -> str:
+                def make_execute(server_name: str, server_cmd: str, server_args: list[str], default_env: dict[str, str], s: ClientSession, t_name: str) -> Any:
+                    async def execute_tool(args_dict: dict[str, Any], **kwargs) -> str:
+                        user_id = kwargs.get("user_id")
+                        session_to_use = s
+                        temp_stack = None
+                        
+                        if user_id:
+                            # Try database override
+                            from clerk.db.config import get_config
+                            if get_config().is_database_configured:
+                                try:
+                                    from clerk.db import get_async_session
+                                    from clerk.db.models import McpServerConfig
+                                    from sqlalchemy import select
+                                    import uuid
+                                    
+                                    async with get_async_session() as db_session:
+                                        stmt = select(McpServerConfig).where(
+                                            McpServerConfig.user_id == uuid.UUID(user_id),
+                                            McpServerConfig.server_name == server_name
+                                        )
+                                        result = await db_session.execute(stmt)
+                                        config = result.scalar_one_or_none()
+                                        
+                                        if config and config.env_vars:
+                                            # Spawn a temporary session
+                                            user_env = default_env.copy()
+                                            for k, v in config.env_vars.items():
+                                                user_env[k] = str(v)
+                                            
+                                            logger.info(f"Spawning temporary MCP session for user {user_id} on {server_name}")
+                                            
+                                            temp_stack = AsyncExitStack()
+                                            server_params = StdioServerParameters(
+                                                command=server_cmd,
+                                                args=server_args,
+                                                env=user_env
+                                            )
+                                            
+                                            stdio_transport = await temp_stack.enter_async_context(stdio_client(server_params))
+                                            read, write = stdio_transport
+                                            session_to_use = await temp_stack.enter_async_context(ClientSession(read, write))
+                                            await session_to_use.initialize()
+                                except Exception as e:
+                                    logger.error(f"Error spawning temporary MCP session for {server_name}: {e}")
+                                    if temp_stack:
+                                        await temp_stack.aclose()
+                                        temp_stack = None
+                                        session_to_use = s
+
                         try:
                             # call_tool expects arguments as a mapping
-                            result = await s.call_tool(t_name, arguments=args_dict)
+                            result = await session_to_use.call_tool(t_name, arguments=args_dict)
                             if result.isError:
                                 # Sometimes content is plain text, let's extract it safely
                                 error_text = getattr(result, "content", "Unknown error")
@@ -97,13 +145,17 @@ async def init_mcp_servers(config_path: str = "mcp_servers.json") -> None:
                         except Exception as e:
                             logger.error(f"Error executing MCP tool {t_name}: {e}")
                             return f"Error executing tool {t_name}: {str(e)}"
+                        finally:
+                            if temp_stack:
+                                await temp_stack.aclose()
+                                
                     return execute_tool
 
                 register_tool(ToolDefinition(
                     name=tool.name,  # tool.name must be unique across all servers in the current implementation
                     description=tool.description or f"MCP tool: {tool.name}",
                     parameters=tool.inputSchema,
-                    execute=make_execute(session, tool.name),
+                    execute=make_execute(name, command, args, server_env, session, tool.name),
                     source=name
                 ))
                 

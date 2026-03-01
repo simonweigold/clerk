@@ -55,7 +55,7 @@ class State(TypedDict):
     model_used: str  # LLM model being used
     # Tool fields
     tools: dict[str, dict]  # tool_number -> {tool_name, tool_id, ...}
-
+    user_id: str | None  # Add user ID for tool context
 
 def create_initial_state(
     kit: ReasoningKit,
@@ -65,6 +65,7 @@ def create_initial_state(
     db_version_id: UUID | None = None,
     save_to_db: bool = False,
     model: str = DEFAULT_MODEL,
+    user_id: str | None = None,
 ) -> State:
     """Create initial state from a reasoning kit.
 
@@ -76,6 +77,7 @@ def create_initial_state(
         db_version_id: Database kit version UUID (if saving to DB)
         save_to_db: Whether to save execution to database
         model: LLM model to use
+        user_id: ID of the user executing the kit
 
     Returns:
         Initial state for the workflow
@@ -114,6 +116,7 @@ def create_initial_state(
         save_to_db=save_to_db,
         model_used=model,
         tools=tools_data,
+        user_id=user_id,
     )
 
 
@@ -368,7 +371,7 @@ def execute_step(state: State) -> dict[str, Any]:
                 tool_def = get_tool(tool_call["name"])
                 if tool_def:
                     try:
-                        tool_result = asyncio.run(tool_def.execute(tool_call["args"]))
+                        tool_result = asyncio.run(tool_def.execute(tool_call["args"], user_id=state.get("user_id")))
                     except Exception as te:
                         tool_result = f"Error executing tool: {te}"
                 else:
@@ -556,6 +559,7 @@ def run_reasoning_kit(
     save_to_db: bool = False,
     db_version_id: UUID | None = None,
     model: str = DEFAULT_MODEL,
+    user_id: str | None = None,
 ) -> dict[str, str]:
     """Run a reasoning kit through the workflow.
 
@@ -566,6 +570,7 @@ def run_reasoning_kit(
         save_to_db: Whether to save execution to database
         db_version_id: Database kit version UUID (required if save_to_db=True)
         model: LLM model to use
+        user_id: ID of the user executing the kit
 
     Returns:
         Dict of all outputs from the workflow
@@ -600,6 +605,7 @@ def run_reasoning_kit(
         db_version_id=db_version_id,
         save_to_db=save_to_db,
         model=model,
+        user_id=user_id,
     )
 
     print(f"\n{'#' * 60}")
@@ -669,6 +675,7 @@ async def run_reasoning_kit_async(
     save_to_db: bool = False,
     db_version_id: UUID | None = None,
     model: str = DEFAULT_MODEL,
+    user_id: str | None = None,
 ) -> dict[str, str]:
     """Async version of run_reasoning_kit for use in async contexts.
 
@@ -682,6 +689,7 @@ async def run_reasoning_kit_async(
         save_to_db: Whether to save execution to database
         db_version_id: Database kit version UUID (required if save_to_db=True)
         model: LLM model to use
+        user_id: ID of the user executing the kit
 
     Returns:
         Dict of all outputs from the workflow
@@ -750,7 +758,7 @@ async def run_reasoning_kit_async(
                         tool_def = get_tool(tool_call["name"])
                         if tool_def:
                             try:
-                                tool_result = await tool_def.execute(tool_call["args"])
+                                tool_result = await tool_def.execute(tool_call["args"], user_id=user_id)
                             except Exception as te:
                                 tool_result = f"Error executing tool: {te}"
                         else:

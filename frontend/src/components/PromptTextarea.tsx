@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import type { KeyboardEvent } from 'react';
-import type { Resource, Step, Tool } from '../lib/api';
+import { formatToolName, type Resource, type Step, type Tool } from '../lib/api';
 
 interface PromptTextareaProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
     resources: Resource[];
@@ -76,7 +76,7 @@ export function PromptTextarea({ resources, steps, tools = [], value, onChange, 
         })),
         ...tools.map(t => ({
             id: t.tool_id,
-            displayName: t.display_name || t.tool_name,
+            displayName: t.display_name || formatToolName(t.tool_name),
             type: 'tool' as const
         }))
     ];

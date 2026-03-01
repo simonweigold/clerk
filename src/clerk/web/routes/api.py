@@ -268,8 +268,8 @@ async def add_resource(
                     return own_err
 
                 resource_number = 1
-                if db_kit.current_version:
-                    resource_number = len(db_kit.current_version.resources) + 1
+                if db_kit.current_version and db_kit.current_version.resources:
+                    resource_number = max(r.resource_number for r in db_kit.current_version.resources) + 1
 
                 commit_msg = f"Added resource: {filename}"
                 version = await version_repo.create(
@@ -643,8 +643,8 @@ async def add_step(
                     return own_err
 
                 step_number = 1
-                if db_kit.current_version:
-                    step_number = len(db_kit.current_version.workflow_steps) + 1
+                if db_kit.current_version and db_kit.current_version.workflow_steps:
+                    step_number = max(s.step_number for s in db_kit.current_version.workflow_steps) + 1
 
                 version = await version_repo.create(
                     kit_id=db_kit.id,
@@ -981,8 +981,8 @@ async def add_tool(
                     return own_err
 
                 tool_number = 1
-                if db_kit.current_version:
-                    tool_number = len(db_kit.current_version.tools) + 1
+                if db_kit.current_version and db_kit.current_version.tools:
+                    tool_number = max(t.tool_number for t in db_kit.current_version.tools) + 1
 
                 version = await version_repo.create(
                     kit_id=db_kit.id,

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { getKit, deleteKit, updateKit, addResource, deleteResource, updateResource, addStep, deleteStep, updateStep, getAvailableTools, addTool, updateTool, deleteTool, type KitDetail, type Resource, type Step, type Tool, type AvailableTool } from '../lib/api';
+import { getKit, deleteKit, updateKit, addResource, deleteResource, updateResource, addStep, deleteStep, updateStep, getAvailableTools, addTool, updateTool, deleteTool, formatToolName, type KitDetail, type Resource, type Step, type Tool, type AvailableTool } from '../lib/api';
 import { useAuth } from '../hooks/useAuth';
 import { useToast } from '../hooks/useToast';
 import { PromptTextarea } from '../components/PromptTextarea';
@@ -17,15 +17,20 @@ function ResourceCard({ resource, slug, isOwner, onRefresh }: {
     const [editFile, setEditFile] = useState<File | null>(null);
     const [editText, setEditText] = useState('');
     const [saving, setSaving] = useState(false);
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [isDeleting, setIsDeleting] = useState(false);
 
-    const handleDelete = async () => {
-        if (!confirm('Delete this resource?')) return;
+    const confirmDelete = async () => {
+        setIsDeleting(true);
         try {
             await deleteResource(slug, resource.number);
             addToast('success', 'Resource deleted.');
             onRefresh();
         } catch (err) {
             addToast('error', err instanceof Error ? err.message : 'Delete failed.');
+        } finally {
+            setIsDeleting(false);
+            setShowDeleteModal(false);
         }
     };
 
@@ -75,7 +80,7 @@ function ResourceCard({ resource, slug, isOwner, onRefresh }: {
                                     <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
                                 </svg>
                             </button>
-                            <button onClick={handleDelete} className="btn btn-ghost btn-sm text-destructive" title="Delete">
+                            <button onClick={() => setShowDeleteModal(true)} className="btn btn-ghost btn-sm text-destructive" title="Delete">
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                     <polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" /><path d="M10 11v6" /><path d="M14 11v6" />
                                 </svg>
@@ -145,6 +150,20 @@ function ResourceCard({ resource, slug, isOwner, onRefresh }: {
                     )}
                 </div>
             )}
+            {showDeleteModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm fade-in">
+                    <div className="card p-6 max-w-md w-full shadow-lg">
+                        <h2 className="text-xl font-bold mb-2">Delete Resource</h2>
+                        <p className="text-muted-foreground mb-6">
+                            Are you sure you want to delete <strong>{resource.display_name || resource.filename}</strong>? This action cannot be undone.
+                        </p>
+                        <div className="flex justify-end gap-3">
+                            <button className="btn btn-ghost" onClick={() => setShowDeleteModal(false)} disabled={isDeleting}>Cancel</button>
+                            <button className="btn btn-destructive" onClick={confirmDelete} disabled={isDeleting}>{isDeleting ? 'Deleting...' : 'Delete'}</button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
@@ -159,15 +178,20 @@ function StepCard({ step, slug, isOwner, onRefresh, resources, steps, tools }: {
     const [editPrompt, setEditPrompt] = useState(step.prompt_template);
     const [editDisplayName, setEditDisplayName] = useState(step.display_name || '');
     const [saving, setSaving] = useState(false);
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [isDeleting, setIsDeleting] = useState(false);
 
-    const handleDelete = async () => {
-        if (!confirm('Delete this step?')) return;
+    const confirmDelete = async () => {
+        setIsDeleting(true);
         try {
             await deleteStep(slug, step.number);
             addToast('success', 'Step deleted.');
             onRefresh();
         } catch (err) {
             addToast('error', err instanceof Error ? err.message : 'Delete failed.');
+        } finally {
+            setIsDeleting(false);
+            setShowDeleteModal(false);
         }
     };
 
@@ -201,7 +225,7 @@ function StepCard({ step, slug, isOwner, onRefresh, resources, steps, tools }: {
                                     <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
                                 </svg>
                             </button>
-                            <button onClick={handleDelete} className="btn btn-ghost btn-sm text-destructive" title="Delete">
+                            <button onClick={() => setShowDeleteModal(true)} className="btn btn-ghost btn-sm text-destructive" title="Delete">
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                     <polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" /><path d="M10 11v6" /><path d="M14 11v6" />
                                 </svg>
@@ -241,6 +265,20 @@ function StepCard({ step, slug, isOwner, onRefresh, resources, steps, tools }: {
                             {step.prompt_template}
                         </div>
                     )}
+                </div>
+            )}
+            {showDeleteModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm fade-in">
+                    <div className="card p-6 max-w-md w-full shadow-lg">
+                        <h2 className="text-xl font-bold mb-2">Delete Step</h2>
+                        <p className="text-muted-foreground mb-6">
+                            Are you sure you want to delete this step? This action cannot be undone.
+                        </p>
+                        <div className="flex justify-end gap-3">
+                            <button className="btn btn-ghost" onClick={() => setShowDeleteModal(false)} disabled={isDeleting}>Cancel</button>
+                            <button className="btn btn-destructive" onClick={confirmDelete} disabled={isDeleting}>{isDeleting ? 'Deleting...' : 'Delete'}</button>
+                        </div>
+                    </div>
                 </div>
             )}
         </div>
@@ -335,9 +373,11 @@ function ToolCard({ tool, slug, isOwner, onRefresh }: { tool: Tool; slug: string
     const [editDisplayName, setEditDisplayName] = useState(tool.display_name || '');
     const [editConfiguration, setEditConfiguration] = useState(tool.configuration || '');
     const [saving, setSaving] = useState(false);
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [isDeleting, setIsDeleting] = useState(false);
 
-    const handleDelete = async () => {
-        if (!confirm(`Remove ${tool.tool_name} from this kit?`)) return;
+    const confirmDelete = async () => {
+        setIsDeleting(true);
         try {
             // tool.tool_id is "tool_N", extract N
             const num = parseInt(tool.tool_id.split('_')[1], 10);
@@ -346,6 +386,9 @@ function ToolCard({ tool, slug, isOwner, onRefresh }: { tool: Tool; slug: string
             onRefresh();
         } catch (err) {
             addToast('error', err instanceof Error ? err.message : 'Remove failed.');
+        } finally {
+            setIsDeleting(false);
+            setShowDeleteModal(false);
         }
     };
 
@@ -369,7 +412,7 @@ function ToolCard({ tool, slug, isOwner, onRefresh }: { tool: Tool; slug: string
             <div className="step-card-header flex items-center justify-between">
                 <span className="flex items-center gap-2">
                     <span className="font-medium text-purple-600 dark:text-purple-400">
-                        {tool.display_name || tool.tool_name}
+                        {tool.display_name || formatToolName(tool.tool_name)}
                     </span>
                     <span className="text-xs text-muted-foreground">({tool.tool_id})</span>
                     {tool.display_name && (
@@ -384,7 +427,7 @@ function ToolCard({ tool, slug, isOwner, onRefresh }: { tool: Tool; slug: string
                                     <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
                                 </svg>
                             </button>
-                            <button onClick={handleDelete} className="btn btn-ghost btn-sm text-destructive" title="Remove">
+                            <button onClick={() => setShowDeleteModal(true)} className="btn btn-ghost btn-sm text-destructive" title="Remove">
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                     <line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line>
                                 </svg>
@@ -415,6 +458,32 @@ function ToolCard({ tool, slug, isOwner, onRefresh }: { tool: Tool; slug: string
                     <pre className="content-preview text-xs mt-0 overflow-x-auto font-mono bg-muted/50 p-2 rounded border border-border">
                         {tool.configuration}
                     </pre>
+                </div>
+            )}
+            {showDeleteModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm fade-in">
+                    <div className="card p-6 max-w-md w-full shadow-lg">
+                        <h2 className="text-xl font-bold mb-2">Remove Tool</h2>
+                        <p className="text-muted-foreground mb-6">
+                            Are you sure you want to remove <strong>{tool.display_name || formatToolName(tool.tool_name)}</strong> from this kit?
+                        </p>
+                        <div className="flex justify-end gap-3">
+                            <button
+                                className="btn btn-ghost"
+                                onClick={() => setShowDeleteModal(false)}
+                                disabled={isDeleting}
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                className="btn btn-destructive"
+                                onClick={confirmDelete}
+                                disabled={isDeleting}
+                            >
+                                {isDeleting ? 'Removing...' : 'Remove'}
+                            </button>
+                        </div>
+                    </div>
                 </div>
             )}
         </div>
@@ -477,7 +546,7 @@ function AddToolForm({ slug, onRefresh }: { slug: string; onRefresh: () => void 
                 <label className="label">Select Tool</label>
                 <select className="input" value={selectedTool} onChange={e => setSelectedTool(e.target.value)} required>
                     {availableTools.map(t => (
-                        <option key={t.name} value={t.name}>{t.name}</option>
+                        <option key={t.name} value={t.name}>{formatToolName(t.name)}</option>
                     ))}
                 </select>
                 {selectedToolDef && (
@@ -561,6 +630,8 @@ export default function KitDetailPage() {
     const [editName, setEditName] = useState('');
     const [editDescription, setEditDescription] = useState('');
     const [savingKit, setSavingKit] = useState(false);
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [isDeleting, setIsDeleting] = useState(false);
 
     const handleSaveKitDetails = async () => {
         if (!slug || !kit) return;
@@ -596,14 +667,17 @@ export default function KitDetailPage() {
 
     useEffect(() => { fetchKit(); }, [slug]);
 
-    const handleDelete = async () => {
-        if (!slug || !confirm('Are you sure you want to delete this kit? This action cannot be undone.')) return;
+    const confirmDelete = async () => {
+        if (!slug) return;
+        setIsDeleting(true);
         try {
             await deleteKit(slug);
             addToast('success', 'Kit deleted.');
             navigate('/');
         } catch (err) {
             addToast('error', err instanceof Error ? err.message : 'Delete failed.');
+            setIsDeleting(false);
+            setShowDeleteModal(false);
         }
     };
 
@@ -695,7 +769,7 @@ export default function KitDetailPage() {
                     <Link to={`/kit/${slug}/run`} className="btn btn-primary">Run Kit</Link>
                     {user && <Link to={`/kit/${slug}/history`} className="btn btn-secondary">History</Link>}
                     {kit.is_owner && (
-                        <button onClick={handleDelete} className="btn btn-ghost text-destructive">Delete</button>
+                        <button onClick={() => setShowDeleteModal(true)} className="btn btn-ghost text-destructive">Delete</button>
                     )}
                 </div>
             </div>
@@ -774,6 +848,21 @@ export default function KitDetailPage() {
                     </div>
                 )}
             </section>
+
+            {showDeleteModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm fade-in">
+                    <div className="card p-6 max-w-md w-full shadow-lg">
+                        <h2 className="text-xl font-bold mb-2">Delete Kit</h2>
+                        <p className="text-muted-foreground mb-6">
+                            Are you sure you want to delete the kit <strong>{kit.kit.name}</strong>? This action cannot be undone.
+                        </p>
+                        <div className="flex justify-end gap-3">
+                            <button className="btn btn-ghost" onClick={() => setShowDeleteModal(false)} disabled={isDeleting}>Cancel</button>
+                            <button className="btn btn-destructive" onClick={confirmDelete} disabled={isDeleting}>{isDeleting ? 'Deleting...' : 'Delete'}</button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

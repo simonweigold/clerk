@@ -123,6 +123,9 @@ class ReasoningKitRepository:
                 selectinload(ReasoningKit.current_version).selectinload(
                     KitVersion.workflow_steps
                 ),
+                selectinload(ReasoningKit.current_version).selectinload(
+                    KitVersion.tools
+                ),
             )
         )
         result = await self.session.execute(stmt)
@@ -146,6 +149,9 @@ class ReasoningKitRepository:
                 ),
                 selectinload(ReasoningKit.current_version).selectinload(
                     KitVersion.workflow_steps
+                ),
+                selectinload(ReasoningKit.current_version).selectinload(
+                    KitVersion.tools
                 ),
             )
         )

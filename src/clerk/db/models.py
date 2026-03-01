@@ -93,6 +93,7 @@ class ReasoningKit(Base):
     versions: Mapped[list["KitVersion"]] = relationship(
         back_populates="kit",
         foreign_keys="KitVersion.kit_id",
+        cascade="all, delete-orphan",
         lazy="selectin",
         order_by="KitVersion.version_number.desc()",
     )

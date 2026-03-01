@@ -30,6 +30,7 @@ dependencies = [
     # Tool support
     "httpx>=0.27.0",
     "beautifulsoup4>=4.12.0",
+    "mcp>=1.26.0",
 ]
 
 [project.scripts]

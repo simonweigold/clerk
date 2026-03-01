@@ -117,12 +117,14 @@ export interface Tool {
     tool_name: string; // "read_url"
     display_name?: string;
     configuration?: string;
+    source?: string;
 }
 
 export interface AvailableTool {
     name: string;
     description: string;
     parameters: Record<string, unknown>;
+    source?: string;
 }
 
 export function formatToolName(name: string): string {

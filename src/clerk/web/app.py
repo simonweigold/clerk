@@ -10,6 +10,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 
 from ..db.config import close_engines, get_config
+from ..mcp_client import close_mcp_servers, init_mcp_servers
 
 # Paths
 WEB_DIR = Path(__file__).parent
@@ -20,7 +21,9 @@ SPA_DIR = Path(__file__).resolve().parent.parent.parent.parent / "frontend" / "d
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Application lifespan: startup and shutdown."""
+    await init_mcp_servers()
     yield
+    await close_mcp_servers()
     await close_engines()
 
 

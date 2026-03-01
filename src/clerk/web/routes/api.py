@@ -919,6 +919,7 @@ async def list_available_tools(
                 "name": t.name,
                 "description": t.description,
                 "parameters": t.parameters,
+                "source": getattr(t, "source", "builtin"),
             }
             for t in tools
         ]
@@ -2611,7 +2612,9 @@ async def get_kit_detail_json(
                                     "display_name": s.display_name,
                                 }
                             )
+                        from ...tools import get_tool
                         for t in sorted(version.tools, key=lambda x: x.tool_number):
+                            tool_def = get_tool(t.tool_name)
                             tools.append(
                                 {
                                     "number": t.tool_number,
@@ -2619,6 +2622,7 @@ async def get_kit_detail_json(
                                     "tool_id": t.tool_id,
                                     "display_name": t.display_name,
                                     "configuration": t.configuration,
+                                    "source": getattr(tool_def, "source", "builtin") if tool_def else "unknown",
                                 }
                             )
         except Exception:

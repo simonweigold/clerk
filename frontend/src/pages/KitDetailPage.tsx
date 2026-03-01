@@ -418,6 +418,9 @@ function ToolCard({ tool, slug, isOwner, onRefresh }: { tool: Tool; slug: string
                     {tool.display_name && (
                         <span className="text-xs text-muted-foreground ml-2 uppercase font-mono tracking-widest">{tool.tool_name}</span>
                     )}
+                    {tool.source && tool.source !== 'builtin' && (
+                        <span className="badge badge-outline text-[10px] ml-1">{tool.source}</span>
+                    )}
                 </span>
                 <span className="flex items-center gap-2">
                     {isOwner && (
@@ -545,8 +548,19 @@ function AddToolForm({ slug, onRefresh }: { slug: string; onRefresh: () => void 
             <div>
                 <label className="label">Select Tool</label>
                 <select className="input" value={selectedTool} onChange={e => setSelectedTool(e.target.value)} required>
-                    {availableTools.map(t => (
-                        <option key={t.name} value={t.name}>{formatToolName(t.name)}</option>
+                    {Object.entries(
+                        availableTools.reduce((acc, t) => {
+                            const source = t.source || 'builtin';
+                            if (!acc[source]) acc[source] = [];
+                            acc[source].push(t);
+                            return acc;
+                        }, {} as Record<string, AvailableTool[]>)
+                    ).map(([source, tools]) => (
+                        <optgroup key={source} label={source === 'builtin' ? 'Built-in Tools' : `MCP: ${source}`}>
+                            {tools.map(t => (
+                                <option key={t.name} value={t.name}>{formatToolName(t.name)}</option>
+                            ))}
+                        </optgroup>
                     ))}
                 </select>
                 {selectedToolDef && (

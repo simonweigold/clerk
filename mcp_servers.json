@@ -1,0 +1,24 @@
+{
+    "mcpServers": {
+        "google-sheets": {
+            "command": "uvx",
+            "args": [
+                "mcp-google-sheets@latest"
+            ],
+            "env": {
+                "SERVICE_ACCOUNT_PATH": "${GOOGLE_SHEETS_SERVICE_ACCOUNT_PATH}",
+                "DRIVE_FOLDER_ID": "${GOOGLE_SHEETS_DRIVE_FOLDER_ID}"
+            }
+        },
+        "airtable": {
+            "command": "npx",
+            "args": [
+                "-y",
+                "@felores/airtable-mcp-server"
+            ],
+            "env": {
+                "AIRTABLE_API_KEY": "${AIRTABLE_API_KEY}"
+            }
+        }
+    }
+}

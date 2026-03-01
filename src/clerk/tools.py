@@ -21,6 +21,7 @@ class ToolDefinition:
     description: str
     parameters: dict[str, Any]  # JSON Schema (OpenAI function format)
     execute: Callable[[dict[str, Any]], Awaitable[str]]
+    source: str = "builtin"  # "builtin" or the MCP server name
 
 
 # ---------------------------------------------------------------------------

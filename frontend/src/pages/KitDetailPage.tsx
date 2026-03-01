@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { getKit, deleteKit, updateKit, addResource, deleteResource, updateResource, addStep, deleteStep, updateStep, type KitDetail, type Resource, type Step } from '../lib/api';
+import { getKit, deleteKit, updateKit, addResource, deleteResource, updateResource, addStep, deleteStep, updateStep, getAvailableTools, addTool, updateTool, deleteTool, formatToolName, type KitDetail, type Resource, type Step, type Tool, type AvailableTool } from '../lib/api';
 import { useAuth } from '../hooks/useAuth';
 import { useToast } from '../hooks/useToast';
 import { PromptTextarea } from '../components/PromptTextarea';
@@ -17,15 +17,20 @@ function ResourceCard({ resource, slug, isOwner, onRefresh }: {
     const [editFile, setEditFile] = useState<File | null>(null);
     const [editText, setEditText] = useState('');
     const [saving, setSaving] = useState(false);
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [isDeleting, setIsDeleting] = useState(false);
 
-    const handleDelete = async () => {
-        if (!confirm('Delete this resource?')) return;
+    const confirmDelete = async () => {
+        setIsDeleting(true);
         try {
             await deleteResource(slug, resource.number);
             addToast('success', 'Resource deleted.');
             onRefresh();
         } catch (err) {
             addToast('error', err instanceof Error ? err.message : 'Delete failed.');
+        } finally {
+            setIsDeleting(false);
+            setShowDeleteModal(false);
         }
     };
 
@@ -75,7 +80,7 @@ function ResourceCard({ resource, slug, isOwner, onRefresh }: {
                                     <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
                                 </svg>
                             </button>
-                            <button onClick={handleDelete} className="btn btn-ghost btn-sm text-destructive" title="Delete">
+                            <button onClick={() => setShowDeleteModal(true)} className="btn btn-ghost btn-sm text-destructive" title="Delete">
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                     <polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" /><path d="M10 11v6" /><path d="M14 11v6" />
                                 </svg>
@@ -145,13 +150,27 @@ function ResourceCard({ resource, slug, isOwner, onRefresh }: {
                     )}
                 </div>
             )}
+            {showDeleteModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm fade-in">
+                    <div className="card p-6 max-w-md w-full shadow-lg">
+                        <h2 className="text-xl font-bold mb-2">Delete Resource</h2>
+                        <p className="text-muted-foreground mb-6">
+                            Are you sure you want to delete <strong>{resource.display_name || resource.filename}</strong>? This action cannot be undone.
+                        </p>
+                        <div className="flex justify-end gap-3">
+                            <button className="btn btn-ghost" onClick={() => setShowDeleteModal(false)} disabled={isDeleting}>Cancel</button>
+                            <button className="btn btn-destructive" onClick={confirmDelete} disabled={isDeleting}>{isDeleting ? 'Deleting...' : 'Delete'}</button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
 
-function StepCard({ step, slug, isOwner, onRefresh, resources, steps }: {
+function StepCard({ step, slug, isOwner, onRefresh, resources, steps, tools }: {
     step: Step; slug: string; isOwner: boolean; onRefresh: () => void;
-    resources: Resource[]; steps: Step[];
+    resources: Resource[]; steps: Step[]; tools: Tool[];
 }) {
     const { addToast } = useToast();
     const [expanded, setExpanded] = useState(false);
@@ -159,15 +178,20 @@ function StepCard({ step, slug, isOwner, onRefresh, resources, steps }: {
     const [editPrompt, setEditPrompt] = useState(step.prompt_template);
     const [editDisplayName, setEditDisplayName] = useState(step.display_name || '');
     const [saving, setSaving] = useState(false);
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [isDeleting, setIsDeleting] = useState(false);
 
-    const handleDelete = async () => {
-        if (!confirm('Delete this step?')) return;
+    const confirmDelete = async () => {
+        setIsDeleting(true);
         try {
             await deleteStep(slug, step.number);
             addToast('success', 'Step deleted.');
             onRefresh();
         } catch (err) {
             addToast('error', err instanceof Error ? err.message : 'Delete failed.');
+        } finally {
+            setIsDeleting(false);
+            setShowDeleteModal(false);
         }
     };
 
@@ -201,7 +225,7 @@ function StepCard({ step, slug, isOwner, onRefresh, resources, steps }: {
                                     <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
                                 </svg>
                             </button>
-                            <button onClick={handleDelete} className="btn btn-ghost btn-sm text-destructive" title="Delete">
+                            <button onClick={() => setShowDeleteModal(true)} className="btn btn-ghost btn-sm text-destructive" title="Delete">
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                     <polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" /><path d="M10 11v6" /><path d="M14 11v6" />
                                 </svg>
@@ -218,7 +242,7 @@ function StepCard({ step, slug, isOwner, onRefresh, resources, steps }: {
                     </div>
                     <div>
                         <label className="label text-xs">Prompt Template</label>
-                        <PromptTextarea className="input" rows={8} value={editPrompt} onChange={(e) => setEditPrompt(e.target.value)} resources={resources} steps={steps} />
+                        <PromptTextarea className="input" rows={8} value={editPrompt} onChange={(e) => setEditPrompt(e.target.value)} resources={resources} steps={steps} tools={tools} />
                     </div>
                     <div className="flex gap-2 pt-1">
                         <button onClick={handleSave} className="btn btn-primary btn-sm" disabled={saving}>{saving ? 'Saving...' : 'Save'}</button>
@@ -241,6 +265,20 @@ function StepCard({ step, slug, isOwner, onRefresh, resources, steps }: {
                             {step.prompt_template}
                         </div>
                     )}
+                </div>
+            )}
+            {showDeleteModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm fade-in">
+                    <div className="card p-6 max-w-md w-full shadow-lg">
+                        <h2 className="text-xl font-bold mb-2">Delete Step</h2>
+                        <p className="text-muted-foreground mb-6">
+                            Are you sure you want to delete this step? This action cannot be undone.
+                        </p>
+                        <div className="flex justify-end gap-3">
+                            <button className="btn btn-ghost" onClick={() => setShowDeleteModal(false)} disabled={isDeleting}>Cancel</button>
+                            <button className="btn btn-destructive" onClick={confirmDelete} disabled={isDeleting}>{isDeleting ? 'Deleting...' : 'Delete'}</button>
+                        </div>
+                    </div>
                 </div>
             )}
         </div>
@@ -327,7 +365,231 @@ function AddResourceForm({ slug, onRefresh }: { slug: string; onRefresh: () => v
     );
 }
 
-function AddStepForm({ slug, onRefresh, resources, steps }: { slug: string; onRefresh: () => void; resources: Resource[]; steps: Step[]; }) {
+// ─── TOOL COMPONENTS ──────────────────────────────────────────────────────────
+
+function ToolCard({ tool, slug, isOwner, onRefresh }: { tool: Tool; slug: string; isOwner: boolean; onRefresh: () => void }) {
+    const { addToast } = useToast();
+    const [editing, setEditing] = useState(false);
+    const [editDisplayName, setEditDisplayName] = useState(tool.display_name || '');
+    const [editConfiguration, setEditConfiguration] = useState(tool.configuration || '');
+    const [saving, setSaving] = useState(false);
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [isDeleting, setIsDeleting] = useState(false);
+
+    const confirmDelete = async () => {
+        setIsDeleting(true);
+        try {
+            // tool.tool_id is "tool_N", extract N
+            const num = parseInt(tool.tool_id.split('_')[1], 10);
+            await deleteTool(slug, num);
+            addToast('success', 'Tool removed.');
+            onRefresh();
+        } catch (err) {
+            addToast('error', err instanceof Error ? err.message : 'Remove failed.');
+        } finally {
+            setIsDeleting(false);
+            setShowDeleteModal(false);
+        }
+    };
+
+    const handleSave = async () => {
+        setSaving(true);
+        try {
+            const num = parseInt(tool.tool_id.split('_')[1], 10);
+            await updateTool(slug, num, editDisplayName, editConfiguration);
+            addToast('success', 'Tool updated.');
+            setEditing(false);
+            onRefresh();
+        } catch (err) {
+            addToast('error', err instanceof Error ? err.message : 'Update failed.');
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    return (
+        <div className="step-card">
+            <div className="step-card-header flex items-center justify-between">
+                <span className="flex items-center gap-2">
+                    <span className="font-medium text-purple-600 dark:text-purple-400">
+                        {tool.display_name || formatToolName(tool.tool_name)}
+                    </span>
+                    <span className="text-xs text-muted-foreground">({tool.tool_id})</span>
+                    {tool.display_name && (
+                        <span className="text-xs text-muted-foreground ml-2 uppercase font-mono tracking-widest">{tool.tool_name}</span>
+                    )}
+                    {tool.source && tool.source !== 'builtin' && (
+                        <span className="badge badge-outline text-[10px] ml-1">{tool.source}</span>
+                    )}
+                </span>
+                <span className="flex items-center gap-2">
+                    {isOwner && (
+                        <>
+                            <button onClick={() => { setEditing(!editing); setEditDisplayName(tool.display_name || ''); setEditConfiguration(tool.configuration || ''); }} className="btn btn-ghost btn-sm" title="Edit">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
+                                </svg>
+                            </button>
+                            <button onClick={() => setShowDeleteModal(true)} className="btn btn-ghost btn-sm text-destructive" title="Remove">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line>
+                                </svg>
+                            </button>
+                        </>
+                    )}
+                </span>
+            </div>
+            {editing && (
+                <div className="step-card-body space-y-4 border-t border-border pt-3">
+                    <div>
+                        <label className="label text-xs">Display Name <span className="text-muted-foreground font-normal">(optional)</span></label>
+                        <input type="text" className="input text-sm" value={editDisplayName} onChange={(e) => setEditDisplayName(e.target.value)} placeholder="Readable name" />
+                    </div>
+                    <div>
+                        <label className="label text-xs">Configuration JSON <span className="text-muted-foreground font-normal">(optional)</span></label>
+                        <textarea className="input text-sm font-mono" rows={3} value={editConfiguration} onChange={(e) => setEditConfiguration(e.target.value)} placeholder='{"key": "value"}' />
+                    </div>
+                    <div className="flex gap-2 pt-1">
+                        <button onClick={handleSave} className="btn btn-primary btn-sm" disabled={saving}>{saving ? 'Saving...' : 'Save'}</button>
+                        <button onClick={() => setEditing(false)} className="btn btn-ghost btn-sm">Cancel</button>
+                    </div>
+                </div>
+            )}
+            {!editing && tool.configuration && (
+                <div className="step-card-body">
+                    <div className="text-xs text-muted-foreground mt-1 mb-1 font-semibold uppercase tracking-wider">Configuration</div>
+                    <pre className="content-preview text-xs mt-0 overflow-x-auto font-mono bg-muted/50 p-2 rounded border border-border">
+                        {tool.configuration}
+                    </pre>
+                </div>
+            )}
+            {showDeleteModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm fade-in">
+                    <div className="card p-6 max-w-md w-full shadow-lg">
+                        <h2 className="text-xl font-bold mb-2">Remove Tool</h2>
+                        <p className="text-muted-foreground mb-6">
+                            Are you sure you want to remove <strong>{tool.display_name || formatToolName(tool.tool_name)}</strong> from this kit?
+                        </p>
+                        <div className="flex justify-end gap-3">
+                            <button
+                                className="btn btn-ghost"
+                                onClick={() => setShowDeleteModal(false)}
+                                disabled={isDeleting}
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                className="btn btn-destructive"
+                                onClick={confirmDelete}
+                                disabled={isDeleting}
+                            >
+                                {isDeleting ? 'Removing...' : 'Remove'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
+
+function AddToolForm({ slug, onRefresh }: { slug: string; onRefresh: () => void }) {
+    const { addToast } = useToast();
+    const [availableTools, setAvailableTools] = useState<AvailableTool[]>([]);
+    const [selectedTool, setSelectedTool] = useState<string>('');
+    const [displayName, setDisplayName] = useState('');
+    const [configuration, setConfiguration] = useState('');
+    const [loading, setLoading] = useState(false);
+    const [fetchingTools, setFetchingTools] = useState(true);
+
+    useEffect(() => {
+        getAvailableTools()
+            .then(data => {
+                setAvailableTools(data.tools);
+                if (data.tools.length > 0) setSelectedTool(data.tools[0].name);
+            })
+            .catch(err => addToast('error', err instanceof Error ? err.message : 'Failed to fetch available tools.'))
+            .finally(() => setFetchingTools(false));
+    }, [addToast]);
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!selectedTool) return;
+        setLoading(true);
+        try {
+            await addTool(slug, selectedTool, displayName, configuration);
+            addToast('success', 'Tool added to kit.');
+            setDisplayName('');
+            setConfiguration('');
+            // Optional: setSelectedTool to default
+            onRefresh();
+        } catch (err) {
+            addToast('error', err instanceof Error ? err.message : 'Add tool failed.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    if (fetchingTools) return <div className="card p-5 animate-pulse"><div className="h-4 bg-muted rounded w-1/4 mb-4"></div><div className="h-10 bg-muted rounded"></div></div>;
+
+    if (availableTools.length === 0) return null; // No tools available globally
+
+    const selectedToolDef = availableTools.find(t => t.name === selectedTool);
+
+    return (
+        <form onSubmit={handleSubmit} className="card p-5 space-y-4 border-purple-500/20 shadow-sm shadow-purple-500/10">
+            <div className="flex items-center gap-2 mb-2">
+                <svg className="w-5 h-5 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                </svg>
+                <h3 className="font-semibold text-foreground">Attach Tool</h3>
+            </div>
+
+            <div>
+                <label className="label">Select Tool</label>
+                <select className="input" value={selectedTool} onChange={e => setSelectedTool(e.target.value)} required>
+                    {Object.entries(
+                        availableTools.reduce((acc, t) => {
+                            const source = t.source || 'builtin';
+                            if (!acc[source]) acc[source] = [];
+                            acc[source].push(t);
+                            return acc;
+                        }, {} as Record<string, AvailableTool[]>)
+                    ).map(([source, tools]) => (
+                        <optgroup key={source} label={source === 'builtin' ? 'Built-in Tools' : `MCP: ${source}`}>
+                            {tools.map(t => (
+                                <option key={t.name} value={t.name}>{formatToolName(t.name)}</option>
+                            ))}
+                        </optgroup>
+                    ))}
+                </select>
+                {selectedToolDef && (
+                    <p className="text-xs text-muted-foreground mt-1.5">{selectedToolDef.description}</p>
+                )}
+            </div>
+
+            <div>
+                <label className="label">Display Name <span className="text-muted-foreground font-normal">(optional)</span></label>
+                <input type="text" className="input text-sm" value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="Readable name" />
+            </div>
+
+            <div>
+                <label className="label flex justify-between">
+                    <span>Configuration <span className="text-muted-foreground font-normal">(optional JSON)</span></span>
+                </label>
+                <textarea className="input text-sm font-mono" rows={2} value={configuration} onChange={(e) => setConfiguration(e.target.value)} placeholder='{"key": "value"}' />
+            </div>
+
+            <button type="submit" className="btn btn-primary" disabled={loading || !selectedTool}>
+                {loading ? 'Attaching...' : 'Attach Tool'}
+            </button>
+        </form>
+    );
+}
+
+// ─── END TOOL COMPONENTS ──────────────────────────────────────────────────────
+
+function AddStepForm({ slug, onRefresh, resources, steps, tools }: { slug: string; onRefresh: () => void; resources: Resource[]; steps: Step[]; tools: Tool[] }) {
     const [prompt, setPrompt] = useState('');
     const [displayName, setDisplayName] = useState('');
     const [loading, setLoading] = useState(false);
@@ -357,9 +619,9 @@ function AddStepForm({ slug, onRefresh, resources, steps }: { slug: string; onRe
             </div>
             <div>
                 <label className="label">Prompt Template</label>
-                <PromptTextarea className="input" rows={6} value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder="Enter your LLM prompt..." required resources={resources} steps={steps} />
+                <PromptTextarea className="input" rows={6} value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder="Enter your LLM prompt..." required resources={resources} steps={steps} tools={tools} />
                 <p className="text-xs text-muted-foreground mt-1.5">
-                    Use <code className="bg-muted px-1.5 py-0.5 rounded-md text-xs">{'{'}<span>resource_N</span>{'}'}</code> and <code className="bg-muted px-1.5 py-0.5 rounded-md text-xs">{'{'}<span>workflow_N</span>{'}'}</code> for placeholders.
+                    Use <code className="bg-muted px-1.5 py-0.5 rounded-md text-xs">{'{'}<span>resource_N</span>{'}'}</code>, <code className="bg-muted px-1.5 py-0.5 rounded-md text-xs">{'{'}<span>workflow_N</span>{'}'}</code>, and <code className="bg-muted px-1.5 py-0.5 rounded-md text-xs">{'{'}<span>tool_N</span>{'}'}</code> for placeholders.
                 </p>
             </div>
             <button type="submit" className="btn btn-primary" disabled={loading}>
@@ -382,6 +644,8 @@ export default function KitDetailPage() {
     const [editName, setEditName] = useState('');
     const [editDescription, setEditDescription] = useState('');
     const [savingKit, setSavingKit] = useState(false);
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [isDeleting, setIsDeleting] = useState(false);
 
     const handleSaveKitDetails = async () => {
         if (!slug || !kit) return;
@@ -417,14 +681,17 @@ export default function KitDetailPage() {
 
     useEffect(() => { fetchKit(); }, [slug]);
 
-    const handleDelete = async () => {
-        if (!slug || !confirm('Are you sure you want to delete this kit? This action cannot be undone.')) return;
+    const confirmDelete = async () => {
+        if (!slug) return;
+        setIsDeleting(true);
         try {
             await deleteKit(slug);
             addToast('success', 'Kit deleted.');
             navigate('/');
         } catch (err) {
             addToast('error', err instanceof Error ? err.message : 'Delete failed.');
+            setIsDeleting(false);
+            setShowDeleteModal(false);
         }
     };
 
@@ -516,7 +783,7 @@ export default function KitDetailPage() {
                     <Link to={`/kit/${slug}/run`} className="btn btn-primary">Run Kit</Link>
                     {user && <Link to={`/kit/${slug}/history`} className="btn btn-secondary">History</Link>}
                     {kit.is_owner && (
-                        <button onClick={handleDelete} className="btn btn-ghost text-destructive">Delete</button>
+                        <button onClick={() => setShowDeleteModal(true)} className="btn btn-ghost text-destructive">Delete</button>
                     )}
                 </div>
             </div>
@@ -548,6 +815,31 @@ export default function KitDetailPage() {
 
             <hr className="divider" />
 
+            {/* Tools */}
+            <section className="mb-10">
+                <h2 className="text-xl font-semibold mb-4 tracking-tight">
+                    Tools ({kit.tools?.length || 0})
+                </h2>
+                {(!kit.tools || kit.tools.length === 0) ? (
+                    <div className="empty-state py-8">
+                        <p className="text-sm">No tools attached to this kit.</p>
+                    </div>
+                ) : (
+                    <div className="stream-container grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {kit.tools.map((t) => (
+                            <ToolCard key={t.tool_id} tool={t} slug={slug!} isOwner={kit.is_owner} onRefresh={fetchKit} />
+                        ))}
+                    </div>
+                )}
+                {kit.is_owner && (
+                    <div className="mt-6">
+                        <AddToolForm slug={slug!} onRefresh={fetchKit} />
+                    </div>
+                )}
+            </section>
+
+            <hr className="divider" />
+
             {/* Workflow Steps */}
             <section>
                 <h2 className="text-xl font-semibold mb-4 tracking-tight">
@@ -560,16 +852,31 @@ export default function KitDetailPage() {
                 ) : (
                     <div className="stream-container">
                         {kit.steps.map((s) => (
-                            <StepCard key={s.number} step={s} slug={slug!} isOwner={kit.is_owner} onRefresh={fetchKit} resources={kit.resources} steps={kit.steps} />
+                            <StepCard key={s.number} step={s} slug={slug!} isOwner={kit.is_owner} onRefresh={fetchKit} resources={kit.resources} steps={kit.steps} tools={kit.tools} />
                         ))}
                     </div>
                 )}
                 {kit.is_owner && (
                     <div className="mt-6">
-                        <AddStepForm slug={slug!} onRefresh={fetchKit} resources={kit.resources} steps={kit.steps} />
+                        <AddStepForm slug={slug!} onRefresh={fetchKit} resources={kit.resources} steps={kit.steps} tools={kit.tools || []} />
                     </div>
                 )}
             </section>
+
+            {showDeleteModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm fade-in">
+                    <div className="card p-6 max-w-md w-full shadow-lg">
+                        <h2 className="text-xl font-bold mb-2">Delete Kit</h2>
+                        <p className="text-muted-foreground mb-6">
+                            Are you sure you want to delete the kit <strong>{kit.kit.name}</strong>? This action cannot be undone.
+                        </p>
+                        <div className="flex justify-end gap-3">
+                            <button className="btn btn-ghost" onClick={() => setShowDeleteModal(false)} disabled={isDeleting}>Cancel</button>
+                            <button className="btn btn-destructive" onClick={confirmDelete} disabled={isDeleting}>{isDeleting ? 'Deleting...' : 'Delete'}</button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

@@ -1,10 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
 import type { KeyboardEvent } from 'react';
-import type { Resource, Step } from '../lib/api';
+import { formatToolName, type Resource, type Step, type Tool } from '../lib/api';
 
 interface PromptTextareaProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
     resources: Resource[];
     steps: Step[];
+    tools?: Tool[];
     value: string;
     onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
 }
@@ -12,7 +13,7 @@ interface PromptTextareaProps extends React.TextareaHTMLAttributes<HTMLTextAreaE
 interface Suggestion {
     id: string; // the string to insert, e.g. "resource_1" or "workflow_1"
     displayName: string;
-    type: 'resource' | 'step';
+    type: 'resource' | 'step' | 'tool';
 }
 
 function getCaretCoordinates(element: HTMLTextAreaElement, position: number) {
@@ -54,7 +55,7 @@ function getCaretCoordinates(element: HTMLTextAreaElement, position: number) {
     return coordinates;
 }
 
-export function PromptTextarea({ resources, steps, value, onChange, ...props }: PromptTextareaProps) {
+export function PromptTextarea({ resources, steps, tools = [], value, onChange, ...props }: PromptTextareaProps) {
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const [isOpen, setIsOpen] = useState(false);
     const [query, setQuery] = useState('');
@@ -72,6 +73,11 @@ export function PromptTextarea({ resources, steps, value, onChange, ...props }: 
             id: `workflow_${s.number}`,
             displayName: s.display_name || `Step ${s.number}`,
             type: 'step' as const
+        })),
+        ...tools.map(t => ({
+            id: t.tool_id,
+            displayName: t.display_name || formatToolName(t.tool_name),
+            type: 'tool' as const
         }))
     ];
 

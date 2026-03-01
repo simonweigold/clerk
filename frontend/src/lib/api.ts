@@ -112,10 +112,34 @@ export interface Step {
     display_name?: string;
 }
 
+export interface Tool {
+    tool_id: string; // e.g., "tool_1"
+    tool_name: string; // "read_url"
+    display_name?: string;
+    configuration?: string;
+    source?: string;
+}
+
+export interface AvailableTool {
+    name: string;
+    description: string;
+    parameters: Record<string, unknown>;
+    source?: string;
+}
+
+export function formatToolName(name: string): string {
+    if (!name) return '';
+    return name
+        .split('_')
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ');
+}
+
 export interface KitDetail {
     kit: Kit;
     resources: Resource[];
     steps: Step[];
+    tools: Tool[];
     source: string;
     is_owner: boolean;
 }
@@ -191,6 +215,58 @@ export async function updateResource(
 
 export async function deleteResource(slug: string, number: number): Promise<{ ok: boolean }> {
     const res = await fetch(`${API_BASE}/kits/${slug}/resources/${number}`, { method: 'DELETE' });
+    return handleResponse(res);
+}
+
+// ─── Tools ───────────────────────────────────────────────────────────────────
+
+export async function getAvailableTools(): Promise<{ tools: AvailableTool[] }> {
+    const res = await fetch(`${API_BASE}/tools/available`);
+    return handleResponse(res);
+}
+
+export async function addTool(
+    slug: string,
+    toolName: string,
+    displayName?: string,
+    configuration?: string
+): Promise<{ ok: boolean }> {
+    const payload: any = { tool_name: toolName };
+    if (displayName) payload.display_name = displayName;
+    if (configuration) payload.configuration = configuration;
+
+    const res = await fetch(`${API_BASE}/kits/${slug}/tools`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+    });
+    return handleResponse(res);
+}
+
+export async function updateTool(
+    slug: string,
+    number: number,
+    displayName?: string,
+    configuration?: string
+): Promise<{ ok: boolean }> {
+    const payload: any = {};
+    if (displayName) payload.display_name = displayName;
+    if (configuration) payload.configuration = configuration;
+
+    const res = await fetch(`${API_BASE}/kits/${slug}/tools/${number}/update`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+    });
+    return handleResponse(res);
+}
+
+export async function deleteTool(slug: string, number: number): Promise<{ ok: boolean }> {
+    const res = await fetch(`${API_BASE}/kits/${slug}/tools/${number}`, { method: 'DELETE' });
     return handleResponse(res);
 }
 
@@ -347,7 +423,31 @@ export async function updateExecutionLabel(
     });
     return handleResponse(res);
 }
-
 export function getDownloadUrl(slug: string, runId: string, format: 'md' | 'json'): string {
     return `${API_BASE}/kits/${slug}/executions/${runId}/download?format=${format}`;
 }
+
+// ---------------------------------------------------------------------------
+// MCP Server Configurations
+// ---------------------------------------------------------------------------
+
+export interface McpConfig {
+    server_name: string;
+    env_vars: Record<string, string>;
+    is_active?: boolean;
+}
+
+export async function getMcpConfigs(): Promise<{ configs: McpConfig[] }> {
+    const res = await fetch(`${API_BASE}/mcp/config`);
+    return handleResponse(res);
+}
+
+export async function updateMcpConfig(server_name: string, env_vars: Record<string, string>, is_active: boolean = false): Promise<{ ok: boolean }> {
+    const res = await fetch(`${API_BASE}/mcp/config/${server_name}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ env_vars, is_active }),
+    });
+    return handleResponse(res);
+}
+

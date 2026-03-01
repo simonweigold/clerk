@@ -10,6 +10,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 
 from ..db.config import close_engines, get_config
+from ..mcp_client import close_mcp_servers, init_mcp_servers
 
 # Paths
 WEB_DIR = Path(__file__).parent
@@ -20,7 +21,9 @@ SPA_DIR = Path(__file__).resolve().parent.parent.parent.parent / "frontend" / "d
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Application lifespan: startup and shutdown."""
+    await init_mcp_servers()
     yield
+    await close_mcp_servers()
     await close_engines()
 
 
@@ -74,6 +77,10 @@ def create_app() -> FastAPI:
     @app.get("/{full_path:path}")
     async def spa_fallback(request: Request, full_path: str) -> FileResponse:
         """Serve React SPA for client-side routing."""
+        # Never intercept API routes — let FastAPI handle them
+        if full_path.startswith("api/"):
+            from fastapi.responses import JSONResponse
+            return JSONResponse({"error": "Not found"}, status_code=404)
         # Check if a specific file exists in dist
         file_path = SPA_DIR / full_path
         if full_path and file_path.is_file():

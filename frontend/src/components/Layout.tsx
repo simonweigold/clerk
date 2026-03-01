@@ -28,12 +28,20 @@ export default function Layout() {
                             Kits
                         </Link>
                         {user && (
-                            <Link
-                                to="/kit/new"
-                                className={`nav-link ${isActive('/kit/new') ? 'active' : ''}`}
-                            >
-                                Create
-                            </Link>
+                            <>
+                                <Link
+                                    to="/kit/new"
+                                    className={`nav-link ${isActive('/kit/new') ? 'active' : ''}`}
+                                >
+                                    Create
+                                </Link>
+                                <Link
+                                    to="/settings"
+                                    className={`nav-link ${isActive('/settings') ? 'active' : ''}`}
+                                >
+                                    Integrations
+                                </Link>
+                            </>
                         )}
                         {supabaseConfigured && (
                             <>

@@ -13,7 +13,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
 )
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from pgvector.sqlalchemy import Vector
 
@@ -93,6 +93,7 @@ class ReasoningKit(Base):
     versions: Mapped[list["KitVersion"]] = relationship(
         back_populates="kit",
         foreign_keys="KitVersion.kit_id",
+        cascade="all, delete-orphan",
         lazy="selectin",
         order_by="KitVersion.version_number.desc()",
     )
@@ -154,6 +155,12 @@ class KitVersion(Base):
         cascade="all, delete-orphan",
         lazy="selectin",
         order_by="WorkflowStep.step_number",
+    )
+    tools: Mapped[list["Tool"]] = relationship(
+        back_populates="version",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+        order_by="Tool.tool_number",
     )
     execution_runs: Mapped[list["ExecutionRun"]] = relationship(
         back_populates="version", lazy="selectin"
@@ -239,6 +246,47 @@ class WorkflowStep(Base):
     def output_id(self) -> str:
         """Get the output_id for this step."""
         return f"workflow_{self.step_number}"
+
+
+class Tool(Base):
+    """A tool assignment in a kit version.
+
+    References a tool from the global registry by name. The tool can be
+    referenced in workflow steps using {tool_N} placeholders. When referenced,
+    the execution engine includes the tool in the LLM call and handles
+    the function-call loop.
+    """
+
+    __tablename__ = "tools"
+    __table_args__ = (
+        UniqueConstraint("version_id", "tool_number", name="uq_tool_number"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    version_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("kit_versions.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    tool_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    tool_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    display_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    configuration: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=datetime.utcnow
+    )
+
+    # Relationships
+    version: Mapped["KitVersion"] = relationship(
+        back_populates="tools", lazy="selectin"
+    )
+
+    @property
+    def tool_id(self) -> str:
+        """Get the tool_id for placeholder resolution."""
+        return f"tool_{self.tool_number}"
 
 
 class ExecutionRun(Base):
@@ -386,4 +434,39 @@ class EmbeddingCache(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=datetime.utcnow
     )
+
+
+class McpServerConfig(Base):
+    """User-specific configuration for an MCP server.
+
+    Stores credentials and environment variables required to run an
+    MCP server (like Airtable API keys) for a specific user.
+    """
+
+    __tablename__ = "mcp_server_configs"
+    __table_args__ = (
+        UniqueConstraint("user_id", "server_name", name="uq_user_mcp_config"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("user_profiles.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    server_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    env_vars: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=datetime.utcnow
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+    # Relationships
+    user: Mapped["UserProfile"] = relationship(lazy="selectin")
+
 

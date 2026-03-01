@@ -17,6 +17,7 @@ from .models import (
     ReasoningKit,
     Resource,
     StepExecution,
+    Tool,
     UserKitBookmark,
     UserProfile,
     WorkflowStep,
@@ -122,6 +123,9 @@ class ReasoningKitRepository:
                 selectinload(ReasoningKit.current_version).selectinload(
                     KitVersion.workflow_steps
                 ),
+                selectinload(ReasoningKit.current_version).selectinload(
+                    KitVersion.tools
+                ),
             )
         )
         result = await self.session.execute(stmt)
@@ -145,6 +149,9 @@ class ReasoningKitRepository:
                 ),
                 selectinload(ReasoningKit.current_version).selectinload(
                     KitVersion.workflow_steps
+                ),
+                selectinload(ReasoningKit.current_version).selectinload(
+                    KitVersion.tools
                 ),
             )
         )
@@ -491,6 +498,37 @@ class KitVersionRepository:
         self.session.add(step)
         await self.session.flush()
         return step
+
+    async def add_tool(
+        self,
+        version_id: UUID,
+        tool_number: int,
+        tool_name: str,
+        display_name: str | None = None,
+        configuration: str | None = None,
+    ) -> Tool:
+        """Add a tool to a version.
+
+        Args:
+            version_id: The version's UUID
+            tool_number: The tool number (1, 2, 3, ...)
+            tool_name: The global registry tool name
+            display_name: Optional custom display name
+            configuration: Optional JSON configuration overrides
+
+        Returns:
+            Created tool
+        """
+        tool = Tool(
+            version_id=version_id,
+            tool_number=tool_number,
+            tool_name=tool_name,
+            display_name=display_name,
+            configuration=configuration,
+        )
+        self.session.add(tool)
+        await self.session.flush()
+        return tool
 
 
 class ExecutionRepository:

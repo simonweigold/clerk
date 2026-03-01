@@ -23,6 +23,7 @@ from .evaluation import (
 from .embeddings import CachedEmbeddings
 from .db.config import get_async_session_factory
 from .models import Evaluation, ReasoningKit
+from .tools import get_openai_tool_schema, get_tool
 
 
 DEFAULT_MODEL = "gpt-5-mini"
@@ -52,7 +53,9 @@ class State(TypedDict):
     db_version_id: str | None  # Kit version UUID (as string for TypedDict)
     save_to_db: bool  # Whether to save execution to database
     model_used: str  # LLM model being used
-
+    # Tool fields
+    tools: dict[str, dict]  # tool_number -> {tool_name, tool_id, ...}
+    user_id: str | None  # Add user ID for tool context
 
 def create_initial_state(
     kit: ReasoningKit,
@@ -62,6 +65,7 @@ def create_initial_state(
     db_version_id: UUID | None = None,
     save_to_db: bool = False,
     model: str = DEFAULT_MODEL,
+    user_id: str | None = None,
 ) -> State:
     """Create initial state from a reasoning kit.
 
@@ -73,6 +77,7 @@ def create_initial_state(
         db_version_id: Database kit version UUID (if saving to DB)
         save_to_db: Whether to save execution to database
         model: LLM model to use
+        user_id: ID of the user executing the kit
 
     Returns:
         Initial state for the workflow
@@ -80,6 +85,15 @@ def create_initial_state(
     resources = {r.resource_id: r.content for r in kit.resources.values()}
     workflow_prompts = {k: v.prompt for k, v in kit.workflow.items()}
     workflow_output_ids = {k: v.output_id for k, v in kit.workflow.items()}
+    tools_data = {
+        k: {
+            "tool_name": v.tool_name,
+            "tool_id": v.tool_id,
+            "display_name": v.display_name,
+            "configuration": v.configuration,
+        }
+        for k, v in kit.tools.items()
+    }
 
     return State(
         kit_name=kit.name,
@@ -101,6 +115,8 @@ def create_initial_state(
         db_version_id=str(db_version_id) if db_version_id else None,
         save_to_db=save_to_db,
         model_used=model,
+        tools=tools_data,
+        user_id=user_id,
     )
 
 
@@ -155,6 +171,55 @@ def chunk_text(text: str, max_size: int = 2000, overlap: int = 200) -> list[str]
 def extract_search_query(text: str) -> str:
     """Remove all {placeholders} from text to create a clean search query."""
     return re.sub(r"\{(\w+)\}", "", text).strip()
+
+
+def extract_tool_refs(text: str, kit_tools: dict[str, dict]) -> list[dict]:
+    """Find {tool_N} references in text and return their OpenAI tool schemas.
+
+    Args:
+        text: Prompt template that may contain {tool_1}, {tool_2}, etc.
+        kit_tools: Dict of tool_number -> {tool_name, tool_id, ...} from kit
+
+    Returns:
+        List of OpenAI-compatible tool schemas for referenced tools
+    """
+    placeholders = re.findall(r"\{(tool_\d+)\}", text)
+    schemas = []
+    seen = set()
+
+    for placeholder in placeholders:
+        # Extract number from "tool_1" -> "1"
+        num = placeholder.replace("tool_", "")
+        if num in kit_tools and placeholder not in seen:
+            tool_name = kit_tools[num]["tool_name"]
+            schema = get_openai_tool_schema(tool_name)
+            if schema:
+                schemas.append(schema)
+                seen.add(placeholder)
+
+    return schemas
+
+
+def remove_tool_placeholders(text: str, kit_tools: dict[str, dict] | None = None) -> str:
+    """Replace {tool_N} placeholders with the tool's name for a readable prompt.
+
+    Instead of just stripping placeholders, we replace them with a readable
+    reference like 'the read_url tool' so the LLM knows which tool to use.
+    The actual tool definitions are passed separately via the tools parameter.
+    """
+    import re as _re
+
+    def _replace_match(m: _re.Match) -> str:
+        num = m.group(1)
+        if kit_tools and num in kit_tools:
+            name = kit_tools[num].get("display_name") or kit_tools[num].get("tool_name", "")
+            return f"the {name} tool"
+        return ""
+
+    cleaned = _re.sub(r"\{tool_(\d+)\}", _replace_match, text)
+    # Collapse any double spaces left behind
+    cleaned = _re.sub(r"  +", " ", cleaned)
+    return cleaned.strip()
 
 
 def resolve_placeholders(
@@ -274,13 +339,59 @@ def execute_step(state: State) -> dict[str, Any]:
     # Resolve placeholders in prompt
     prompt = resolve_placeholders(prompt_template, state["resources"], state["outputs"])
 
+    # Extract tool references and clean prompt
+    kit_tools = state.get("tools", {})
+    openai_tools = extract_tool_refs(prompt_template, kit_tools)
+    clean_prompt = remove_tool_placeholders(prompt, kit_tools)
+
     # Track execution time
     start_time = time.time()
 
     # Execute with LLM
     llm = ChatOpenAI(model=state["model_used"], temperature=0)
-    response = llm.invoke(prompt)
-    result = str(response.content)
+
+    if openai_tools:
+        # Tool-aware execution
+        from langchain_core.messages import HumanMessage, ToolMessage
+
+        llm_with_tools = llm.bind_tools(
+            [t["function"] for t in openai_tools]
+        )
+        messages = [HumanMessage(content=clean_prompt)]
+        response = llm_with_tools.invoke(messages)
+        messages.append(response)
+
+        # Tool-call loop
+        max_rounds = 5
+        for _ in range(max_rounds):
+            if not response.tool_calls:
+                break
+
+            for tool_call in response.tool_calls:
+                tool_def = get_tool(tool_call["name"])
+                if tool_def:
+                    try:
+                        tool_result = asyncio.run(tool_def.execute(tool_call["args"], user_id=state.get("user_id")))
+                    except Exception as te:
+                        tool_result = f"Error executing tool: {te}"
+                else:
+                    tool_result = f"Unknown tool: {tool_call['name']}"
+
+                messages.append(
+                    ToolMessage(
+                        content=tool_result,
+                        tool_call_id=tool_call["id"],
+                    )
+                )
+
+            response = llm_with_tools.invoke(messages)
+            messages.append(response)
+
+        result = str(response.content)
+    else:
+        # Standard execution without tools
+        response = llm.invoke(clean_prompt)
+        result = str(response.content)
 
     # Calculate latency
     latency_ms = int((time.time() - start_time) * 1000)
@@ -299,7 +410,7 @@ def execute_step(state: State) -> dict[str, Any]:
     print(f"\n{'=' * 60}")
     print(f"Step {current_step} - Output ID: {output_id}")
     print(f"{'=' * 60}")
-    print(f"Prompt:\n{prompt[:200]}..." if len(prompt) > 200 else f"Prompt:\n{prompt}")
+    print(f"Prompt:\n{clean_prompt[:200]}..." if len(clean_prompt) > 200 else f"Prompt:\n{clean_prompt}")
     print(f"\nResult:\n{result}")
     print(f"{'=' * 60}\n")
 
@@ -310,7 +421,7 @@ def execute_step(state: State) -> dict[str, Any]:
                 save_step_to_db(
                     run_id=UUID(state["db_run_id"]),
                     step_number=int(current_step),
-                    prompt=prompt,
+                    prompt=clean_prompt,
                     output=result,
                     mode=state["evaluation_mode"],
                     model_used=state["model_used"],
@@ -324,7 +435,7 @@ def execute_step(state: State) -> dict[str, Any]:
                 save_step_to_db(
                     run_id=UUID(state["db_run_id"]),
                     step_number=int(current_step),
-                    prompt=prompt,
+                    prompt=clean_prompt,
                     output=result,
                     mode=state["evaluation_mode"],
                     model_used=state["model_used"],
@@ -335,7 +446,7 @@ def execute_step(state: State) -> dict[str, Any]:
 
     return {
         "outputs": new_outputs,
-        "last_prompt": prompt,
+        "last_prompt": clean_prompt,
         "last_output": result,
     }
 
@@ -448,6 +559,7 @@ def run_reasoning_kit(
     save_to_db: bool = False,
     db_version_id: UUID | None = None,
     model: str = DEFAULT_MODEL,
+    user_id: str | None = None,
 ) -> dict[str, str]:
     """Run a reasoning kit through the workflow.
 
@@ -458,6 +570,7 @@ def run_reasoning_kit(
         save_to_db: Whether to save execution to database
         db_version_id: Database kit version UUID (required if save_to_db=True)
         model: LLM model to use
+        user_id: ID of the user executing the kit
 
     Returns:
         Dict of all outputs from the workflow
@@ -492,6 +605,7 @@ def run_reasoning_kit(
         db_version_id=db_version_id,
         save_to_db=save_to_db,
         model=model,
+        user_id=user_id,
     )
 
     print(f"\n{'#' * 60}")
@@ -561,6 +675,7 @@ async def run_reasoning_kit_async(
     save_to_db: bool = False,
     db_version_id: UUID | None = None,
     model: str = DEFAULT_MODEL,
+    user_id: str | None = None,
 ) -> dict[str, str]:
     """Async version of run_reasoning_kit for use in async contexts.
 
@@ -574,6 +689,7 @@ async def run_reasoning_kit_async(
         save_to_db: Whether to save execution to database
         db_version_id: Database kit version UUID (required if save_to_db=True)
         model: LLM model to use
+        user_id: ID of the user executing the kit
 
     Returns:
         Dict of all outputs from the workflow
@@ -597,16 +713,73 @@ async def run_reasoning_kit_async(
     llm = ChatOpenAI(model=model, temperature=0)
     error_message: str | None = None
 
+    # Build tool data from kit
+    kit_tools = {
+        k: {
+            "tool_name": v.tool_name,
+            "tool_id": v.tool_id,
+            "display_name": v.display_name,
+            "configuration": v.configuration,
+        }
+        for k, v in kit.tools.items()
+    }
+
     for step_key in sorted(kit.workflow.keys(), key=int):
         step = kit.workflow[step_key]
         step_num = int(step_key)
 
         prompt = await aresolve_placeholders(step.prompt, resources, outputs)
+
+        # Extract tool references and clean prompt
+        openai_tools = extract_tool_refs(step.prompt, kit_tools)
+        clean_prompt = remove_tool_placeholders(prompt, kit_tools)
+
         start_time = time.time()
 
         try:
-            response = await llm.ainvoke(prompt)
-            result = str(response.content)
+            if openai_tools:
+                # Tool-aware execution
+                from langchain_core.messages import HumanMessage, ToolMessage
+
+                llm_with_tools = llm.bind_tools(
+                    [t["function"] for t in openai_tools]
+                )
+                messages = [HumanMessage(content=clean_prompt)]
+                response = await llm_with_tools.ainvoke(messages)
+                messages.append(response)
+
+                # Tool-call loop
+                max_rounds = 5
+                for _ in range(max_rounds):
+                    if not response.tool_calls:
+                        break
+
+                    for tool_call in response.tool_calls:
+                        tool_def = get_tool(tool_call["name"])
+                        if tool_def:
+                            try:
+                                tool_result = await tool_def.execute(tool_call["args"], user_id=user_id)
+                            except Exception as te:
+                                tool_result = f"Error executing tool: {te}"
+                        else:
+                            tool_result = f"Unknown tool: {tool_call['name']}"
+
+                        messages.append(
+                            ToolMessage(
+                                content=tool_result,
+                                tool_call_id=tool_call["id"],
+                            )
+                        )
+
+                    response = await llm_with_tools.ainvoke(messages)
+                    messages.append(response)
+
+                result = str(response.content)
+            else:
+                # Standard execution without tools
+                response = await llm.ainvoke(clean_prompt)
+                result = str(response.content)
+
             latency_ms = int((time.time() - start_time) * 1000)
 
             tokens_used = None
@@ -623,7 +796,7 @@ async def run_reasoning_kit_async(
                     await save_step_to_db(
                         run_id=db_run_id,
                         step_number=step_num,
-                        prompt=prompt,
+                        prompt=clean_prompt,
                         output=result,
                         mode=evaluation_mode,
                         model_used=model,

@@ -458,6 +458,7 @@ class McpServerConfig(Base):
     )
     server_name: Mapped[str] = mapped_column(String(255), nullable=False)
     env_vars: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=datetime.utcnow
     )

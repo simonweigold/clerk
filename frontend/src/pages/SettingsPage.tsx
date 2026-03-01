@@ -41,9 +41,9 @@ export default function SettingsPage() {
         }
     }
 
-    async function handleSave(serverName: string, envVars: Record<string, string>) {
+    async function handleSave(serverName: string, envVars: Record<string, string>, isActive: boolean) {
         try {
-            await updateMcpConfig(serverName, envVars);
+            await updateMcpConfig(serverName, envVars, isActive);
             addToast('success', 'Configuration saved successfully');
             loadConfigs();
         } catch (err: unknown) {
@@ -79,7 +79,7 @@ export default function SettingsPage() {
                             key={server.name}
                             server={server}
                             existingConfig={existingConfig}
-                            onSave={(envVars) => handleSave(server.name, envVars)}
+                            onSave={(envVars, isActive) => handleSave(server.name, envVars, isActive)}
                         />
                     );
                 })}
@@ -95,15 +95,19 @@ function ServerConfigForm({
 }: {
     server: typeof KNOWN_SERVERS[0];
     existingConfig?: McpConfig;
-    onSave: (envVars: Record<string, string>) => void;
+    onSave: (envVars: Record<string, string>, isActive: boolean) => void;
 }) {
     const [formVars, setFormVars] = useState<Record<string, string>>(
         existingConfig?.env_vars || {}
+    );
+    const [isActive, setIsActive] = useState<boolean>(
+        existingConfig?.is_active || false
     );
 
     // Update local state if the server configs reload
     useEffect(() => {
         setFormVars(existingConfig?.env_vars || {});
+        setIsActive(existingConfig?.is_active || false);
     }, [existingConfig]);
 
     return (
@@ -117,7 +121,22 @@ function ServerConfigForm({
                 {server.label} Integration
             </h2>
 
-            <div className="space-y-4 max-w-2xl mt-6">
+            <div className="flex items-center gap-3 mt-2 mb-6">
+                <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                        type="checkbox"
+                        className="sr-only peer"
+                        checked={isActive}
+                        onChange={(e) => setIsActive(e.target.checked)}
+                    />
+                    <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                    <span className="ml-3 text-sm font-medium text-slate-700 dark:text-slate-300">
+                        {isActive ? 'Enabled' : 'Disabled'}
+                    </span>
+                </label>
+            </div>
+
+            <div className="space-y-4 max-w-2xl">
                 {server.vars.map(v => (
                     <div key={v}>
                         <label className="block text-sm font-medium mb-1.5 font-mono text-xs">{v}</label>
@@ -134,9 +153,9 @@ function ServerConfigForm({
                 <div className="pt-4 flex items-center justify-end">
                     <button
                         className="btn btn-primary"
-                        onClick={() => onSave(formVars)}
+                        onClick={() => onSave(formVars, isActive)}
                     >
-                        Save Credentials
+                        Save Settings
                     </button>
                 </div>
             </div>

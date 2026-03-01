@@ -434,6 +434,7 @@ export function getDownloadUrl(slug: string, runId: string, format: 'md' | 'json
 export interface McpConfig {
     server_name: string;
     env_vars: Record<string, string>;
+    is_active?: boolean;
 }
 
 export async function getMcpConfigs(): Promise<{ configs: McpConfig[] }> {
@@ -441,11 +442,11 @@ export async function getMcpConfigs(): Promise<{ configs: McpConfig[] }> {
     return handleResponse(res);
 }
 
-export async function updateMcpConfig(server_name: string, env_vars: Record<string, string>): Promise<{ ok: boolean }> {
+export async function updateMcpConfig(server_name: string, env_vars: Record<string, string>, is_active: boolean = false): Promise<{ ok: boolean }> {
     const res = await fetch(`${API_BASE}/mcp/config/${server_name}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ env_vars }),
+        body: JSON.stringify({ env_vars, is_active }),
     });
     return handleResponse(res);
 }

@@ -913,16 +913,37 @@ async def list_available_tools(
     from ...tools import list_tools
 
     tools = list_tools()
-    return {
-        "tools": [
-            {
+    
+    active_mcp_servers = set()
+    if user and "id" in user:
+        try:
+            from ...db import get_async_session
+            from ...db.models import McpServerConfig
+            from sqlalchemy import select
+            
+            async with get_async_session() as session:
+                stmt = select(McpServerConfig.server_name).where(
+                    McpServerConfig.user_id == user["id"],
+                    McpServerConfig.is_active == True
+                )
+                result = await session.execute(stmt)
+                active_mcp_servers = set(result.scalars().all())
+        except Exception:
+            pass
+            
+    filtered_tools = []
+    for t in tools:
+        source = getattr(t, "source", "builtin")
+        if source == "builtin" or source in active_mcp_servers:
+            filtered_tools.append({
                 "name": t.name,
                 "description": t.description,
                 "parameters": t.parameters,
-                "source": getattr(t, "source", "builtin"),
-            }
-            for t in tools
-        ]
+                "source": source,
+            })
+
+    return {
+        "tools": filtered_tools
     }
 
 
@@ -2714,6 +2735,7 @@ async def get_mcp_configs(user: dict | None = Depends(get_optional_user)):
                     {
                         "server_name": c.server_name,
                         "env_vars": c.env_vars,
+                        "is_active": c.is_active,
                     }
                     for c in configs
                 ]
@@ -2750,11 +2772,14 @@ async def update_mcp_config(request: Request, server_name: str, user: dict | Non
             
             if config:
                 config.env_vars = env_vars
+                if "is_active" in data:
+                    config.is_active = data["is_active"]
             else:
                 config = McpServerConfig(
                     user_id=user["id"],
                     server_name=server_name,
-                    env_vars=env_vars
+                    env_vars=env_vars,
+                    is_active=data.get("is_active", False)
                 )
                 session.add(config)
                 

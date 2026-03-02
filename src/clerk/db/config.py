@@ -24,6 +24,9 @@ class DatabaseConfig:
         self.supabase_service_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
         self.database_url = os.getenv("DATABASE_URL")
         self.database_url_direct = os.getenv("DATABASE_URL_DIRECT")
+        self.session_secret_key = os.getenv(
+            "CLERK_SESSION_SECRET", "clerk-session-secret-change-in-production"
+        )
 
     def validate(self) -> None:
         """Validate that required configuration is present."""

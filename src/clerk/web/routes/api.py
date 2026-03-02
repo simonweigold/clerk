@@ -279,25 +279,32 @@ async def add_resource(
 
                 if db_kit.current_version:
                     old_version = db_kit.current_version
+                    resources_to_add = []
                     for r in old_version.resources:
-                        await version_repo.add_resource(
-                            version_id=version.id,
-                            resource_number=r.resource_number,
-                            filename=r.filename,
-                            storage_path=r.storage_path,
-                            mime_type=r.mime_type,
-                            extracted_text=r.extracted_text,
-                            file_size_bytes=r.file_size_bytes,
-                            is_dynamic=getattr(r, "is_dynamic", False),
-                            display_name=r.display_name,
-                        )
+                        resources_to_add.append({
+                            "version_id": version.id,
+                            "resource_number": r.resource_number,
+                            "filename": r.filename,
+                            "storage_path": r.storage_path,
+                            "mime_type": r.mime_type,
+                            "extracted_text": r.extracted_text,
+                            "file_size_bytes": r.file_size_bytes,
+                            "is_dynamic": getattr(r, "is_dynamic", False),
+                            "display_name": r.display_name,
+                        })
+                    if resources_to_add:
+                        await version_repo.add_resources(resources_to_add)
+
+                    steps_to_add = []
                     for s in old_version.workflow_steps:
-                        await version_repo.add_workflow_step(
-                            version_id=version.id,
-                            step_number=s.step_number,
-                            prompt_template=s.prompt_template,
-                            display_name=s.display_name,
-                        )
+                        steps_to_add.append({
+                            "version_id": version.id,
+                            "step_number": s.step_number,
+                            "prompt_template": s.prompt_template,
+                            "display_name": s.display_name,
+                        })
+                    if steps_to_add:
+                        await version_repo.add_workflow_steps(steps_to_add)
 
                 storage = StorageService(use_service_key=True)
                 import tempfile
@@ -415,35 +422,45 @@ async def delete_resource(
                     commit_message=f"Deleted resource {number}",
                 )
 
+                resources_to_add = []
                 for r in db_kit.current_version.resources:
                     if r.resource_number != number:
-                        await version_repo.add_resource(
-                            version_id=version.id,
-                            resource_number=r.resource_number,
-                            filename=r.filename,
-                            storage_path=r.storage_path,
-                            mime_type=r.mime_type,
-                            extracted_text=r.extracted_text,
-                            file_size_bytes=r.file_size_bytes,
-                            is_dynamic=getattr(r, "is_dynamic", False),
-                            display_name=r.display_name,
-                        )
+                        resources_to_add.append({
+                            "version_id": version.id,
+                            "resource_number": r.resource_number,
+                            "filename": r.filename,
+                            "storage_path": r.storage_path,
+                            "mime_type": r.mime_type,
+                            "extracted_text": r.extracted_text,
+                            "file_size_bytes": r.file_size_bytes,
+                            "is_dynamic": getattr(r, "is_dynamic", False),
+                            "display_name": r.display_name,
+                        })
+                if resources_to_add:
+                    await version_repo.add_resources(resources_to_add)
 
+                steps_to_add = []
                 for s in db_kit.current_version.workflow_steps:
-                    await version_repo.add_workflow_step(
-                        version_id=version.id,
-                        step_number=s.step_number,
-                        prompt_template=s.prompt_template,
-                        display_name=s.display_name,
-                    )
+                    steps_to_add.append({
+                        "version_id": version.id,
+                        "step_number": s.step_number,
+                        "prompt_template": s.prompt_template,
+                        "display_name": s.display_name,
+                    })
+                if steps_to_add:
+                    await version_repo.add_workflow_steps(steps_to_add)
+
+                tools_to_add = []
                 for t in db_kit.current_version.tools:
-                    await version_repo.add_tool(
-                        version_id=version.id,
-                        tool_number=t.tool_number,
-                        tool_name=t.tool_name,
-                        display_name=t.display_name,
-                        configuration=t.configuration,
-                    )
+                    tools_to_add.append({
+                        "version_id": version.id,
+                        "tool_number": t.tool_number,
+                        "tool_name": t.tool_name,
+                        "display_name": t.display_name,
+                        "configuration": t.configuration,
+                    })
+                if tools_to_add:
+                    await version_repo.add_tools(tools_to_add)
 
             return {"ok": True}
         except Exception as e:
@@ -507,6 +524,7 @@ async def update_resource(
                     commit_message=f"Updated resource {number}",
                 )
 
+                resources_to_add = []
                 for r in db_kit.current_version.resources:
                     if r.resource_number == number:
                         res_display_name = display_name.strip() or None
@@ -534,57 +552,66 @@ async def update_resource(
                             finally:
                                 tmp_path.unlink(missing_ok=True)
 
-                            await version_repo.add_resource(
-                                version_id=version.id,
-                                resource_number=number,
-                                filename=f"resource_{number}{Path(new_filename).suffix}",
-                                storage_path=storage_path,
-                                mime_type=mime_type,
-                                extracted_text=extracted,
-                                file_size_bytes=len(new_file_content),
-                                is_dynamic=res_is_dynamic,
-                                display_name=res_display_name,
-                            )
+                            resources_to_add.append({
+                                "version_id": version.id,
+                                "resource_number": number,
+                                "filename": f"resource_{number}{Path(new_filename).suffix}",
+                                "storage_path": storage_path,
+                                "mime_type": mime_type,
+                                "extracted_text": extracted,
+                                "file_size_bytes": len(new_file_content),
+                                "is_dynamic": res_is_dynamic,
+                                "display_name": res_display_name,
+                            })
                         else:
-                            await version_repo.add_resource(
-                                version_id=version.id,
-                                resource_number=r.resource_number,
-                                filename=r.filename,
-                                storage_path=r.storage_path,
-                                mime_type=r.mime_type,
-                                extracted_text=r.extracted_text,
-                                file_size_bytes=r.file_size_bytes,
-                                is_dynamic=res_is_dynamic,
-                                display_name=res_display_name,
-                            )
+                            resources_to_add.append({
+                                "version_id": version.id,
+                                "resource_number": r.resource_number,
+                                "filename": r.filename,
+                                "storage_path": r.storage_path,
+                                "mime_type": r.mime_type,
+                                "extracted_text": r.extracted_text,
+                                "file_size_bytes": r.file_size_bytes,
+                                "is_dynamic": res_is_dynamic,
+                                "display_name": res_display_name,
+                            })
                     else:
-                        await version_repo.add_resource(
-                            version_id=version.id,
-                            resource_number=r.resource_number,
-                            filename=r.filename,
-                            storage_path=r.storage_path,
-                            mime_type=r.mime_type,
-                            extracted_text=r.extracted_text,
-                            file_size_bytes=r.file_size_bytes,
-                            is_dynamic=getattr(r, "is_dynamic", False),
-                            display_name=r.display_name,
-                        )
+                        resources_to_add.append({
+                            "version_id": version.id,
+                            "resource_number": r.resource_number,
+                            "filename": r.filename,
+                            "storage_path": r.storage_path,
+                            "mime_type": r.mime_type,
+                            "extracted_text": r.extracted_text,
+                            "file_size_bytes": r.file_size_bytes,
+                            "is_dynamic": getattr(r, "is_dynamic", False),
+                            "display_name": r.display_name,
+                        })
+                if resources_to_add:
+                    await version_repo.add_resources(resources_to_add)
 
+                steps_to_add = []
                 for s in db_kit.current_version.workflow_steps:
-                    await version_repo.add_workflow_step(
-                        version_id=version.id,
-                        step_number=s.step_number,
-                        prompt_template=s.prompt_template,
-                        display_name=s.display_name,
-                    )
+                    steps_to_add.append({
+                        "version_id": version.id,
+                        "step_number": s.step_number,
+                        "prompt_template": s.prompt_template,
+                        "display_name": s.display_name,
+                    })
+                if steps_to_add:
+                    await version_repo.add_workflow_steps(steps_to_add)
+
+                tools_to_add = []
                 for t in db_kit.current_version.tools:
-                    await version_repo.add_tool(
-                        version_id=version.id,
-                        tool_number=t.tool_number,
-                        tool_name=t.tool_name,
-                        display_name=t.display_name,
-                        configuration=t.configuration,
-                    )
+                    tools_to_add.append({
+                        "version_id": version.id,
+                        "tool_number": t.tool_number,
+                        "tool_name": t.tool_name,
+                        "display_name": t.display_name,
+                        "configuration": t.configuration,
+                    })
+                if tools_to_add:
+                    await version_repo.add_tools(tools_to_add)
 
             return {"ok": True}
         except Exception as e:
@@ -652,33 +679,44 @@ async def add_step(
                 )
 
                 if db_kit.current_version:
+                    resources_to_add = []
                     for r in db_kit.current_version.resources:
-                        await version_repo.add_resource(
-                            version_id=version.id,
-                            resource_number=r.resource_number,
-                            filename=r.filename,
-                            storage_path=r.storage_path,
-                            mime_type=r.mime_type,
-                            extracted_text=r.extracted_text,
-                            file_size_bytes=r.file_size_bytes,
-                            is_dynamic=getattr(r, "is_dynamic", False),
-                            display_name=r.display_name,
-                        )
+                        resources_to_add.append({
+                            "version_id": version.id,
+                            "resource_number": r.resource_number,
+                            "filename": r.filename,
+                            "storage_path": r.storage_path,
+                            "mime_type": r.mime_type,
+                            "extracted_text": r.extracted_text,
+                            "file_size_bytes": r.file_size_bytes,
+                            "is_dynamic": getattr(r, "is_dynamic", False),
+                            "display_name": r.display_name,
+                        })
+                    if resources_to_add:
+                        await version_repo.add_resources(resources_to_add)
+
+                    steps_to_add = []
                     for s in db_kit.current_version.workflow_steps:
-                        await version_repo.add_workflow_step(
-                            version_id=version.id,
-                            step_number=s.step_number,
-                            prompt_template=s.prompt_template,
-                            display_name=s.display_name,
-                        )
+                        steps_to_add.append({
+                            "version_id": version.id,
+                            "step_number": s.step_number,
+                            "prompt_template": s.prompt_template,
+                            "display_name": s.display_name,
+                        })
+                    if steps_to_add:
+                        await version_repo.add_workflow_steps(steps_to_add)
+
+                    tools_to_add = []
                     for t in db_kit.current_version.tools:
-                        await version_repo.add_tool(
-                            version_id=version.id,
-                            tool_number=t.tool_number,
-                            tool_name=t.tool_name,
-                            display_name=t.display_name,
-                            configuration=t.configuration,
-                        )
+                        tools_to_add.append({
+                            "version_id": version.id,
+                            "tool_number": t.tool_number,
+                            "tool_name": t.tool_name,
+                            "display_name": t.display_name,
+                            "configuration": t.configuration,
+                        })
+                    if tools_to_add:
+                        await version_repo.add_tools(tools_to_add)
 
                 await version_repo.add_workflow_step(
                     version_id=version.id,
@@ -770,19 +808,23 @@ async def update_step(
                     commit_message=f"Updated step {number}",
                 )
 
+                resources_to_add = []
                 for r in db_kit.current_version.resources:
-                    await version_repo.add_resource(
-                        version_id=version.id,
-                        resource_number=r.resource_number,
-                        filename=r.filename,
-                        storage_path=r.storage_path,
-                        mime_type=r.mime_type,
-                        extracted_text=r.extracted_text,
-                        file_size_bytes=r.file_size_bytes,
-                        is_dynamic=getattr(r, "is_dynamic", False),
-                        display_name=r.display_name,
-                    )
+                    resources_to_add.append({
+                        "version_id": version.id,
+                        "resource_number": r.resource_number,
+                        "filename": r.filename,
+                        "storage_path": r.storage_path,
+                        "mime_type": r.mime_type,
+                        "extracted_text": r.extracted_text,
+                        "file_size_bytes": r.file_size_bytes,
+                        "is_dynamic": getattr(r, "is_dynamic", False),
+                        "display_name": r.display_name,
+                    })
+                if resources_to_add:
+                    await version_repo.add_resources(resources_to_add)
 
+                steps_to_add = []
                 for s in db_kit.current_version.workflow_steps:
                     template = prompt if s.step_number == number else s.prompt_template
                     step_display = (
@@ -790,20 +832,26 @@ async def update_step(
                         if s.step_number == number
                         else s.display_name
                     )
-                    await version_repo.add_workflow_step(
-                        version_id=version.id,
-                        step_number=s.step_number,
-                        prompt_template=template,
-                        display_name=step_display,
-                    )
+                    steps_to_add.append({
+                        "version_id": version.id,
+                        "step_number": s.step_number,
+                        "prompt_template": template,
+                        "display_name": step_display,
+                    })
+                if steps_to_add:
+                    await version_repo.add_workflow_steps(steps_to_add)
+
+                tools_to_add = []
                 for t in db_kit.current_version.tools:
-                    await version_repo.add_tool(
-                        version_id=version.id,
-                        tool_number=t.tool_number,
-                        tool_name=t.tool_name,
-                        display_name=t.display_name,
-                        configuration=t.configuration,
-                    )
+                    tools_to_add.append({
+                        "version_id": version.id,
+                        "tool_number": t.tool_number,
+                        "tool_name": t.tool_name,
+                        "display_name": t.display_name,
+                        "configuration": t.configuration,
+                    })
+                if tools_to_add:
+                    await version_repo.add_tools(tools_to_add)
 
             return {"ok": True}
         except Exception as e:
@@ -864,35 +912,45 @@ async def delete_step(
                     commit_message=f"Deleted step {number}",
                 )
 
+                resources_to_add = []
                 for r in db_kit.current_version.resources:
-                    await version_repo.add_resource(
-                        version_id=version.id,
-                        resource_number=r.resource_number,
-                        filename=r.filename,
-                        storage_path=r.storage_path,
-                        mime_type=r.mime_type,
-                        extracted_text=r.extracted_text,
-                        file_size_bytes=r.file_size_bytes,
-                        is_dynamic=getattr(r, "is_dynamic", False),
-                        display_name=r.display_name,
-                    )
+                    resources_to_add.append({
+                        "version_id": version.id,
+                        "resource_number": r.resource_number,
+                        "filename": r.filename,
+                        "storage_path": r.storage_path,
+                        "mime_type": r.mime_type,
+                        "extracted_text": r.extracted_text,
+                        "file_size_bytes": r.file_size_bytes,
+                        "is_dynamic": getattr(r, "is_dynamic", False),
+                        "display_name": r.display_name,
+                    })
+                if resources_to_add:
+                    await version_repo.add_resources(resources_to_add)
 
+                steps_to_add = []
                 for s in db_kit.current_version.workflow_steps:
                     if s.step_number != number:
-                        await version_repo.add_workflow_step(
-                            version_id=version.id,
-                            step_number=s.step_number,
-                            prompt_template=s.prompt_template,
-                            display_name=s.display_name,
-                        )
+                        steps_to_add.append({
+                            "version_id": version.id,
+                            "step_number": s.step_number,
+                            "prompt_template": s.prompt_template,
+                            "display_name": s.display_name,
+                        })
+                if steps_to_add:
+                    await version_repo.add_workflow_steps(steps_to_add)
+
+                tools_to_add = []
                 for t in db_kit.current_version.tools:
-                    await version_repo.add_tool(
-                        version_id=version.id,
-                        tool_number=t.tool_number,
-                        tool_name=t.tool_name,
-                        display_name=t.display_name,
-                        configuration=t.configuration,
-                    )
+                    tools_to_add.append({
+                        "version_id": version.id,
+                        "tool_number": t.tool_number,
+                        "tool_name": t.tool_name,
+                        "display_name": t.display_name,
+                        "configuration": t.configuration,
+                    })
+                if tools_to_add:
+                    await version_repo.add_tools(tools_to_add)
 
             return {"ok": True}
         except Exception as e:
@@ -1012,33 +1070,44 @@ async def add_tool(
                 )
 
                 if db_kit.current_version:
+                    resources_to_add = []
                     for r in db_kit.current_version.resources:
-                        await version_repo.add_resource(
-                            version_id=version.id,
-                            resource_number=r.resource_number,
-                            filename=r.filename,
-                            storage_path=r.storage_path,
-                            mime_type=r.mime_type,
-                            extracted_text=r.extracted_text,
-                            file_size_bytes=r.file_size_bytes,
-                            is_dynamic=getattr(r, "is_dynamic", False),
-                            display_name=r.display_name,
-                        )
+                        resources_to_add.append({
+                            "version_id": version.id,
+                            "resource_number": r.resource_number,
+                            "filename": r.filename,
+                            "storage_path": r.storage_path,
+                            "mime_type": r.mime_type,
+                            "extracted_text": r.extracted_text,
+                            "file_size_bytes": r.file_size_bytes,
+                            "is_dynamic": getattr(r, "is_dynamic", False),
+                            "display_name": r.display_name,
+                        })
+                    if resources_to_add:
+                        await version_repo.add_resources(resources_to_add)
+
+                    steps_to_add = []
                     for s in db_kit.current_version.workflow_steps:
-                        await version_repo.add_workflow_step(
-                            version_id=version.id,
-                            step_number=s.step_number,
-                            prompt_template=s.prompt_template,
-                            display_name=s.display_name,
-                        )
+                        steps_to_add.append({
+                            "version_id": version.id,
+                            "step_number": s.step_number,
+                            "prompt_template": s.prompt_template,
+                            "display_name": s.display_name,
+                        })
+                    if steps_to_add:
+                        await version_repo.add_workflow_steps(steps_to_add)
+
+                    tools_to_add = []
                     for t in db_kit.current_version.tools:
-                        await version_repo.add_tool(
-                            version_id=version.id,
-                            tool_number=t.tool_number,
-                            tool_name=t.tool_name,
-                            display_name=t.display_name,
-                            configuration=t.configuration,
-                        )
+                        tools_to_add.append({
+                            "version_id": version.id,
+                            "tool_number": t.tool_number,
+                            "tool_name": t.tool_name,
+                            "display_name": t.display_name,
+                            "configuration": t.configuration,
+                        })
+                    if tools_to_add:
+                        await version_repo.add_tools(tools_to_add)
 
                 await version_repo.add_tool(
                     version_id=version.id,
@@ -1104,37 +1173,46 @@ async def update_tool(
                     commit_message=f"Updated tool {number}",
                 )
 
+                resources_to_add = []
                 for r in db_kit.current_version.resources:
-                    await version_repo.add_resource(
-                        version_id=version.id,
-                        resource_number=r.resource_number,
-                        filename=r.filename,
-                        storage_path=r.storage_path,
-                        mime_type=r.mime_type,
-                        extracted_text=r.extracted_text,
-                        file_size_bytes=r.file_size_bytes,
-                        is_dynamic=getattr(r, "is_dynamic", False),
-                        display_name=r.display_name,
-                    )
+                    resources_to_add.append({
+                        "version_id": version.id,
+                        "resource_number": r.resource_number,
+                        "filename": r.filename,
+                        "storage_path": r.storage_path,
+                        "mime_type": r.mime_type,
+                        "extracted_text": r.extracted_text,
+                        "file_size_bytes": r.file_size_bytes,
+                        "is_dynamic": getattr(r, "is_dynamic", False),
+                        "display_name": r.display_name,
+                    })
+                if resources_to_add:
+                    await version_repo.add_resources(resources_to_add)
 
+                steps_to_add = []
                 for s in db_kit.current_version.workflow_steps:
-                    await version_repo.add_workflow_step(
-                        version_id=version.id,
-                        step_number=s.step_number,
-                        prompt_template=s.prompt_template,
-                        display_name=s.display_name,
-                    )
+                    steps_to_add.append({
+                        "version_id": version.id,
+                        "step_number": s.step_number,
+                        "prompt_template": s.prompt_template,
+                        "display_name": s.display_name,
+                    })
+                if steps_to_add:
+                    await version_repo.add_workflow_steps(steps_to_add)
 
+                tools_to_add = []
                 for t in db_kit.current_version.tools:
                     t_display = display_name.strip() if t.tool_number == number and display_name is not None else t.display_name
                     t_config = configuration if t.tool_number == number and configuration is not None else t.configuration
-                    await version_repo.add_tool(
-                        version_id=version.id,
-                        tool_number=t.tool_number,
-                        tool_name=t.tool_name,
-                        display_name=t_display,
-                        configuration=t_config,
-                    )
+                    tools_to_add.append({
+                        "version_id": version.id,
+                        "tool_number": t.tool_number,
+                        "tool_name": t.tool_name,
+                        "display_name": t_display,
+                        "configuration": t_config,
+                    })
+                if tools_to_add:
+                    await version_repo.add_tools(tools_to_add)
 
             return {"ok": True}
         except Exception as e:
@@ -1185,36 +1263,45 @@ async def delete_tool(
                 commit_message=f"Deleted tool {number}",
             )
 
+            resources_to_add = []
             for r in db_kit.current_version.resources:
-                await version_repo.add_resource(
-                    version_id=version.id,
-                    resource_number=r.resource_number,
-                    filename=r.filename,
-                    storage_path=r.storage_path,
-                    mime_type=r.mime_type,
-                    extracted_text=r.extracted_text,
-                    file_size_bytes=r.file_size_bytes,
-                    is_dynamic=getattr(r, "is_dynamic", False),
-                    display_name=r.display_name,
-                )
+                resources_to_add.append({
+                    "version_id": version.id,
+                    "resource_number": r.resource_number,
+                    "filename": r.filename,
+                    "storage_path": r.storage_path,
+                    "mime_type": r.mime_type,
+                    "extracted_text": r.extracted_text,
+                    "file_size_bytes": r.file_size_bytes,
+                    "is_dynamic": getattr(r, "is_dynamic", False),
+                    "display_name": r.display_name,
+                })
+            if resources_to_add:
+                await version_repo.add_resources(resources_to_add)
 
+            steps_to_add = []
             for s in db_kit.current_version.workflow_steps:
-                await version_repo.add_workflow_step(
-                    version_id=version.id,
-                    step_number=s.step_number,
-                    prompt_template=s.prompt_template,
-                    display_name=s.display_name,
-                )
+                steps_to_add.append({
+                    "version_id": version.id,
+                    "step_number": s.step_number,
+                    "prompt_template": s.prompt_template,
+                    "display_name": s.display_name,
+                })
+            if steps_to_add:
+                await version_repo.add_workflow_steps(steps_to_add)
 
+            tools_to_add = []
             for t in db_kit.current_version.tools:
                 if t.tool_number != number:
-                    await version_repo.add_tool(
-                        version_id=version.id,
-                        tool_number=t.tool_number,
-                        tool_name=t.tool_name,
-                        display_name=t.display_name,
-                        configuration=t.configuration,
-                    )
+                    tools_to_add.append({
+                        "version_id": version.id,
+                        "tool_number": t.tool_number,
+                        "tool_name": t.tool_name,
+                        "display_name": t.display_name,
+                        "configuration": t.configuration,
+                    })
+            if tools_to_add:
+                await version_repo.add_tools(tools_to_add)
 
         return {"ok": True}
     except Exception as e:

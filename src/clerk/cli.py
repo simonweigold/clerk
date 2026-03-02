@@ -11,7 +11,6 @@ from dotenv import load_dotenv
 from .db.config import get_config
 from .graph import run_reasoning_kit
 from .loader import (
-    LoadedKit,
     get_kit_info_from_db,
     list_reasoning_kits,
     list_reasoning_kits_from_db,
@@ -633,7 +632,6 @@ def _db_migrate(revision: str = "head") -> None:
         sys.exit(1)
 
     # Get database URL
-    config = get_config()
     db_url = os.getenv("DATABASE_URL_DIRECT") or os.getenv("DATABASE_URL")
     if not db_url:
         print("Error: DATABASE_URL or DATABASE_URL_DIRECT must be set")
@@ -1338,7 +1336,7 @@ def _kit_delete_resource(args: argparse.Namespace) -> None:
         existing_file.unlink()
         print(f"Deleted resource_{args.number} from '{args.kit}'")
         print(
-            f"Note: Remaining resources are NOT renumbered to preserve workflow references"
+            "Note: Remaining resources are NOT renumbered to preserve workflow references"
         )
 
     except Exception as e:
@@ -1363,7 +1361,7 @@ def _kit_delete_step(args: argparse.Namespace) -> None:
     try:
         existing_file.unlink()
         print(f"Deleted instruction_{args.number} from '{args.kit}'")
-        print(f"Note: Remaining steps are NOT renumbered to preserve workflow order")
+        print("Note: Remaining steps are NOT renumbered to preserve workflow order")
 
     except Exception as e:
         print(f"Error deleting step: {e}")

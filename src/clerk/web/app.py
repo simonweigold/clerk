@@ -42,7 +42,7 @@ def create_app() -> FastAPI:
     # Session middleware for auth cookies
     app.add_middleware(
         SessionMiddleware,
-        secret_key="clerk-session-secret-change-in-production",
+        secret_key=get_config().session_secret_key,
         session_cookie="clerk_session",
         max_age=60 * 60 * 24 * 7,  # 1 week
     )

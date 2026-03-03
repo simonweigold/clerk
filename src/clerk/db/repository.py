@@ -471,6 +471,23 @@ class KitVersionRepository:
         await self.session.flush()
         return resource
 
+    async def add_resources(
+        self,
+        resources_data: list[dict],
+    ) -> list[Resource]:
+        """Add multiple resources to a version in bulk.
+
+        Args:
+            resources_data: List of dictionaries containing kwargs for Resource
+
+        Returns:
+            List of created resources
+        """
+        resources = [Resource(**data) for data in resources_data]
+        self.session.add_all(resources)
+        await self.session.flush()
+        return resources
+
     async def add_workflow_step(
         self,
         version_id: UUID,
@@ -498,6 +515,23 @@ class KitVersionRepository:
         self.session.add(step)
         await self.session.flush()
         return step
+
+    async def add_workflow_steps(
+        self,
+        steps_data: list[dict],
+    ) -> list[WorkflowStep]:
+        """Add multiple workflow steps to a version in bulk.
+
+        Args:
+            steps_data: List of dictionaries containing kwargs for WorkflowStep
+
+        Returns:
+            List of created workflow steps
+        """
+        steps = [WorkflowStep(**data) for data in steps_data]
+        self.session.add_all(steps)
+        await self.session.flush()
+        return steps
 
     async def add_tool(
         self,
@@ -529,6 +563,23 @@ class KitVersionRepository:
         self.session.add(tool)
         await self.session.flush()
         return tool
+
+    async def add_tools(
+        self,
+        tools_data: list[dict],
+    ) -> list[Tool]:
+        """Add multiple tools to a version in bulk.
+
+        Args:
+            tools_data: List of dictionaries containing kwargs for Tool
+
+        Returns:
+            List of created tools
+        """
+        tools = [Tool(**data) for data in tools_data]
+        self.session.add_all(tools)
+        await self.session.flush()
+        return tools
 
 
 class ExecutionRepository:

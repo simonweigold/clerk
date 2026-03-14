@@ -27,6 +27,9 @@ export default function Layout() {
                         <Link to="/" className={`nav-link ${isActive('/') ? 'active' : ''}`}>
                             Kits
                         </Link>
+                        <Link to="/docs" className={`nav-link ${isActive('/docs') ? 'active' : ''}`}>
+                            Docs
+                        </Link>
                         {user && (
                             <>
                                 <Link

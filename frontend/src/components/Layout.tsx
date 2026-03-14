@@ -35,21 +35,16 @@ export default function Layout() {
                                 >
                                     Create
                                 </Link>
-                                <Link
-                                    to="/settings"
-                                    className={`nav-link ${isActive('/settings') ? 'active' : ''}`}
-                                >
-                                    Integrations
-                                </Link>
+
                             </>
                         )}
                         {supabaseConfigured && (
                             <>
                                 {user ? (
                                     <>
-                                        <span className="text-sm text-muted-foreground ml-2">
-                                            {user.email}
-                                        </span>
+                                        <Link to="/settings" className="btn btn-ghost btn-sm ml-2">
+                                            Account Settings
+                                        </Link>
                                         <Link to="/auth/logout" className="btn btn-ghost btn-sm ml-1">
                                             Sign Out
                                         </Link>

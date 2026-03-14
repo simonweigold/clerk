@@ -451,3 +451,23 @@ export async function updateMcpConfig(server_name: string, env_vars: Record<stri
     return handleResponse(res);
 }
 
+// ---------------------------------------------------------------------------
+// Documentation
+// ---------------------------------------------------------------------------
+
+export interface DocItem {
+    path: string;
+    slug: string;
+    title: string;
+}
+
+export async function getDocsList(): Promise<{ docs: DocItem[] }> {
+    const res = await fetch(`${API_BASE}/docs`);
+    return handleResponse(res);
+}
+
+export async function getDocContent(slug: string): Promise<{ content: string }> {
+    const res = await fetch(`${API_BASE}/docs/${slug}`);
+    return handleResponse(res);
+}
+

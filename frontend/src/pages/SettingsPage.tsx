@@ -65,12 +65,46 @@ export default function SettingsPage() {
             <h1 className="text-3xl font-bold mb-8">Settings & Integrations</h1>
 
             <p className="text-muted-foreground mb-8">
-                Provide your custom API keys and credentials for MCP servers here.
+                View your account details and configure custom API keys for MCP servers.
                 These credentials will be securely stored and used only during your own kit executions.
                 If left empty, the global system credentials will be used as a fallback if available.
             </p>
 
             <div className="space-y-8">
+                {/* Account Settings Section */}
+                <div className="card p-6">
+                    <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-md bg-primary/10 flex items-center justify-center text-primary">
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                            </svg>
+                        </div>
+                        Account Information
+                    </h2>
+                    
+                    <div className="space-y-4 max-w-2xl mt-4">
+                        <div>
+                            <label className="block text-sm font-medium mb-1.5 font-mono text-xs text-muted-foreground">Email Address</label>
+                            <div className="p-2 bg-muted/30 rounded border border-border text-sm">
+                                {user?.email}
+                            </div>
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium mb-1.5 font-mono text-xs text-muted-foreground">Account ID</label>
+                            <div className="p-2 bg-muted/30 rounded border border-border text-sm font-mono text-xs">
+                                {user?.id}
+                            </div>
+                        </div>
+                        {user?.display_name && (
+                            <div>
+                                <label className="block text-sm font-medium mb-1.5 font-mono text-xs text-muted-foreground">Display Name</label>
+                                <div className="p-2 bg-muted/30 rounded border border-border text-sm">
+                                    {user.display_name}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
                 {KNOWN_SERVERS.map(server => {
                     const existingConfig = configs.find(c => c.server_name === server.name);
 

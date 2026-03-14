@@ -13,6 +13,7 @@ import KitRunPage from './pages/KitRunPage';
 import KitHistoryPage from './pages/KitHistoryPage';
 import ExecutionDetailPage from './pages/ExecutionDetailPage';
 import SettingsPage from './pages/SettingsPage';
+import DocsPage from './pages/DocsPage';
 
 export default function App() {
   return (
@@ -40,6 +41,9 @@ export default function App() {
 
               {/* Settings */}
               <Route path="/settings" element={<SettingsPage />} />
+
+              {/* Docs */}
+              <Route path="/docs/*" element={<DocsPage />} />
             </Route>
           </Routes>
         </AuthProvider>

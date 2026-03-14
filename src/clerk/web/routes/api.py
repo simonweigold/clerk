@@ -2906,3 +2906,59 @@ async def delete_mcp_config(server_name: str, user: dict | None = Depends(get_op
     except Exception as e:
         return JSONResponse({"ok": False, "error": f"Error deleting MCP config: {e}"}, status_code=500)
 
+
+# =============================================================================
+# DOCUMENTATION
+# =============================================================================
+
+@router.get("/docs")
+async def list_docs():
+    """List all documentation markdown files."""
+    docs_dir = Path("docs")
+    if not docs_dir.exists():
+        return {"docs": []}
+        
+    docs = []
+    for file_path in docs_dir.rglob("*.md"):
+        rel_path = file_path.relative_to(docs_dir)
+        
+        # Try to extract the first h1 header for the title
+        title = rel_path.stem.replace("_", " ").title()
+        try:
+            content = file_path.read_text(encoding="utf-8")
+            for line in content.splitlines():
+                if line.startswith("# "):
+                    title = line[2:].strip()
+                    break
+        except Exception:
+            pass
+            
+        docs.append({
+            "path": str(rel_path),
+            "slug": str(rel_path.with_suffix("")),
+            "title": title,
+        })
+        
+    # Sort docs: README first, then alphabetically
+    docs.sort(key=lambda x: (
+        0 if x["slug"] == "README" else 1,
+        x["title"]
+    ))
+    return {"docs": docs}
+
+
+@router.get("/docs/{slug:path}")
+async def get_doc(slug: str):
+    """Get the raw markdown content of a documentation file."""
+    docs_dir = Path("docs")
+    file_path = docs_dir / f"{slug}.md"
+    
+    if not file_path.exists() or not file_path.is_file():
+        # Prevent directory traversal attacks
+        return JSONResponse({"ok": False, "error": "Document not found"}, status_code=404)
+        
+    try:
+        content = file_path.read_text(encoding="utf-8")
+        return {"content": content}
+    except Exception as e:
+        return JSONResponse({"ok": False, "error": f"Error reading document: {e}"}, status_code=500)

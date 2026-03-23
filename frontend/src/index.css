@@ -317,22 +317,20 @@ body {
 /* ── Form inputs ── */
 .input {
   width: 100%;
-  padding: 0.625rem 0.875rem;
+  padding: 0.25rem;
   font-family: 'Inter', system-ui, sans-serif;
-  font-size: 0.9375rem;
+  font-size: 0.75rem;
   color: var(--color-foreground);
   background: var(--color-input-background);
   border: 1px solid var(--color-input);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-sm);
   box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.04);
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .input:focus {
-  border-color: var(--color-primary-hex);
-  box-shadow:
-    inset 0 1px 2px rgba(0, 0, 0, 0.04),
-    0 0 0 4px var(--color-ring);
+  border-color: var(--color-foreground);
+  box-shadow: 0 0 0 0.25px var(--color-foreground);
   outline: none;
 }
 
@@ -451,6 +449,14 @@ textarea.input {
     transform: scale(1);
     opacity: 1;
   }
+}
+
+.animation-delay-150 {
+  animation-delay: 150ms;
+}
+
+.animation-delay-300 {
+  animation-delay: 300ms;
 }
 
 /* ── Flash / Toast messages ── */

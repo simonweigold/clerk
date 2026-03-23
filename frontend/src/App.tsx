@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from './hooks/useAuth';
 import { ToastProvider } from './hooks/useToast';
 import Layout from './components/Layout';
@@ -15,39 +16,52 @@ import ExecutionDetailPage from './pages/ExecutionDetailPage';
 import SettingsPage from './pages/SettingsPage';
 import DocsPage from './pages/DocsPage';
 
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 1000 * 60 * 5, // 5 minutes
+      gcTime: 1000 * 60 * 30, // 30 minutes
+      refetchOnWindowFocus: false,
+      retry: 1,
+    },
+  },
+});
+
 export default function App() {
   return (
-    <BrowserRouter>
-      <ToastProvider>
-        <AuthProvider>
-          <Routes>
-            <Route element={<Layout />}>
-              <Route path="/" element={<HomePage />} />
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter>
+        <ToastProvider>
+          <AuthProvider>
+            <Routes>
+              <Route element={<Layout />}>
+                <Route path="/" element={<HomePage />} />
 
-              {/* Auth */}
-              <Route path="/auth/login" element={<LoginPage />} />
-              <Route path="/auth/signup" element={<SignupPage />} />
-              <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
-              <Route path="/auth/logout" element={<LogoutPage />} />
+                {/* Auth */}
+                <Route path="/auth/login" element={<LoginPage />} />
+                <Route path="/auth/signup" element={<SignupPage />} />
+                <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
+                <Route path="/auth/logout" element={<LogoutPage />} />
 
-              {/* Kit CRUD */}
-              <Route path="/kit/new" element={<KitCreatePage />} />
-              <Route path="/kit/:slug" element={<KitDetailPage />} />
+                {/* Kit CRUD */}
+                <Route path="/kit/new" element={<KitCreatePage />} />
+                <Route path="/kit/:slug" element={<KitDetailPage />} />
 
-              {/* Kit Execution */}
-              <Route path="/kit/:slug/run" element={<KitRunPage />} />
-              <Route path="/kit/:slug/history" element={<KitHistoryPage />} />
-              <Route path="/kit/:slug/history/:runId" element={<ExecutionDetailPage />} />
+                {/* Kit Execution */}
+                <Route path="/kit/:slug/run" element={<KitRunPage />} />
+                <Route path="/kit/:slug/history" element={<KitHistoryPage />} />
+                <Route path="/kit/:slug/history/:runId" element={<ExecutionDetailPage />} />
 
-              {/* Settings */}
-              <Route path="/settings" element={<SettingsPage />} />
+                {/* Settings */}
+                <Route path="/settings" element={<SettingsPage />} />
 
-              {/* Docs */}
-              <Route path="/docs/*" element={<DocsPage />} />
-            </Route>
-          </Routes>
-        </AuthProvider>
-      </ToastProvider>
-    </BrowserRouter>
+                {/* Docs */}
+                <Route path="/docs/*" element={<DocsPage />} />
+              </Route>
+            </Routes>
+          </AuthProvider>
+        </ToastProvider>
+      </BrowserRouter>
+    </QueryClientProvider>
   );
 }

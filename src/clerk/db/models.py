@@ -470,3 +470,37 @@ class McpServerConfig(Base):
     user: Mapped["UserProfile"] = relationship(lazy="selectin")
 
 
+class LlmProviderConfig(Base):
+    """User-specific configuration for an LLM provider.
+
+    Stores credentials, selected model, and active status for 
+    different LLM providers (e.g. OpenAI, Anthropic, Mistral) for a specific user.
+    """
+
+    __tablename__ = "llm_provider_configs"
+    __table_args__ = (
+        UniqueConstraint("user_id", "provider_name", name="uq_user_llm_config"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("user_profiles.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    provider_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    env_vars: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    selected_model: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=datetime.utcnow
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+    # Relationships
+    user: Mapped["UserProfile"] = relationship(lazy="selectin")
+

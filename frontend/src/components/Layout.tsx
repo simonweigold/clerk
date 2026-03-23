@@ -1,6 +1,7 @@
 import { Link, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { ToastContainer } from '../hooks/useToast';
+import { Settings, LogOut } from 'lucide-react';
 
 export default function Layout() {
     const { user, supabaseConfigured } = useAuth();
@@ -45,11 +46,11 @@ export default function Layout() {
                             <>
                                 {user ? (
                                     <>
-                                        <Link to="/settings" className="btn btn-ghost btn-sm ml-2">
-                                            Account Settings
+                                        <Link to="/settings" className="btn btn-ghost btn-sm ml-2 px-2" title="Account Settings">
+                                            <Settings className="w-4 h-4" />
                                         </Link>
-                                        <Link to="/auth/logout" className="btn btn-ghost btn-sm ml-1">
-                                            Sign Out
+                                        <Link to="/auth/logout" className="btn btn-ghost btn-sm ml-1 px-2" title="Sign Out">
+                                            <LogOut className="w-4 h-4" />
                                         </Link>
                                     </>
                                 ) : (

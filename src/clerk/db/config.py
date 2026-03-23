@@ -127,7 +127,7 @@ def get_async_engine(direct: bool = False) -> AsyncEngine:
     if direct:
         if _engine_direct is not None and _engine_direct_loop is not current_loop:
             _engine_direct = None
-            
+
         if not config.database_url_direct:
             # Fall back to regular URL if direct not specified
             url = cast(str, config.database_url)
@@ -146,14 +146,15 @@ def get_async_engine(direct: bool = False) -> AsyncEngine:
     else:
         if _engine is not None and _engine_loop is not current_loop:
             _engine = None
-            
+
         if _engine is None:
             _engine = create_async_engine(
                 cast(str, config.database_url),
                 echo=False,
                 pool_recycle=300,
-                pool_size=5,
-                max_overflow=10,
+                pool_size=20,
+                max_overflow=30,
+                pool_pre_ping=True,
                 connect_args=connect_args,
             )
             _engine_loop = current_loop

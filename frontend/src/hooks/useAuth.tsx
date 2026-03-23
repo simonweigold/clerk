@@ -18,9 +18,10 @@ const AuthContext = createContext<AuthContextType>({
 export function AuthProvider({ children }: { children: ReactNode }) {
     const [user, setUser] = useState<User | null>(null);
     const [supabaseConfigured, setSupabaseConfigured] = useState(false);
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(false);
 
     const refresh = async () => {
+        setLoading(true);
         try {
             const data = await getMe();
             setUser(data.user);
@@ -33,7 +34,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
 
     useEffect(() => {
-        refresh();
+        // Non-blocking auth check - start with null user, verify in background
+        getMe()
+            .then((data) => {
+                setUser(data.user);
+                setSupabaseConfigured(data.supabase_configured);
+            })
+            .catch(() => {
+                setUser(null);
+            });
     }, []);
 
     return (

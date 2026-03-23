@@ -7,9 +7,10 @@ from pathlib import Path
 from typing import Annotated, Any, TypedDict
 from uuid import UUID
 
-from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from langchain_core.vectorstores import InMemoryVectorStore
+from langchain_openai import OpenAIEmbeddings
 from langgraph.graph import StateGraph, END
+from .llm_factory import get_llm
 
 from .evaluation import (
     complete_execution_run,
@@ -347,8 +348,12 @@ def execute_step(state: State) -> dict[str, Any]:
     # Track execution time
     start_time = time.time()
 
-    # Execute with LLM
-    llm = ChatOpenAI(model=state["model_used"], temperature=0)
+    # Execute with LLM (using the factory and waiting for the async result)
+    try:
+        loop = asyncio.get_event_loop()
+        llm = loop.run_until_complete(get_llm(user_id=state.get("user_id"), model=state["model_used"], temperature=0))
+    except RuntimeError:
+        llm = asyncio.run(get_llm(user_id=state.get("user_id"), model=state["model_used"], temperature=0))
 
     if openai_tools:
         # Tool-aware execution
@@ -710,7 +715,7 @@ async def run_reasoning_kit_async(
 
     resources = {r.resource_id: r.content for r in kit.resources.values()}
     outputs: dict[str, str] = {}
-    llm = ChatOpenAI(model=model, temperature=0)
+    llm = await get_llm(user_id=user_id, model=model, temperature=0)
     error_message: str | None = None
 
     # Build tool data from kit

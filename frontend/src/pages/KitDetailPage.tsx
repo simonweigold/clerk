@@ -1,8 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { getKit, deleteKit, updateKit, addResource, deleteResource, updateResource, addStep, deleteStep, updateStep, getAvailableTools, addTool, updateTool, deleteTool, formatToolName, type KitDetail, type Resource, type Step, type Tool, type AvailableTool } from '../lib/api';
+import { useQueryClient } from '@tanstack/react-query';
+import { deleteKit, updateKit, addResource, deleteResource, updateResource, addStep, deleteStep, updateStep, addTool, updateTool, deleteTool, formatToolName, type Resource, type Step, type Tool, type AvailableTool } from '../lib/api';
 import { useAuth } from '../hooks/useAuth';
 import { useToast } from '../hooks/useToast';
+import { useKitDetail, kitKeys } from '../hooks/useKits';
 import { PromptTextarea } from '../components/PromptTextarea';
 
 function ResourceCard({ resource, slug, isOwner, onRefresh }: {
@@ -98,35 +100,25 @@ function ResourceCard({ resource, slug, isOwner, onRefresh }: {
                     </div>
 
                     <div>
-                        <label className="label text-xs">Display Name</label>
-                        <input type="text" className="input" value={editDisplayName} onChange={(e) => setEditDisplayName(e.target.value)} placeholder="Readable name" />
+                        <label className="label text-xs">Display Name <span className="text-muted-foreground font-normal">(optional)</span></label>
+                        <input type="text" className="input text-sm" value={editDisplayName} onChange={(e) => setEditDisplayName(e.target.value)} placeholder="Resource name" />
                     </div>
 
                     {editMode === 'file' && (
                         <div>
-                            <label className="label text-xs">Replace file <span className="text-muted-foreground font-normal">(optional)</span></label>
-                            <input type="file" className="input text-sm" onChange={(e) => setEditFile(e.target.files?.[0] || null)} />
+                            <label className="label text-xs">File</label>
+                            <input type="file" className="input text-sm py-2" onChange={(e) => setEditFile(e.target.files?.[0] || null)} />
                         </div>
                     )}
 
-                    {editMode === 'text' && (
+                    {(editMode === 'text' || editMode === 'dynamic') && (
                         <div>
-                            <label className="label text-xs">Replace content with text <span className="text-muted-foreground font-normal">(optional)</span></label>
-                            <textarea className="input text-sm" rows={4} value={editText} onChange={(e) => setEditText(e.target.value)} placeholder="Paste new text content..." />
+                            <label className="label text-xs">{editMode === 'dynamic' ? 'Dynamic Value (JS Expression)' : 'Text Content'}</label>
+                            <textarea className="input text-sm font-mono" rows={4} value={editText} onChange={(e) => setEditText(e.target.value)} />
                         </div>
                     )}
 
-                    {editMode === 'dynamic' && (
-                        <div className="text-sm text-muted-foreground space-y-2">
-                            <p className="text-xs">Dynamic resources let users provide custom input when running the kit. The value will be replaced at execution time.</p>
-                            <div>
-                                <label className="label text-xs">Update Default Content <span className="text-muted-foreground font-normal">(optional)</span></label>
-                                <textarea className="input text-sm" rows={3} value={editText} onChange={(e) => setEditText(e.target.value)} placeholder="Default or placeholder text..." />
-                            </div>
-                        </div>
-                    )}
-
-                    <div className="flex gap-2 pt-1">
+                    <div className="flex gap-2 pt-2">
                         <button onClick={handleSave} className="btn btn-primary btn-sm" disabled={saving}>{saving ? 'Saving...' : 'Save'}</button>
                         <button onClick={() => setEditing(false)} className="btn btn-ghost btn-sm">Cancel</button>
                     </div>
@@ -134,19 +126,13 @@ function ResourceCard({ resource, slug, isOwner, onRefresh }: {
             )}
             {!editing && resource.extracted_text && (
                 <div className="step-card-body">
-                    <button
-                        className="btn btn-ghost btn-sm p-1 flex items-center gap-1.5"
-                        onClick={() => setExpanded(!expanded)}
-                    >
-                        <svg className={`w-4 h-4 transition-transform duration-200 ${expanded ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
-                        </svg>
-                        <span className="text-xs text-muted-foreground">Preview</span>
-                    </button>
-                    {expanded && (
-                        <div className="content-preview text-xs mt-2" style={{ maxHeight: '24rem', overflowY: 'auto' }}>
-                            {resource.extracted_text}
-                        </div>
+                    <pre className={`content-preview text-sm mt-0 ${expanded ? '' : 'line-clamp-3'}`}>
+                        {resource.extracted_text}
+                    </pre>
+                    {resource.extracted_text.length > 200 && (
+                        <button onClick={() => setExpanded(!expanded)} className="text-xs text-primary mt-2 hover:underline">
+                            {expanded ? 'Show less' : 'Show more'}
+                        </button>
                     )}
                 </div>
             )}
@@ -155,7 +141,7 @@ function ResourceCard({ resource, slug, isOwner, onRefresh }: {
                     <div className="card p-6 max-w-md w-full shadow-lg">
                         <h2 className="text-xl font-bold mb-2">Delete Resource</h2>
                         <p className="text-muted-foreground mb-6">
-                            Are you sure you want to delete <strong>{resource.display_name || resource.filename}</strong>? This action cannot be undone.
+                            Are you sure you want to delete <strong>{resource.display_name || resource.filename}</strong>?
                         </p>
                         <div className="flex justify-end gap-3">
                             <button className="btn btn-ghost" onClick={() => setShowDeleteModal(false)} disabled={isDeleting}>Cancel</button>
@@ -173,7 +159,6 @@ function StepCard({ step, slug, isOwner, onRefresh, resources, steps, tools }: {
     resources: Resource[]; steps: Step[]; tools: Tool[];
 }) {
     const { addToast } = useToast();
-    const [expanded, setExpanded] = useState(false);
     const [editing, setEditing] = useState(false);
     const [editPrompt, setEditPrompt] = useState(step.prompt_template);
     const [editDisplayName, setEditDisplayName] = useState(step.display_name || '');
@@ -212,37 +197,34 @@ function StepCard({ step, slug, isOwner, onRefresh, resources, steps, tools }: {
     return (
         <div className="step-card">
             <div className="step-card-header flex items-center justify-between">
-                <span>
-                    Step {step.number}
-                    {step.display_name && <span> — {step.display_name}</span>}
-                    <span className="text-xs text-muted-foreground ml-2">({step.output_id})</span>
-                </span>
                 <span className="flex items-center gap-2">
-                    {isOwner && (
-                        <>
-                            <button onClick={() => { setEditing(!editing); setEditPrompt(step.prompt_template); setEditDisplayName(step.display_name || ''); }} className="btn btn-ghost btn-sm" title="Edit">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                    <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
-                                </svg>
-                            </button>
-                            <button onClick={() => setShowDeleteModal(true)} className="btn btn-ghost btn-sm text-destructive" title="Delete">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                    <polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" /><path d="M10 11v6" /><path d="M14 11v6" />
-                                </svg>
-                            </button>
-                        </>
-                    )}
+                    <span className="step-number">{step.number}</span>
+                    <span className="font-medium">{step.display_name || `Step ${step.number}`}</span>
                 </span>
+                {isOwner && (
+                    <span className="flex items-center gap-2">
+                        <button onClick={() => { setEditing(!editing); setEditPrompt(step.prompt_template); setEditDisplayName(step.display_name || ''); }} className="btn btn-ghost btn-sm" title="Edit">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
+                            </svg>
+                        </button>
+                        <button onClick={() => setShowDeleteModal(true)} className="btn btn-ghost btn-sm text-destructive" title="Delete">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" /><path d="M10 11v6" /><path d="M14 11v6" />
+                            </svg>
+                        </button>
+                    </span>
+                )}
             </div>
             {editing ? (
-                <div className="step-card-body space-y-3 border-t border-border pt-3">
+                <div className="step-card-body space-y-4 border-t border-border pt-3">
                     <div>
-                        <label className="label text-xs">Display Name</label>
-                        <input type="text" className="input" value={editDisplayName} onChange={(e) => setEditDisplayName(e.target.value)} placeholder="Step name" />
+                        <label className="label text-xs">Display Name <span className="text-muted-foreground font-normal">(optional)</span></label>
+                        <input type="text" className="input text-sm" value={editDisplayName} onChange={(e) => setEditDisplayName(e.target.value)} placeholder="Step name" />
                     </div>
                     <div>
                         <label className="label text-xs">Prompt Template</label>
-                        <PromptTextarea className="input" rows={8} value={editPrompt} onChange={(e) => setEditPrompt(e.target.value)} resources={resources} steps={steps} tools={tools} />
+                        <PromptTextarea className="input text-sm font-mono" rows={6} value={editPrompt} onChange={(e) => setEditPrompt(e.target.value)} resources={resources} steps={steps} tools={tools} />
                     </div>
                     <div className="flex gap-2 pt-1">
                         <button onClick={handleSave} className="btn btn-primary btn-sm" disabled={saving}>{saving ? 'Saving...' : 'Save'}</button>
@@ -251,20 +233,10 @@ function StepCard({ step, slug, isOwner, onRefresh, resources, steps, tools }: {
                 </div>
             ) : (
                 <div className="step-card-body">
-                    <button
-                        className="btn btn-ghost btn-sm p-1 flex items-center gap-1.5"
-                        onClick={() => setExpanded(!expanded)}
-                    >
-                        <svg className={`w-4 h-4 transition-transform duration-200 ${expanded ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
-                        </svg>
-                        <span className="text-xs text-muted-foreground">Prompt</span>
-                    </button>
-                    {expanded && (
-                        <div className="content-preview text-xs mt-2" style={{ maxHeight: '24rem', overflowY: 'auto' }}>
-                            {step.prompt_template}
-                        </div>
-                    )}
+                    <pre className="content-preview text-sm mt-0">{step.prompt_template}</pre>
+                    <p className="text-xs text-muted-foreground mt-2">
+                        Output ID: <code className="bg-muted px-1 py-0.5 rounded">{step.output_id}</code>
+                    </p>
                 </div>
             )}
             {showDeleteModal && (
@@ -272,7 +244,7 @@ function StepCard({ step, slug, isOwner, onRefresh, resources, steps, tools }: {
                     <div className="card p-6 max-w-md w-full shadow-lg">
                         <h2 className="text-xl font-bold mb-2">Delete Step</h2>
                         <p className="text-muted-foreground mb-6">
-                            Are you sure you want to delete this step? This action cannot be undone.
+                            Are you sure you want to delete step <strong>{step.display_name || step.number}</strong>?
                         </p>
                         <div className="flex justify-end gap-3">
                             <button className="btn btn-ghost" onClick={() => setShowDeleteModal(false)} disabled={isDeleting}>Cancel</button>
@@ -285,89 +257,7 @@ function StepCard({ step, slug, isOwner, onRefresh, resources, steps, tools }: {
     );
 }
 
-function AddResourceForm({ slug, onRefresh }: { slug: string; onRefresh: () => void }) {
-    const [mode, setMode] = useState<'file' | 'text' | 'dynamic'>('file');
-    const [displayName, setDisplayName] = useState('');
-    const [textContent, setTextContent] = useState('');
-    const [file, setFile] = useState<File | null>(null);
-    const [loading, setLoading] = useState(false);
-    const { addToast } = useToast();
-
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setLoading(true);
-        try {
-            const fd = new FormData();
-            if (displayName) fd.append('display_name', displayName);
-            if (mode === 'dynamic') {
-                fd.append('is_dynamic', 'on');
-                fd.append('text_content', textContent || `{${displayName || 'input'}}`);
-            } else if (mode === 'file' && file) {
-                fd.append('file', file);
-            } else if (mode === 'text') {
-                fd.append('text_content', textContent);
-            }
-            await addResource(slug, fd);
-            addToast('success', 'Resource added.');
-            setDisplayName(''); setTextContent(''); setFile(null);
-            onRefresh();
-        } catch (err) {
-            addToast('error', err instanceof Error ? err.message : 'Add failed.');
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    return (
-        <form onSubmit={handleSubmit} className="card p-5 space-y-4">
-            <h3 className="font-semibold text-foreground">Add Resource</h3>
-
-            {/* Tab toggle */}
-            <div className="flex gap-2">
-                <button type="button" onClick={() => setMode('file')} className={`btn btn-sm ${mode === 'file' ? 'btn-primary' : 'btn-ghost'}`}>File Upload</button>
-                <button type="button" onClick={() => setMode('text')} className={`btn btn-sm ${mode === 'text' ? 'btn-primary' : 'btn-ghost'}`}>Text Input</button>
-                <button type="button" onClick={() => setMode('dynamic')} className={`btn btn-sm ${mode === 'dynamic' ? 'btn-primary' : 'btn-ghost'}`}>Dynamic Resource</button>
-            </div>
-
-            <div>
-                <label className="label">Display Name <span className="text-muted-foreground font-normal">(optional)</span></label>
-                <input type="text" className="input" value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="Readable name" />
-            </div>
-
-            {mode === 'file' && (
-                <div>
-                    <label className="label">File</label>
-                    <input type="file" className="input" onChange={(e) => setFile(e.target.files?.[0] || null)} />
-                </div>
-            )}
-
-            {mode === 'text' && (
-                <div>
-                    <label className="label">Content</label>
-                    <textarea className="input" rows={5} value={textContent} onChange={(e) => setTextContent(e.target.value)} placeholder="Paste text content..." />
-                </div>
-            )}
-
-            {mode === 'dynamic' && (
-                <div className="text-sm text-muted-foreground space-y-2">
-                    <p>Dynamic resources let users provide custom input when running the kit. The value will be replaced at execution time.</p>
-                    <div>
-                        <label className="label">Default Content <span className="text-muted-foreground font-normal">(optional)</span></label>
-                        <textarea className="input" rows={3} value={textContent} onChange={(e) => setTextContent(e.target.value)} placeholder="Default or placeholder text..." />
-                    </div>
-                </div>
-            )}
-
-            <button type="submit" className="btn btn-primary" disabled={loading}>
-                {loading ? 'Adding...' : 'Add Resource'}
-            </button>
-        </form>
-    );
-}
-
-// ─── TOOL COMPONENTS ──────────────────────────────────────────────────────────
-
-function ToolCard({ tool, slug, isOwner, onRefresh }: { tool: Tool; slug: string; isOwner: boolean; onRefresh: () => void }) {
+function ToolCard({ tool, slug, isOwner, onRefresh }: { tool: Tool; slug: string; isOwner: boolean; onRefresh: () => void; }) {
     const { addToast } = useToast();
     const [editing, setEditing] = useState(false);
     const [editDisplayName, setEditDisplayName] = useState(tool.display_name || '');
@@ -379,9 +269,8 @@ function ToolCard({ tool, slug, isOwner, onRefresh }: { tool: Tool; slug: string
     const confirmDelete = async () => {
         setIsDeleting(true);
         try {
-            // tool.tool_id is "tool_N", extract N
-            const num = parseInt(tool.tool_id.split('_')[1], 10);
-            await deleteTool(slug, num);
+            const toolNumber = parseInt(tool.tool_id.replace('tool_', ''), 10);
+            await deleteTool(slug, toolNumber);
             addToast('success', 'Tool removed.');
             onRefresh();
         } catch (err) {
@@ -395,8 +284,8 @@ function ToolCard({ tool, slug, isOwner, onRefresh }: { tool: Tool; slug: string
     const handleSave = async () => {
         setSaving(true);
         try {
-            const num = parseInt(tool.tool_id.split('_')[1], 10);
-            await updateTool(slug, num, editDisplayName, editConfiguration);
+            const toolNumber = parseInt(tool.tool_id.replace('tool_', ''), 10);
+            await updateTool(slug, toolNumber, editDisplayName, editConfiguration);
             addToast('success', 'Tool updated.');
             setEditing(false);
             onRefresh();
@@ -493,24 +382,37 @@ function ToolCard({ tool, slug, isOwner, onRefresh }: { tool: Tool; slug: string
     );
 }
 
+// ─── LAZY LOADED TOOL FORM ────────────────────────────────────────────────────
+
 function AddToolForm({ slug, onRefresh }: { slug: string; onRefresh: () => void }) {
     const { addToast } = useToast();
+    const [isExpanded, setIsExpanded] = useState(false);
     const [availableTools, setAvailableTools] = useState<AvailableTool[]>([]);
     const [selectedTool, setSelectedTool] = useState<string>('');
     const [displayName, setDisplayName] = useState('');
     const [configuration, setConfiguration] = useState('');
     const [loading, setLoading] = useState(false);
-    const [fetchingTools, setFetchingTools] = useState(true);
+    const [fetchingTools, setFetchingTools] = useState(false);
+    const [hasLoadedTools, setHasLoadedTools] = useState(false);
 
-    useEffect(() => {
-        getAvailableTools()
-            .then(data => {
+    // Lazy load tools only when form is expanded
+    const handleExpand = async () => {
+        setIsExpanded(true);
+        if (!hasLoadedTools && !fetchingTools) {
+            setFetchingTools(true);
+            try {
+                const { getAvailableTools } = await import('../lib/api');
+                const data = await getAvailableTools();
                 setAvailableTools(data.tools);
                 if (data.tools.length > 0) setSelectedTool(data.tools[0].name);
-            })
-            .catch(err => addToast('error', err instanceof Error ? err.message : 'Failed to fetch available tools.'))
-            .finally(() => setFetchingTools(false));
-    }, [addToast]);
+                setHasLoadedTools(true);
+            } catch (err) {
+                addToast('error', err instanceof Error ? err.message : 'Failed to fetch available tools.');
+            } finally {
+                setFetchingTools(false);
+            }
+        }
+    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -521,7 +423,6 @@ function AddToolForm({ slug, onRefresh }: { slug: string; onRefresh: () => void 
             addToast('success', 'Tool added to kit.');
             setDisplayName('');
             setConfiguration('');
-            // Optional: setSelectedTool to default
             onRefresh();
         } catch (err) {
             addToast('error', err instanceof Error ? err.message : 'Add tool failed.');
@@ -530,19 +431,42 @@ function AddToolForm({ slug, onRefresh }: { slug: string; onRefresh: () => void 
         }
     };
 
+    if (!isExpanded) {
+        return (
+            <button 
+                onClick={handleExpand}
+                className="card p-5 flex items-center gap-2 text-muted-foreground hover:text-foreground hover:border-purple-500/30 transition-colors border-dashed border-2"
+            >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                </svg>
+                <span>Attach Tool</span>
+            </button>
+        );
+    }
+
     if (fetchingTools) return <div className="card p-5 animate-pulse"><div className="h-4 bg-muted rounded w-1/4 mb-4"></div><div className="h-10 bg-muted rounded"></div></div>;
 
-    if (availableTools.length === 0) return null; // No tools available globally
+    if (availableTools.length === 0) return null;
 
     const selectedToolDef = availableTools.find(t => t.name === selectedTool);
 
     return (
         <form onSubmit={handleSubmit} className="card p-5 space-y-4 border-purple-500/20 shadow-sm shadow-purple-500/10">
-            <div className="flex items-center gap-2 mb-2">
-                <svg className="w-5 h-5 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                </svg>
-                <h3 className="font-semibold text-foreground">Attach Tool</h3>
+            <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                    <svg className="w-5 h-5 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                    </svg>
+                    <h3 className="font-semibold text-foreground">Attach Tool</h3>
+                </div>
+                <button 
+                    type="button" 
+                    onClick={() => setIsExpanded(false)}
+                    className="btn btn-ghost btn-sm"
+                >
+                    Cancel
+                </button>
             </div>
 
             <div>
@@ -631,14 +555,85 @@ function AddStepForm({ slug, onRefresh, resources, steps, tools }: { slug: strin
     );
 }
 
+function AddResourceForm({ slug, onRefresh }: { slug: string; onRefresh: () => void }) {
+    const [mode, setMode] = useState<'file' | 'text' | 'dynamic'>('file');
+    const [file, setFile] = useState<File | null>(null);
+    const [text, setText] = useState('');
+    const [displayName, setDisplayName] = useState('');
+    const [loading, setLoading] = useState(false);
+    const { addToast } = useToast();
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setLoading(true);
+        try {
+            const fd = new FormData();
+            fd.append('display_name', displayName);
+            if (mode === 'dynamic') {
+                fd.append('is_dynamic', 'on');
+                if (text.trim()) fd.append('text_content', text);
+            } else if (mode === 'file' && file) {
+                fd.append('file', file);
+            } else if (mode === 'text' && text.trim()) {
+                fd.append('text_content', text);
+            }
+            await addResource(slug, fd);
+            addToast('success', 'Resource added.');
+            setFile(null);
+            setText('');
+            setDisplayName('');
+            onRefresh();
+        } catch (err) {
+            addToast('error', err instanceof Error ? err.message : 'Add failed.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <form onSubmit={handleSubmit} className="card p-5 space-y-4">
+            <h3 className="font-semibold text-foreground">Add Resource</h3>
+            <div className="flex gap-2">
+                <button type="button" onClick={() => { setMode('file'); setText(''); setFile(null); }} className={`btn btn-sm ${mode === 'file' ? 'btn-primary' : 'btn-ghost'}`}>File Upload</button>
+                <button type="button" onClick={() => { setMode('text'); setText(''); setFile(null); }} className={`btn btn-sm ${mode === 'text' ? 'btn-primary' : 'btn-ghost'}`}>Text Input</button>
+                <button type="button" onClick={() => { setMode('dynamic'); setText(''); setFile(null); }} className={`btn btn-sm ${mode === 'dynamic' ? 'btn-primary' : 'btn-ghost'}`}>Dynamic Resource</button>
+            </div>
+
+            <div>
+                <label className="label">Display Name <span className="text-muted-foreground font-normal">(optional)</span></label>
+                <input type="text" className="input" value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="Resource name" />
+            </div>
+
+            {mode === 'file' && (
+                <div>
+                    <label className="label">File</label>
+                    <input type="file" className="input py-2" onChange={(e) => setFile(e.target.files?.[0] || null)} required={mode === 'file'} />
+                </div>
+            )}
+
+            {(mode === 'text' || mode === 'dynamic') && (
+                <div>
+                    <label className="label">{mode === 'dynamic' ? 'Dynamic Value (JS Expression)' : 'Text Content'}</label>
+                    <textarea className="input font-mono" rows={6} value={text} onChange={(e) => setText(e.target.value)} required />
+                </div>
+            )}
+
+            <button type="submit" className="btn btn-primary" disabled={loading || (mode === 'file' && !file) || ((mode === 'text' || mode === 'dynamic') && !text.trim())}>
+                {loading ? 'Adding...' : 'Add Resource'}
+            </button>
+        </form>
+    );
+}
+
 export default function KitDetailPage() {
     const { slug } = useParams<{ slug: string }>();
-    const [kit, setKit] = useState<KitDetail | null>(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState('');
     const { user } = useAuth();
     const { addToast } = useToast();
     const navigate = useNavigate();
+    const queryClient = useQueryClient();
+
+    // Use React Query for kit data with caching
+    const { data: kit, isLoading, error } = useKitDetail(slug || '');
 
     const [editingKit, setEditingKit] = useState<'name' | 'description' | null>(null);
     const [editName, setEditName] = useState('');
@@ -654,7 +649,8 @@ export default function KitDetailPage() {
             await updateKit(slug, editName, editDescription);
             addToast('success', 'Kit details updated.');
             setEditingKit(null);
-            fetchKit();
+            // Invalidate and refetch
+            queryClient.invalidateQueries({ queryKey: kitKeys.detail(slug) });
         } catch (err) {
             addToast('error', err instanceof Error ? err.message : 'Update failed.');
         } finally {
@@ -662,24 +658,11 @@ export default function KitDetailPage() {
         }
     };
 
-    const fetchKit = async () => {
-        if (!slug) return;
-        try {
-            const data = await getKit(slug);
-            // Backend may return { error: "..." } with 200 status
-            if ('error' in data && !data.kit) {
-                setError((data as unknown as { error: string }).error);
-            } else {
-                setKit(data);
-            }
-        } catch (err) {
-            setError(err instanceof Error ? err.message : 'Failed to load kit.');
-        } finally {
-            setLoading(false);
+    const handleRefresh = () => {
+        if (slug) {
+            queryClient.invalidateQueries({ queryKey: kitKeys.detail(slug) });
         }
     };
-
-    useEffect(() => { fetchKit(); }, [slug]);
 
     const confirmDelete = async () => {
         if (!slug) return;
@@ -695,7 +678,7 @@ export default function KitDetailPage() {
         }
     };
 
-    if (loading) {
+    if (isLoading) {
         return (
             <div className="empty-state fade-in">
                 <div className="flex items-center justify-center gap-2">
@@ -708,7 +691,17 @@ export default function KitDetailPage() {
     if (error || !kit) {
         return (
             <div className="fade-in">
-                <div className="flash flash-error">{error || 'Kit not found.'}</div>
+                <div className="flash flash-error">{error instanceof Error ? error.message : 'Kit not found.'}</div>
+                <Link to="/" className="btn btn-ghost mt-4">Back to Kits</Link>
+            </div>
+        );
+    }
+
+    // Handle error case from API
+    if ('error' in kit && !kit.kit) {
+        return (
+            <div className="fade-in">
+                <div className="flash flash-error">{(kit as unknown as { error: string }).error}</div>
                 <Link to="/" className="btn btn-ghost mt-4">Back to Kits</Link>
             </div>
         );
@@ -802,13 +795,13 @@ export default function KitDetailPage() {
                 ) : (
                     <div className="stream-container">
                         {kit.resources.map((r) => (
-                            <ResourceCard key={r.number} resource={r} slug={slug!} isOwner={kit.is_owner} onRefresh={fetchKit} />
+                            <ResourceCard key={r.number} resource={r} slug={slug!} isOwner={kit.is_owner} onRefresh={handleRefresh} />
                         ))}
                     </div>
                 )}
                 {kit.is_owner && (
                     <div className="mt-6">
-                        <AddResourceForm slug={slug!} onRefresh={fetchKit} />
+                        <AddResourceForm slug={slug!} onRefresh={handleRefresh} />
                     </div>
                 )}
             </section>
@@ -827,13 +820,13 @@ export default function KitDetailPage() {
                 ) : (
                     <div className="stream-container grid grid-cols-1 md:grid-cols-2 gap-4">
                         {kit.tools.map((t) => (
-                            <ToolCard key={t.tool_id} tool={t} slug={slug!} isOwner={kit.is_owner} onRefresh={fetchKit} />
+                            <ToolCard key={t.tool_id} tool={t} slug={slug!} isOwner={kit.is_owner} onRefresh={handleRefresh} />
                         ))}
                     </div>
                 )}
                 {kit.is_owner && (
                     <div className="mt-6">
-                        <AddToolForm slug={slug!} onRefresh={fetchKit} />
+                        <AddToolForm slug={slug!} onRefresh={handleRefresh} />
                     </div>
                 )}
             </section>
@@ -852,13 +845,13 @@ export default function KitDetailPage() {
                 ) : (
                     <div className="stream-container">
                         {kit.steps.map((s) => (
-                            <StepCard key={s.number} step={s} slug={slug!} isOwner={kit.is_owner} onRefresh={fetchKit} resources={kit.resources} steps={kit.steps} tools={kit.tools} />
+                            <StepCard key={s.number} step={s} slug={slug!} isOwner={kit.is_owner} onRefresh={handleRefresh} resources={kit.resources} steps={kit.steps} tools={kit.tools || []} />
                         ))}
                     </div>
                 )}
                 {kit.is_owner && (
                     <div className="mt-6">
-                        <AddStepForm slug={slug!} onRefresh={fetchKit} resources={kit.resources} steps={kit.steps} tools={kit.tools || []} />
+                        <AddStepForm slug={slug!} onRefresh={handleRefresh} resources={kit.resources} steps={kit.steps} tools={kit.tools || []} />
                     </div>
                 )}
             </section>

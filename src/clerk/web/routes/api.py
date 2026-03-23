@@ -21,7 +21,9 @@ router = APIRouter()
 def _check_auth(user: dict | None) -> JSONResponse | None:
     """Return a 401 JSON response if user is not logged in, else None."""
     if not user:
-        return JSONResponse({"ok": False, "error": "Sign in to manage kits."}, status_code=401)
+        return JSONResponse(
+            {"ok": False, "error": "Sign in to manage kits."}, status_code=401
+        )
     return None
 
 
@@ -33,8 +35,6 @@ def _check_kit_ownership(db_kit, user: dict | None) -> JSONResponse | None:
             status_code=403,
         )
     return None
-
-
 
 
 # =============================================================================
@@ -55,16 +55,22 @@ async def create_kit(
     try:
         body = await request.json()
     except Exception:
-        return JSONResponse({"ok": False, "error": "Invalid JSON body"}, status_code=400)
+        return JSONResponse(
+            {"ok": False, "error": "Invalid JSON body"}, status_code=400
+        )
 
     name = body.get("name", "").strip()
     description = body.get("description", "").strip()
     if not name:
-        return JSONResponse({"ok": False, "error": "Kit name is required."}, status_code=400)
+        return JSONResponse(
+            {"ok": False, "error": "Kit name is required."}, status_code=400
+        )
 
     slug = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
     if not slug:
-        return JSONResponse({"ok": False, "error": "Invalid kit name."}, status_code=400)
+        return JSONResponse(
+            {"ok": False, "error": "Invalid kit name."}, status_code=400
+        )
 
     from ...db.config import get_config
 
@@ -81,7 +87,10 @@ async def create_kit(
                 existing = await repo.get_by_slug(slug)
                 if existing:
                     return JSONResponse(
-                        {"ok": False, "error": f"A kit with slug '{slug}' already exists."},
+                        {
+                            "ok": False,
+                            "error": f"A kit with slug '{slug}' already exists.",
+                        },
                         status_code=409,
                     )
 
@@ -96,7 +105,9 @@ async def create_kit(
             return {"ok": True, "slug": slug}
 
         except Exception as e:
-            return JSONResponse({"ok": False, "error": f"Error creating kit: {e}"}, status_code=500)
+            return JSONResponse(
+                {"ok": False, "error": f"Error creating kit: {e}"}, status_code=500
+            )
     else:
         try:
             kit_path = Path("reasoning_kits") / slug
@@ -108,7 +119,9 @@ async def create_kit(
             kit_path.mkdir(parents=True)
             return {"ok": True, "slug": slug}
         except Exception as e:
-            return JSONResponse({"ok": False, "error": f"Error creating kit: {e}"}, status_code=500)
+            return JSONResponse(
+                {"ok": False, "error": f"Error creating kit: {e}"}, status_code=500
+            )
 
 
 @router.put("/kits/{slug}")
@@ -125,7 +138,9 @@ async def update_kit(
     try:
         body = await request.json()
     except Exception:
-        return JSONResponse({"ok": False, "error": "Invalid JSON body"}, status_code=400)
+        return JSONResponse(
+            {"ok": False, "error": "Invalid JSON body"}, status_code=400
+        )
 
     name = body.get("name", "").strip()
     description = body.get("description", "").strip()
@@ -142,7 +157,10 @@ async def update_kit(
                 db_kit = await repo.get_by_slug(slug)
 
                 if not db_kit:
-                    return JSONResponse({"ok": False, "error": f"Kit '{slug}' not found."}, status_code=404)
+                    return JSONResponse(
+                        {"ok": False, "error": f"Kit '{slug}' not found."},
+                        status_code=404,
+                    )
 
                 own_err = _check_kit_ownership(db_kit, user)
                 if own_err:
@@ -156,9 +174,13 @@ async def update_kit(
 
             return {"ok": True}
         except Exception as e:
-            return JSONResponse({"ok": False, "error": f"Error updating kit: {e}"}, status_code=500)
+            return JSONResponse(
+                {"ok": False, "error": f"Error updating kit: {e}"}, status_code=500
+            )
 
-    return JSONResponse({"ok": False, "error": "Database not configured"}, status_code=500)
+    return JSONResponse(
+        {"ok": False, "error": "Database not configured"}, status_code=500
+    )
 
 
 @router.delete("/kits/{slug}")
@@ -184,7 +206,10 @@ async def delete_kit(
                 db_kit = await repo.get_by_slug(slug)
 
                 if not db_kit:
-                    return JSONResponse({"ok": False, "error": f"Kit '{slug}' not found."}, status_code=404)
+                    return JSONResponse(
+                        {"ok": False, "error": f"Kit '{slug}' not found."},
+                        status_code=404,
+                    )
 
                 own_err = _check_kit_ownership(db_kit, user)
                 if own_err:
@@ -194,7 +219,9 @@ async def delete_kit(
 
             return {"ok": True}
         except Exception as e:
-            return JSONResponse({"ok": False, "error": f"Error deleting kit: {e}"}, status_code=500)
+            return JSONResponse(
+                {"ok": False, "error": f"Error deleting kit: {e}"}, status_code=500
+            )
     else:
         import shutil
 
@@ -203,7 +230,9 @@ async def delete_kit(
             shutil.rmtree(kit_path)
             return {"ok": True}
         else:
-            return JSONResponse({"ok": False, "error": f"Kit '{slug}' not found."}, status_code=404)
+            return JSONResponse(
+                {"ok": False, "error": f"Kit '{slug}' not found."}, status_code=404
+            )
 
 
 # =============================================================================
@@ -251,7 +280,10 @@ async def add_resource(
                 mime_type = detect_mime_type_from_filename(filename)
             else:
                 return JSONResponse(
-                    {"ok": False, "error": "Please upload a file or paste text content."},
+                    {
+                        "ok": False,
+                        "error": "Please upload a file or paste text content.",
+                    },
                     status_code=400,
                 )
 
@@ -261,7 +293,10 @@ async def add_resource(
                 db_kit = await kit_repo.get_by_slug(slug)
 
                 if not db_kit:
-                    return JSONResponse({"ok": False, "error": f"Kit '{slug}' not found."}, status_code=404)
+                    return JSONResponse(
+                        {"ok": False, "error": f"Kit '{slug}' not found."},
+                        status_code=404,
+                    )
 
                 own_err = _check_kit_ownership(db_kit, user)
                 if own_err:
@@ -269,7 +304,10 @@ async def add_resource(
 
                 resource_number = 1
                 if db_kit.current_version and db_kit.current_version.resources:
-                    resource_number = max(r.resource_number for r in db_kit.current_version.resources) + 1
+                    resource_number = (
+                        max(r.resource_number for r in db_kit.current_version.resources)
+                        + 1
+                    )
 
                 commit_msg = f"Added resource: {filename}"
                 version = await version_repo.create(
@@ -281,34 +319,41 @@ async def add_resource(
                     old_version = db_kit.current_version
                     resources_to_add = []
                     for r in old_version.resources:
-                        resources_to_add.append({
-                            "version_id": version.id,
-                            "resource_number": r.resource_number,
-                            "filename": r.filename,
-                            "storage_path": r.storage_path,
-                            "mime_type": r.mime_type,
-                            "extracted_text": r.extracted_text,
-                            "file_size_bytes": r.file_size_bytes,
-                            "is_dynamic": getattr(r, "is_dynamic", False),
-                            "display_name": r.display_name,
-                        })
+                        resources_to_add.append(
+                            {
+                                "version_id": version.id,
+                                "resource_number": r.resource_number,
+                                "filename": r.filename,
+                                "storage_path": r.storage_path,
+                                "mime_type": r.mime_type,
+                                "extracted_text": r.extracted_text,
+                                "file_size_bytes": r.file_size_bytes,
+                                "is_dynamic": getattr(r, "is_dynamic", False),
+                                "display_name": r.display_name,
+                            }
+                        )
                     if resources_to_add:
                         await version_repo.add_resources(resources_to_add)
 
                     steps_to_add = []
                     for s in old_version.workflow_steps:
-                        steps_to_add.append({
-                            "version_id": version.id,
-                            "step_number": s.step_number,
-                            "prompt_template": s.prompt_template,
-                            "display_name": s.display_name,
-                        })
+                        steps_to_add.append(
+                            {
+                                "version_id": version.id,
+                                "step_number": s.step_number,
+                                "prompt_template": s.prompt_template,
+                                "display_name": s.display_name,
+                            }
+                        )
                     if steps_to_add:
                         await version_repo.add_workflow_steps(steps_to_add)
 
                 storage = StorageService(use_service_key=True)
                 import tempfile
-                with tempfile.NamedTemporaryFile(delete=False, suffix=Path(filename).suffix) as tmp:
+
+                with tempfile.NamedTemporaryFile(
+                    delete=False, suffix=Path(filename).suffix
+                ) as tmp:
                     tmp.write(file_content)
                     tmp_path = Path(tmp.name)
 
@@ -339,12 +384,16 @@ async def add_resource(
             return {"ok": True}
 
         except Exception as e:
-            return JSONResponse({"ok": False, "error": f"Error adding resource: {e}"}, status_code=500)
+            return JSONResponse(
+                {"ok": False, "error": f"Error adding resource: {e}"}, status_code=500
+            )
     else:
         try:
             kit_path = Path("reasoning_kits") / slug
             if not kit_path.exists():
-                return JSONResponse({"ok": False, "error": f"Kit '{slug}' not found."}, status_code=404)
+                return JSONResponse(
+                    {"ok": False, "error": f"Kit '{slug}' not found."}, status_code=404
+                )
 
             existing = list(kit_path.glob("resource_*.*"))
             numbers = []
@@ -362,7 +411,10 @@ async def add_resource(
                 content = await file.read()
             else:
                 return JSONResponse(
-                    {"ok": False, "error": "Please upload a file or paste text content."},
+                    {
+                        "ok": False,
+                        "error": "Please upload a file or paste text content.",
+                    },
                     status_code=400,
                 )
 
@@ -371,7 +423,9 @@ async def add_resource(
 
             return {"ok": True}
         except Exception as e:
-            return JSONResponse({"ok": False, "error": f"Error adding resource: {e}"}, status_code=500)
+            return JSONResponse(
+                {"ok": False, "error": f"Error adding resource: {e}"}, status_code=500
+            )
 
 
 @router.delete("/kits/{slug}/resources/{number}")
@@ -396,7 +450,9 @@ async def delete_resource(
             matches[0].unlink()
             return {"ok": True}
         else:
-            return JSONResponse({"ok": False, "error": f"Resource {number} not found."}, status_code=404)
+            return JSONResponse(
+                {"ok": False, "error": f"Resource {number} not found."}, status_code=404
+            )
     else:
         try:
             from ...db import (
@@ -411,7 +467,10 @@ async def delete_resource(
                 db_kit = await kit_repo.get_by_slug(slug)
 
                 if not db_kit or not db_kit.current_version:
-                    return JSONResponse({"ok": False, "error": "Kit or version not found."}, status_code=404)
+                    return JSONResponse(
+                        {"ok": False, "error": "Kit or version not found."},
+                        status_code=404,
+                    )
 
                 own_err = _check_kit_ownership(db_kit, user)
                 if own_err:
@@ -425,40 +484,46 @@ async def delete_resource(
                 resources_to_add = []
                 for r in db_kit.current_version.resources:
                     if r.resource_number != number:
-                        resources_to_add.append({
-                            "version_id": version.id,
-                            "resource_number": r.resource_number,
-                            "filename": r.filename,
-                            "storage_path": r.storage_path,
-                            "mime_type": r.mime_type,
-                            "extracted_text": r.extracted_text,
-                            "file_size_bytes": r.file_size_bytes,
-                            "is_dynamic": getattr(r, "is_dynamic", False),
-                            "display_name": r.display_name,
-                        })
+                        resources_to_add.append(
+                            {
+                                "version_id": version.id,
+                                "resource_number": r.resource_number,
+                                "filename": r.filename,
+                                "storage_path": r.storage_path,
+                                "mime_type": r.mime_type,
+                                "extracted_text": r.extracted_text,
+                                "file_size_bytes": r.file_size_bytes,
+                                "is_dynamic": getattr(r, "is_dynamic", False),
+                                "display_name": r.display_name,
+                            }
+                        )
                 if resources_to_add:
                     await version_repo.add_resources(resources_to_add)
 
                 steps_to_add = []
                 for s in db_kit.current_version.workflow_steps:
-                    steps_to_add.append({
-                        "version_id": version.id,
-                        "step_number": s.step_number,
-                        "prompt_template": s.prompt_template,
-                        "display_name": s.display_name,
-                    })
+                    steps_to_add.append(
+                        {
+                            "version_id": version.id,
+                            "step_number": s.step_number,
+                            "prompt_template": s.prompt_template,
+                            "display_name": s.display_name,
+                        }
+                    )
                 if steps_to_add:
                     await version_repo.add_workflow_steps(steps_to_add)
 
                 tools_to_add = []
                 for t in db_kit.current_version.tools:
-                    tools_to_add.append({
-                        "version_id": version.id,
-                        "tool_number": t.tool_number,
-                        "tool_name": t.tool_name,
-                        "display_name": t.display_name,
-                        "configuration": t.configuration,
-                    })
+                    tools_to_add.append(
+                        {
+                            "version_id": version.id,
+                            "tool_number": t.tool_number,
+                            "tool_name": t.tool_name,
+                            "display_name": t.display_name,
+                            "configuration": t.configuration,
+                        }
+                    )
                 if tools_to_add:
                     await version_repo.add_tools(tools_to_add)
 
@@ -501,7 +566,9 @@ async def update_resource(
             new_filename = None
             if text_content.strip():
                 new_file_content = text_content.encode("utf-8")
-                safe_name = (display_name.strip() or f"resource_{number}").replace(" ", "_")
+                safe_name = (display_name.strip() or f"resource_{number}").replace(
+                    " ", "_"
+                )
                 new_filename = f"{safe_name}.txt"
             elif file and file.filename:
                 new_file_content = await file.read()
@@ -513,7 +580,10 @@ async def update_resource(
                 db_kit = await kit_repo.get_by_slug(slug)
 
                 if not db_kit or not db_kit.current_version:
-                    return JSONResponse({"ok": False, "error": "Kit or version not found."}, status_code=404)
+                    return JSONResponse(
+                        {"ok": False, "error": "Kit or version not found."},
+                        status_code=404,
+                    )
 
                 own_err = _check_kit_ownership(db_kit, user)
                 if own_err:
@@ -538,7 +608,10 @@ async def update_resource(
 
                             storage = StorageService(use_service_key=True)
                             import tempfile
-                            with tempfile.NamedTemporaryFile(delete=False, suffix=Path(new_filename).suffix) as tmp:
+
+                            with tempfile.NamedTemporaryFile(
+                                delete=False, suffix=Path(new_filename).suffix
+                            ) as tmp:
                                 tmp.write(new_file_content)
                                 tmp_path = Path(tmp.name)
 
@@ -552,19 +625,36 @@ async def update_resource(
                             finally:
                                 tmp_path.unlink(missing_ok=True)
 
-                            resources_to_add.append({
-                                "version_id": version.id,
-                                "resource_number": number,
-                                "filename": f"resource_{number}{Path(new_filename).suffix}",
-                                "storage_path": storage_path,
-                                "mime_type": mime_type,
-                                "extracted_text": extracted,
-                                "file_size_bytes": len(new_file_content),
-                                "is_dynamic": res_is_dynamic,
-                                "display_name": res_display_name,
-                            })
+                            resources_to_add.append(
+                                {
+                                    "version_id": version.id,
+                                    "resource_number": number,
+                                    "filename": f"resource_{number}{Path(new_filename).suffix}",
+                                    "storage_path": storage_path,
+                                    "mime_type": mime_type,
+                                    "extracted_text": extracted,
+                                    "file_size_bytes": len(new_file_content),
+                                    "is_dynamic": res_is_dynamic,
+                                    "display_name": res_display_name,
+                                }
+                            )
                         else:
-                            resources_to_add.append({
+                            resources_to_add.append(
+                                {
+                                    "version_id": version.id,
+                                    "resource_number": r.resource_number,
+                                    "filename": r.filename,
+                                    "storage_path": r.storage_path,
+                                    "mime_type": r.mime_type,
+                                    "extracted_text": r.extracted_text,
+                                    "file_size_bytes": r.file_size_bytes,
+                                    "is_dynamic": res_is_dynamic,
+                                    "display_name": res_display_name,
+                                }
+                            )
+                    else:
+                        resources_to_add.append(
+                            {
                                 "version_id": version.id,
                                 "resource_number": r.resource_number,
                                 "filename": r.filename,
@@ -572,52 +662,50 @@ async def update_resource(
                                 "mime_type": r.mime_type,
                                 "extracted_text": r.extracted_text,
                                 "file_size_bytes": r.file_size_bytes,
-                                "is_dynamic": res_is_dynamic,
-                                "display_name": res_display_name,
-                            })
-                    else:
-                        resources_to_add.append({
-                            "version_id": version.id,
-                            "resource_number": r.resource_number,
-                            "filename": r.filename,
-                            "storage_path": r.storage_path,
-                            "mime_type": r.mime_type,
-                            "extracted_text": r.extracted_text,
-                            "file_size_bytes": r.file_size_bytes,
-                            "is_dynamic": getattr(r, "is_dynamic", False),
-                            "display_name": r.display_name,
-                        })
+                                "is_dynamic": getattr(r, "is_dynamic", False),
+                                "display_name": r.display_name,
+                            }
+                        )
                 if resources_to_add:
                     await version_repo.add_resources(resources_to_add)
 
                 steps_to_add = []
                 for s in db_kit.current_version.workflow_steps:
-                    steps_to_add.append({
-                        "version_id": version.id,
-                        "step_number": s.step_number,
-                        "prompt_template": s.prompt_template,
-                        "display_name": s.display_name,
-                    })
+                    steps_to_add.append(
+                        {
+                            "version_id": version.id,
+                            "step_number": s.step_number,
+                            "prompt_template": s.prompt_template,
+                            "display_name": s.display_name,
+                        }
+                    )
                 if steps_to_add:
                     await version_repo.add_workflow_steps(steps_to_add)
 
                 tools_to_add = []
                 for t in db_kit.current_version.tools:
-                    tools_to_add.append({
-                        "version_id": version.id,
-                        "tool_number": t.tool_number,
-                        "tool_name": t.tool_name,
-                        "display_name": t.display_name,
-                        "configuration": t.configuration,
-                    })
+                    tools_to_add.append(
+                        {
+                            "version_id": version.id,
+                            "tool_number": t.tool_number,
+                            "tool_name": t.tool_name,
+                            "display_name": t.display_name,
+                            "configuration": t.configuration,
+                        }
+                    )
                 if tools_to_add:
                     await version_repo.add_tools(tools_to_add)
 
             return {"ok": True}
         except Exception as e:
-            return JSONResponse({"ok": False, "error": f"Error updating resource: {e}"}, status_code=500)
+            return JSONResponse(
+                {"ok": False, "error": f"Error updating resource: {e}"}, status_code=500
+            )
 
-    return JSONResponse({"ok": False, "error": "Database not configured"}, status_code=500)
+    return JSONResponse(
+        {"ok": False, "error": "Database not configured"}, status_code=500
+    )
+
 
 # =============================================================================
 # STEP MANAGEMENT
@@ -638,13 +726,17 @@ async def add_step(
     try:
         body = await request.json()
     except Exception:
-        return JSONResponse({"ok": False, "error": "Invalid JSON body"}, status_code=400)
+        return JSONResponse(
+            {"ok": False, "error": "Invalid JSON body"}, status_code=400
+        )
 
     prompt = body.get("prompt", "")
     display_name = body.get("display_name", "")
 
     if not prompt:
-        return JSONResponse({"ok": False, "error": "Prompt is required."}, status_code=400)
+        return JSONResponse(
+            {"ok": False, "error": "Prompt is required."}, status_code=400
+        )
 
     from ...db.config import get_config
 
@@ -663,7 +755,10 @@ async def add_step(
                 db_kit = await kit_repo.get_by_slug(slug)
 
                 if not db_kit:
-                    return JSONResponse({"ok": False, "error": f"Kit '{slug}' not found."}, status_code=404)
+                    return JSONResponse(
+                        {"ok": False, "error": f"Kit '{slug}' not found."},
+                        status_code=404,
+                    )
 
                 own_err = _check_kit_ownership(db_kit, user)
                 if own_err:
@@ -671,7 +766,12 @@ async def add_step(
 
                 step_number = 1
                 if db_kit.current_version and db_kit.current_version.workflow_steps:
-                    step_number = max(s.step_number for s in db_kit.current_version.workflow_steps) + 1
+                    step_number = (
+                        max(
+                            s.step_number for s in db_kit.current_version.workflow_steps
+                        )
+                        + 1
+                    )
 
                 version = await version_repo.create(
                     kit_id=db_kit.id,
@@ -681,40 +781,46 @@ async def add_step(
                 if db_kit.current_version:
                     resources_to_add = []
                     for r in db_kit.current_version.resources:
-                        resources_to_add.append({
-                            "version_id": version.id,
-                            "resource_number": r.resource_number,
-                            "filename": r.filename,
-                            "storage_path": r.storage_path,
-                            "mime_type": r.mime_type,
-                            "extracted_text": r.extracted_text,
-                            "file_size_bytes": r.file_size_bytes,
-                            "is_dynamic": getattr(r, "is_dynamic", False),
-                            "display_name": r.display_name,
-                        })
+                        resources_to_add.append(
+                            {
+                                "version_id": version.id,
+                                "resource_number": r.resource_number,
+                                "filename": r.filename,
+                                "storage_path": r.storage_path,
+                                "mime_type": r.mime_type,
+                                "extracted_text": r.extracted_text,
+                                "file_size_bytes": r.file_size_bytes,
+                                "is_dynamic": getattr(r, "is_dynamic", False),
+                                "display_name": r.display_name,
+                            }
+                        )
                     if resources_to_add:
                         await version_repo.add_resources(resources_to_add)
 
                     steps_to_add = []
                     for s in db_kit.current_version.workflow_steps:
-                        steps_to_add.append({
-                            "version_id": version.id,
-                            "step_number": s.step_number,
-                            "prompt_template": s.prompt_template,
-                            "display_name": s.display_name,
-                        })
+                        steps_to_add.append(
+                            {
+                                "version_id": version.id,
+                                "step_number": s.step_number,
+                                "prompt_template": s.prompt_template,
+                                "display_name": s.display_name,
+                            }
+                        )
                     if steps_to_add:
                         await version_repo.add_workflow_steps(steps_to_add)
 
                     tools_to_add = []
                     for t in db_kit.current_version.tools:
-                        tools_to_add.append({
-                            "version_id": version.id,
-                            "tool_number": t.tool_number,
-                            "tool_name": t.tool_name,
-                            "display_name": t.display_name,
-                            "configuration": t.configuration,
-                        })
+                        tools_to_add.append(
+                            {
+                                "version_id": version.id,
+                                "tool_number": t.tool_number,
+                                "tool_name": t.tool_name,
+                                "display_name": t.display_name,
+                                "configuration": t.configuration,
+                            }
+                        )
                     if tools_to_add:
                         await version_repo.add_tools(tools_to_add)
 
@@ -728,12 +834,16 @@ async def add_step(
             return {"ok": True}
 
         except Exception as e:
-            return JSONResponse({"ok": False, "error": f"Error adding step: {e}"}, status_code=500)
+            return JSONResponse(
+                {"ok": False, "error": f"Error adding step: {e}"}, status_code=500
+            )
     else:
         try:
             kit_path = Path("reasoning_kits") / slug
             if not kit_path.exists():
-                return JSONResponse({"ok": False, "error": f"Kit '{slug}' not found."}, status_code=404)
+                return JSONResponse(
+                    {"ok": False, "error": f"Kit '{slug}' not found."}, status_code=404
+                )
 
             existing = list(kit_path.glob("instruction_*.txt"))
             numbers = []
@@ -747,7 +857,9 @@ async def add_step(
             dest.write_text(prompt)
             return {"ok": True}
         except Exception as e:
-            return JSONResponse({"ok": False, "error": f"Error adding step: {e}"}, status_code=500)
+            return JSONResponse(
+                {"ok": False, "error": f"Error adding step: {e}"}, status_code=500
+            )
 
 
 @router.post("/kits/{slug}/steps/{number}/update")
@@ -765,7 +877,10 @@ async def update_step(
 
     # Handle both FormData and JSON for smooth frontend migration
     content_type = request.headers.get("content-type", "")
-    if "multipart/form-data" in content_type or "application/x-www-form-urlencoded" in content_type:
+    if (
+        "multipart/form-data" in content_type
+        or "application/x-www-form-urlencoded" in content_type
+    ):
         form = await request.form()
         prompt = form.get("prompt", "")
         display_name = form.get("display_name", "")
@@ -775,10 +890,14 @@ async def update_step(
             prompt = body.get("prompt", "")
             display_name = body.get("display_name", "")
         except Exception:
-            return JSONResponse({"ok": False, "error": "Invalid request body"}, status_code=400)
+            return JSONResponse(
+                {"ok": False, "error": "Invalid request body"}, status_code=400
+            )
 
     if not prompt:
-        return JSONResponse({"ok": False, "error": "Prompt is required."}, status_code=400)
+        return JSONResponse(
+            {"ok": False, "error": "Prompt is required."}, status_code=400
+        )
 
     from ...db.config import get_config
 
@@ -797,7 +916,10 @@ async def update_step(
                 db_kit = await kit_repo.get_by_slug(slug)
 
                 if not db_kit or not db_kit.current_version:
-                    return JSONResponse({"ok": False, "error": "Kit or version not found."}, status_code=404)
+                    return JSONResponse(
+                        {"ok": False, "error": "Kit or version not found."},
+                        status_code=404,
+                    )
 
                 own_err = _check_kit_ownership(db_kit, user)
                 if own_err:
@@ -810,17 +932,19 @@ async def update_step(
 
                 resources_to_add = []
                 for r in db_kit.current_version.resources:
-                    resources_to_add.append({
-                        "version_id": version.id,
-                        "resource_number": r.resource_number,
-                        "filename": r.filename,
-                        "storage_path": r.storage_path,
-                        "mime_type": r.mime_type,
-                        "extracted_text": r.extracted_text,
-                        "file_size_bytes": r.file_size_bytes,
-                        "is_dynamic": getattr(r, "is_dynamic", False),
-                        "display_name": r.display_name,
-                    })
+                    resources_to_add.append(
+                        {
+                            "version_id": version.id,
+                            "resource_number": r.resource_number,
+                            "filename": r.filename,
+                            "storage_path": r.storage_path,
+                            "mime_type": r.mime_type,
+                            "extracted_text": r.extracted_text,
+                            "file_size_bytes": r.file_size_bytes,
+                            "is_dynamic": getattr(r, "is_dynamic", False),
+                            "display_name": r.display_name,
+                        }
+                    )
                 if resources_to_add:
                     await version_repo.add_resources(resources_to_add)
 
@@ -832,24 +956,28 @@ async def update_step(
                         if s.step_number == number
                         else s.display_name
                     )
-                    steps_to_add.append({
-                        "version_id": version.id,
-                        "step_number": s.step_number,
-                        "prompt_template": template,
-                        "display_name": step_display,
-                    })
+                    steps_to_add.append(
+                        {
+                            "version_id": version.id,
+                            "step_number": s.step_number,
+                            "prompt_template": template,
+                            "display_name": step_display,
+                        }
+                    )
                 if steps_to_add:
                     await version_repo.add_workflow_steps(steps_to_add)
 
                 tools_to_add = []
                 for t in db_kit.current_version.tools:
-                    tools_to_add.append({
-                        "version_id": version.id,
-                        "tool_number": t.tool_number,
-                        "tool_name": t.tool_name,
-                        "display_name": t.display_name,
-                        "configuration": t.configuration,
-                    })
+                    tools_to_add.append(
+                        {
+                            "version_id": version.id,
+                            "tool_number": t.tool_number,
+                            "tool_name": t.tool_name,
+                            "display_name": t.display_name,
+                            "configuration": t.configuration,
+                        }
+                    )
                 if tools_to_add:
                     await version_repo.add_tools(tools_to_add)
 
@@ -862,7 +990,9 @@ async def update_step(
             step_file.write_text(prompt)
             return {"ok": True}
         else:
-            return JSONResponse({"ok": False, "error": f"Step {number} not found."}, status_code=404)
+            return JSONResponse(
+                {"ok": False, "error": f"Step {number} not found."}, status_code=404
+            )
 
 
 @router.delete("/kits/{slug}/steps/{number}")
@@ -886,7 +1016,9 @@ async def delete_step(
             step_file.unlink()
             return {"ok": True}
         else:
-            return JSONResponse({"ok": False, "error": f"Step {number} not found."}, status_code=404)
+            return JSONResponse(
+                {"ok": False, "error": f"Step {number} not found."}, status_code=404
+            )
     else:
         try:
             from ...db import (
@@ -901,7 +1033,10 @@ async def delete_step(
                 db_kit = await kit_repo.get_by_slug(slug)
 
                 if not db_kit or not db_kit.current_version:
-                    return JSONResponse({"ok": False, "error": "Kit or version not found."}, status_code=404)
+                    return JSONResponse(
+                        {"ok": False, "error": "Kit or version not found."},
+                        status_code=404,
+                    )
 
                 own_err = _check_kit_ownership(db_kit, user)
                 if own_err:
@@ -914,41 +1049,47 @@ async def delete_step(
 
                 resources_to_add = []
                 for r in db_kit.current_version.resources:
-                    resources_to_add.append({
-                        "version_id": version.id,
-                        "resource_number": r.resource_number,
-                        "filename": r.filename,
-                        "storage_path": r.storage_path,
-                        "mime_type": r.mime_type,
-                        "extracted_text": r.extracted_text,
-                        "file_size_bytes": r.file_size_bytes,
-                        "is_dynamic": getattr(r, "is_dynamic", False),
-                        "display_name": r.display_name,
-                    })
+                    resources_to_add.append(
+                        {
+                            "version_id": version.id,
+                            "resource_number": r.resource_number,
+                            "filename": r.filename,
+                            "storage_path": r.storage_path,
+                            "mime_type": r.mime_type,
+                            "extracted_text": r.extracted_text,
+                            "file_size_bytes": r.file_size_bytes,
+                            "is_dynamic": getattr(r, "is_dynamic", False),
+                            "display_name": r.display_name,
+                        }
+                    )
                 if resources_to_add:
                     await version_repo.add_resources(resources_to_add)
 
                 steps_to_add = []
                 for s in db_kit.current_version.workflow_steps:
                     if s.step_number != number:
-                        steps_to_add.append({
-                            "version_id": version.id,
-                            "step_number": s.step_number,
-                            "prompt_template": s.prompt_template,
-                            "display_name": s.display_name,
-                        })
+                        steps_to_add.append(
+                            {
+                                "version_id": version.id,
+                                "step_number": s.step_number,
+                                "prompt_template": s.prompt_template,
+                                "display_name": s.display_name,
+                            }
+                        )
                 if steps_to_add:
                     await version_repo.add_workflow_steps(steps_to_add)
 
                 tools_to_add = []
                 for t in db_kit.current_version.tools:
-                    tools_to_add.append({
-                        "version_id": version.id,
-                        "tool_number": t.tool_number,
-                        "tool_name": t.tool_name,
-                        "display_name": t.display_name,
-                        "configuration": t.configuration,
-                    })
+                    tools_to_add.append(
+                        {
+                            "version_id": version.id,
+                            "tool_number": t.tool_number,
+                            "tool_name": t.tool_name,
+                            "display_name": t.display_name,
+                            "configuration": t.configuration,
+                        }
+                    )
                 if tools_to_add:
                     await version_repo.add_tools(tools_to_add)
 
@@ -971,38 +1112,38 @@ async def list_available_tools(
     from ...tools import list_tools
 
     tools = list_tools()
-    
+
     active_mcp_servers = set()
     if user and "id" in user:
         try:
             from ...db import get_async_session
             from ...db.models import McpServerConfig
             from sqlalchemy import select
-            
+
             async with get_async_session() as session:
                 stmt = select(McpServerConfig.server_name).where(
                     McpServerConfig.user_id == user["id"],
-                    McpServerConfig.is_active == True
+                    McpServerConfig.is_active == True,
                 )
                 result = await session.execute(stmt)
                 active_mcp_servers = set(result.scalars().all())
         except Exception:
             pass
-            
+
     filtered_tools = []
     for t in tools:
         source = getattr(t, "source", "builtin")
         if source == "builtin" or source in active_mcp_servers:
-            filtered_tools.append({
-                "name": t.name,
-                "description": t.description,
-                "parameters": t.parameters,
-                "source": source,
-            })
+            filtered_tools.append(
+                {
+                    "name": t.name,
+                    "description": t.description,
+                    "parameters": t.parameters,
+                    "source": source,
+                }
+            )
 
-    return {
-        "tools": filtered_tools
-    }
+    return {"tools": filtered_tools}
 
 
 @router.post("/kits/{slug}/tools")
@@ -1019,14 +1160,18 @@ async def add_tool(
     try:
         body = await request.json()
     except Exception:
-        return JSONResponse({"ok": False, "error": "Invalid JSON body"}, status_code=400)
+        return JSONResponse(
+            {"ok": False, "error": "Invalid JSON body"}, status_code=400
+        )
 
     tool_name = body.get("tool_name", "")
     display_name = body.get("display_name", "")
     configuration = body.get("configuration")
 
     if not tool_name:
-        return JSONResponse({"ok": False, "error": "tool_name is required."}, status_code=400)
+        return JSONResponse(
+            {"ok": False, "error": "tool_name is required."}, status_code=400
+        )
 
     # Verify tool exists in global registry
     from ...tools import get_tool as get_global_tool
@@ -1054,7 +1199,10 @@ async def add_tool(
                 db_kit = await kit_repo.get_by_slug(slug)
 
                 if not db_kit:
-                    return JSONResponse({"ok": False, "error": f"Kit '{slug}' not found."}, status_code=404)
+                    return JSONResponse(
+                        {"ok": False, "error": f"Kit '{slug}' not found."},
+                        status_code=404,
+                    )
 
                 own_err = _check_kit_ownership(db_kit, user)
                 if own_err:
@@ -1062,7 +1210,9 @@ async def add_tool(
 
                 tool_number = 1
                 if db_kit.current_version and db_kit.current_version.tools:
-                    tool_number = max(t.tool_number for t in db_kit.current_version.tools) + 1
+                    tool_number = (
+                        max(t.tool_number for t in db_kit.current_version.tools) + 1
+                    )
 
                 version = await version_repo.create(
                     kit_id=db_kit.id,
@@ -1072,40 +1222,46 @@ async def add_tool(
                 if db_kit.current_version:
                     resources_to_add = []
                     for r in db_kit.current_version.resources:
-                        resources_to_add.append({
-                            "version_id": version.id,
-                            "resource_number": r.resource_number,
-                            "filename": r.filename,
-                            "storage_path": r.storage_path,
-                            "mime_type": r.mime_type,
-                            "extracted_text": r.extracted_text,
-                            "file_size_bytes": r.file_size_bytes,
-                            "is_dynamic": getattr(r, "is_dynamic", False),
-                            "display_name": r.display_name,
-                        })
+                        resources_to_add.append(
+                            {
+                                "version_id": version.id,
+                                "resource_number": r.resource_number,
+                                "filename": r.filename,
+                                "storage_path": r.storage_path,
+                                "mime_type": r.mime_type,
+                                "extracted_text": r.extracted_text,
+                                "file_size_bytes": r.file_size_bytes,
+                                "is_dynamic": getattr(r, "is_dynamic", False),
+                                "display_name": r.display_name,
+                            }
+                        )
                     if resources_to_add:
                         await version_repo.add_resources(resources_to_add)
 
                     steps_to_add = []
                     for s in db_kit.current_version.workflow_steps:
-                        steps_to_add.append({
-                            "version_id": version.id,
-                            "step_number": s.step_number,
-                            "prompt_template": s.prompt_template,
-                            "display_name": s.display_name,
-                        })
+                        steps_to_add.append(
+                            {
+                                "version_id": version.id,
+                                "step_number": s.step_number,
+                                "prompt_template": s.prompt_template,
+                                "display_name": s.display_name,
+                            }
+                        )
                     if steps_to_add:
                         await version_repo.add_workflow_steps(steps_to_add)
 
                     tools_to_add = []
                     for t in db_kit.current_version.tools:
-                        tools_to_add.append({
-                            "version_id": version.id,
-                            "tool_number": t.tool_number,
-                            "tool_name": t.tool_name,
-                            "display_name": t.display_name,
-                            "configuration": t.configuration,
-                        })
+                        tools_to_add.append(
+                            {
+                                "version_id": version.id,
+                                "tool_number": t.tool_number,
+                                "tool_name": t.tool_name,
+                                "display_name": t.display_name,
+                                "configuration": t.configuration,
+                            }
+                        )
                     if tools_to_add:
                         await version_repo.add_tools(tools_to_add)
 
@@ -1120,9 +1276,13 @@ async def add_tool(
             return {"ok": True}
 
         except Exception as e:
-            return JSONResponse({"ok": False, "error": f"Error adding tool: {e}"}, status_code=500)
+            return JSONResponse(
+                {"ok": False, "error": f"Error adding tool: {e}"}, status_code=500
+            )
 
-    return JSONResponse({"ok": False, "error": "Database not configured"}, status_code=500)
+    return JSONResponse(
+        {"ok": False, "error": "Database not configured"}, status_code=500
+    )
 
 
 @router.post("/kits/{slug}/tools/{number}/update")
@@ -1140,7 +1300,9 @@ async def update_tool(
     try:
         body = await request.json()
     except Exception:
-        return JSONResponse({"ok": False, "error": "Invalid JSON body"}, status_code=400)
+        return JSONResponse(
+            {"ok": False, "error": "Invalid JSON body"}, status_code=400
+        )
 
     display_name = body.get("display_name")
     configuration = body.get("configuration")
@@ -1162,7 +1324,10 @@ async def update_tool(
                 db_kit = await kit_repo.get_by_slug(slug)
 
                 if not db_kit or not db_kit.current_version:
-                    return JSONResponse({"ok": False, "error": "Kit or version not found."}, status_code=404)
+                    return JSONResponse(
+                        {"ok": False, "error": "Kit or version not found."},
+                        status_code=404,
+                    )
 
                 own_err = _check_kit_ownership(db_kit, user)
                 if own_err:
@@ -1175,42 +1340,56 @@ async def update_tool(
 
                 resources_to_add = []
                 for r in db_kit.current_version.resources:
-                    resources_to_add.append({
-                        "version_id": version.id,
-                        "resource_number": r.resource_number,
-                        "filename": r.filename,
-                        "storage_path": r.storage_path,
-                        "mime_type": r.mime_type,
-                        "extracted_text": r.extracted_text,
-                        "file_size_bytes": r.file_size_bytes,
-                        "is_dynamic": getattr(r, "is_dynamic", False),
-                        "display_name": r.display_name,
-                    })
+                    resources_to_add.append(
+                        {
+                            "version_id": version.id,
+                            "resource_number": r.resource_number,
+                            "filename": r.filename,
+                            "storage_path": r.storage_path,
+                            "mime_type": r.mime_type,
+                            "extracted_text": r.extracted_text,
+                            "file_size_bytes": r.file_size_bytes,
+                            "is_dynamic": getattr(r, "is_dynamic", False),
+                            "display_name": r.display_name,
+                        }
+                    )
                 if resources_to_add:
                     await version_repo.add_resources(resources_to_add)
 
                 steps_to_add = []
                 for s in db_kit.current_version.workflow_steps:
-                    steps_to_add.append({
-                        "version_id": version.id,
-                        "step_number": s.step_number,
-                        "prompt_template": s.prompt_template,
-                        "display_name": s.display_name,
-                    })
+                    steps_to_add.append(
+                        {
+                            "version_id": version.id,
+                            "step_number": s.step_number,
+                            "prompt_template": s.prompt_template,
+                            "display_name": s.display_name,
+                        }
+                    )
                 if steps_to_add:
                     await version_repo.add_workflow_steps(steps_to_add)
 
                 tools_to_add = []
                 for t in db_kit.current_version.tools:
-                    t_display = display_name.strip() if t.tool_number == number and display_name is not None else t.display_name
-                    t_config = configuration if t.tool_number == number and configuration is not None else t.configuration
-                    tools_to_add.append({
-                        "version_id": version.id,
-                        "tool_number": t.tool_number,
-                        "tool_name": t.tool_name,
-                        "display_name": t_display,
-                        "configuration": t_config,
-                    })
+                    t_display = (
+                        display_name.strip()
+                        if t.tool_number == number and display_name is not None
+                        else t.display_name
+                    )
+                    t_config = (
+                        configuration
+                        if t.tool_number == number and configuration is not None
+                        else t.configuration
+                    )
+                    tools_to_add.append(
+                        {
+                            "version_id": version.id,
+                            "tool_number": t.tool_number,
+                            "tool_name": t.tool_name,
+                            "display_name": t_display,
+                            "configuration": t_config,
+                        }
+                    )
                 if tools_to_add:
                     await version_repo.add_tools(tools_to_add)
 
@@ -1218,7 +1397,9 @@ async def update_tool(
         except Exception as e:
             return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
 
-    return JSONResponse({"ok": False, "error": "Database not configured"}, status_code=500)
+    return JSONResponse(
+        {"ok": False, "error": "Database not configured"}, status_code=500
+    )
 
 
 @router.delete("/kits/{slug}/tools/{number}")
@@ -1237,7 +1418,9 @@ async def delete_tool(
 
     config = get_config()
     if not config.is_database_configured:
-        return JSONResponse({"ok": False, "error": "Database not configured"}, status_code=500)
+        return JSONResponse(
+            {"ok": False, "error": "Database not configured"}, status_code=500
+        )
 
     try:
         from ...db import (
@@ -1252,7 +1435,9 @@ async def delete_tool(
             db_kit = await kit_repo.get_by_slug(slug)
 
             if not db_kit or not db_kit.current_version:
-                return JSONResponse({"ok": False, "error": "Kit or version not found."}, status_code=404)
+                return JSONResponse(
+                    {"ok": False, "error": "Kit or version not found."}, status_code=404
+                )
 
             own_err = _check_kit_ownership(db_kit, user)
             if own_err:
@@ -1265,41 +1450,47 @@ async def delete_tool(
 
             resources_to_add = []
             for r in db_kit.current_version.resources:
-                resources_to_add.append({
-                    "version_id": version.id,
-                    "resource_number": r.resource_number,
-                    "filename": r.filename,
-                    "storage_path": r.storage_path,
-                    "mime_type": r.mime_type,
-                    "extracted_text": r.extracted_text,
-                    "file_size_bytes": r.file_size_bytes,
-                    "is_dynamic": getattr(r, "is_dynamic", False),
-                    "display_name": r.display_name,
-                })
+                resources_to_add.append(
+                    {
+                        "version_id": version.id,
+                        "resource_number": r.resource_number,
+                        "filename": r.filename,
+                        "storage_path": r.storage_path,
+                        "mime_type": r.mime_type,
+                        "extracted_text": r.extracted_text,
+                        "file_size_bytes": r.file_size_bytes,
+                        "is_dynamic": getattr(r, "is_dynamic", False),
+                        "display_name": r.display_name,
+                    }
+                )
             if resources_to_add:
                 await version_repo.add_resources(resources_to_add)
 
             steps_to_add = []
             for s in db_kit.current_version.workflow_steps:
-                steps_to_add.append({
-                    "version_id": version.id,
-                    "step_number": s.step_number,
-                    "prompt_template": s.prompt_template,
-                    "display_name": s.display_name,
-                })
+                steps_to_add.append(
+                    {
+                        "version_id": version.id,
+                        "step_number": s.step_number,
+                        "prompt_template": s.prompt_template,
+                        "display_name": s.display_name,
+                    }
+                )
             if steps_to_add:
                 await version_repo.add_workflow_steps(steps_to_add)
 
             tools_to_add = []
             for t in db_kit.current_version.tools:
                 if t.tool_number != number:
-                    tools_to_add.append({
-                        "version_id": version.id,
-                        "tool_number": t.tool_number,
-                        "tool_name": t.tool_name,
-                        "display_name": t.display_name,
-                        "configuration": t.configuration,
-                    })
+                    tools_to_add.append(
+                        {
+                            "version_id": version.id,
+                            "tool_number": t.tool_number,
+                            "tool_name": t.tool_name,
+                            "display_name": t.display_name,
+                            "configuration": t.configuration,
+                        }
+                    )
             if tools_to_add:
                 await version_repo.add_tools(tools_to_add)
 
@@ -1337,7 +1528,7 @@ async def start_execution(
 
     # Parse config
     content_type = request.headers.get("content-type", "")
-    
+
     evaluate = False
     evaluation_mode = "transparent"
     dynamic_resources = {}
@@ -1346,12 +1537,12 @@ async def start_execution(
         form = await request.form()
         evaluate = str(form.get("evaluate", "")).lower() == "true"
         evaluation_mode = str(form.get("evaluation_mode", "transparent"))
-        
+
         try:
             from ...db import detect_mime_type_from_filename, extract_text_from_bytes
         except ImportError:
             pass  # Fallback logic if needed, but db should be available
-            
+
         for key, value in form.multi_items():
             if key.startswith("dynamic_resource_text_"):
                 res_id = key.replace("dynamic_resource_text_", "")
@@ -1361,7 +1552,11 @@ async def start_execution(
                 if hasattr(value, "filename") and value.filename:
                     file_bytes = await value.read()
                     try:
-                        from ...db import detect_mime_type_from_filename, extract_text_from_bytes
+                        from ...db import (
+                            detect_mime_type_from_filename,
+                            extract_text_from_bytes,
+                        )
+
                         mime_type = detect_mime_type_from_filename(value.filename)
                         extracted = extract_text_from_bytes(file_bytes, mime_type)
                         dynamic_resources[res_id] = extracted
@@ -1442,7 +1637,7 @@ async def start_execution(
         "eval_event": asyncio.Event() if evaluate else None,
         "eval_score": None,
         "user_id": user["id"] if user else None,
-        "db_run_id": None, # Will be created in stream
+        "db_run_id": None,  # Will be created in stream
         "resume_outputs": None,
         "resume_step": None,
     }
@@ -1484,13 +1679,13 @@ async def resume_execution(
         async with _get_session() as session:
             repo = ExecutionRepository(session)
             db_run = await repo.get_by_id(UUID(run_id))
-            
+
             if not db_run:
                 return {"error": "Execution run not found."}
-                
+
             if db_run.user_id and user_id and db_run.user_id != user_id:
                 return {"error": "Access denied."}
-                
+
             if db_run.status != "paused":
                 return {"error": f"Cannot resume run with status '{db_run.status}'."}
 
@@ -1503,16 +1698,18 @@ async def resume_execution(
             past_outputs = {}
             for step in db_run.step_executions:
                 # Find output_id for this step in version
-                output_id = f"workflow_{step.step_number}" # fallback
+                output_id = f"workflow_{step.step_number}"  # fallback
                 if db_run.version and db_run.version.workflow_steps:
                     for ws in db_run.version.workflow_steps:
                         if ws.step_number == step.step_number:
                             output_id = ws.output_id
                             break
                 past_outputs[output_id] = step.output_text
-            
+
             # Highest step number done
-            highest_step = max([s.step_number for s in db_run.step_executions], default=0)
+            highest_step = max(
+                [s.step_number for s in db_run.step_executions], default=0
+            )
 
         # We must load the kit matching the exact DB version we are resuming
         loaded = await load_reasoning_kit_from_db(slug, version_id=version_id)
@@ -1532,7 +1729,6 @@ async def resume_execution(
     except Exception:
         pass
 
-
     # Create execution entry
     execution_id = str(_uuid.uuid4())
     _executions[execution_id] = {
@@ -1545,7 +1741,7 @@ async def resume_execution(
         "eval_event": asyncio.Event() if evaluate else None,
         "eval_score": None,
         "user_id": str(user_id) if user_id else None,
-        "db_run_id": UUID(run_id), # Resume flag tells stream not to create new run
+        "db_run_id": UUID(run_id),  # Resume flag tells stream not to create new run
         "resume_outputs": past_outputs,
         "resume_step": highest_step + 1,
     }
@@ -1609,21 +1805,25 @@ async def execute_kit_stream(
                 if step_num < resume_step:
                     step = kit.workflow[step_key]
                     output_text = exec_state["resume_outputs"].get(step.output_id, "")
-                    past_steps.append({
-                        "step": step_num,
-                        "output_id": step.output_id,
-                        "display_name": step.display_name,
-                        "status": "done",
-                        "result": output_text,
-                    })
-        
+                    past_steps.append(
+                        {
+                            "step": step_num,
+                            "output_id": step.output_id,
+                            "display_name": step.display_name,
+                            "status": "done",
+                            "result": output_text,
+                        }
+                    )
+
         yield f"event: start\ndata: {json.dumps({'kit_name': kit.name, 'total_steps': len(kit.workflow), 'past_steps': past_steps})}\n\n"
 
         # Execute step by step
-        from langchain_openai import ChatOpenAI
+        from ...llm_factory import get_llm
         from langchain_core.messages import HumanMessage, ToolMessage
 
-        llm = ChatOpenAI(model=DEFAULT_MODEL, temperature=0)
+        llm = await get_llm(
+            user_id=user["id"] if user else None, model=DEFAULT_MODEL, temperature=0
+        )
         resources = {r.resource_id: r.content for r in kit.resources.values()}
         outputs: dict[str, str] = exec_state.get("resume_outputs") or {}
         resume_step = exec_state.get("resume_step", 1) or 1
@@ -1651,6 +1851,7 @@ async def execute_kit_stream(
                 if persist and db_run_id:
                     try:
                         from ...evaluation import pause_execution_run
+
                         await pause_execution_run(db_run_id)
                     except Exception:
                         pass
@@ -1695,7 +1896,9 @@ async def execute_kit_stream(
                             if tool_def:
                                 try:
                                     user_id = exec_state.get("user_id")
-                                    tool_result = await tool_def.execute(tool_call["args"], user_id=user_id)
+                                    tool_result = await tool_def.execute(
+                                        tool_call["args"], user_id=user_id
+                                    )
                                 except Exception as te:
                                     tool_result = f"Error executing tool: {te}"
                             else:
@@ -1753,6 +1956,7 @@ async def execute_kit_stream(
                     if persist and db_run_id:
                         try:
                             from ...evaluation import pause_execution_run
+
                             await pause_execution_run(db_run_id)
                         except Exception:
                             pass
@@ -1774,6 +1978,7 @@ async def execute_kit_stream(
                                 if persist and db_run_id:
                                     try:
                                         from ...evaluation import pause_execution_run
+
                                         await pause_execution_run(db_run_id)
                                     except Exception:
                                         pass
@@ -1785,7 +1990,7 @@ async def execute_kit_stream(
                                 await asyncio.wait_for(eval_event.wait(), timeout=0.5)
                             except asyncio.TimeoutError:
                                 pass
-                            
+
                             # Timeout checking happens in an outer wrapping try block in a real system,
                             # but for now we'll rely on the client or let it wait indefinitely up to 10 mins
                             # Not implemented here to keep it simple, but would usually maintain a start_time
@@ -1989,8 +2194,12 @@ async def list_executions(
                         "id": str(run.id),
                         "status": run.status,
                         "label": run.label,
-                        "started_at": run.started_at.isoformat() if run.started_at else None,
-                        "completed_at": run.completed_at.isoformat() if run.completed_at else None,
+                        "started_at": run.started_at.isoformat()
+                        if run.started_at
+                        else None,
+                        "completed_at": run.completed_at.isoformat()
+                        if run.completed_at
+                        else None,
                         "storage_mode": run.storage_mode,
                         "total_steps": len(run.step_executions),
                         "error_message": run.error_message,
@@ -2049,14 +2258,18 @@ async def get_execution(
                     {
                         "step_number": step.step_number,
                         "display_name": ws_info.get("display_name"),
-                        "output_id": ws_info.get("output_id", f"workflow_{step.step_number}"),
+                        "output_id": ws_info.get(
+                            "output_id", f"workflow_{step.step_number}"
+                        ),
                         "input_text": step.input_text,
                         "output_text": step.output_text,
                         "evaluation_score": step.evaluation_score,
                         "model_used": step.model_used,
                         "tokens_used": step.tokens_used,
                         "latency_ms": step.latency_ms,
-                        "executed_at": step.executed_at.isoformat() if step.executed_at else None,
+                        "executed_at": step.executed_at.isoformat()
+                        if step.executed_at
+                        else None,
                     }
                 )
 
@@ -2071,7 +2284,9 @@ async def get_execution(
                 "label": run.label,
                 "storage_mode": run.storage_mode,
                 "started_at": run.started_at.isoformat() if run.started_at else None,
-                "completed_at": run.completed_at.isoformat() if run.completed_at else None,
+                "completed_at": run.completed_at.isoformat()
+                if run.completed_at
+                else None,
                 "error_message": run.error_message,
                 "steps": steps,
             }
@@ -2131,16 +2346,24 @@ async def download_execution(
             sorted_steps = sorted(run.step_executions, key=lambda s: s.step_number)
 
             if format == "json":
-                content = _build_json_download(run, kit_name, sorted_steps, step_display_names)
+                content = _build_json_download(
+                    run, kit_name, sorted_steps, step_display_names
+                )
                 media_type = "application/json"
                 ext = "json"
             else:
-                content = _build_markdown_download(run, kit_name, sorted_steps, step_display_names)
+                content = _build_markdown_download(
+                    run, kit_name, sorted_steps, step_display_names
+                )
                 media_type = "text/markdown"
                 ext = "md"
 
             label_slug = run.label.replace(" ", "_").lower() if run.label else ""
-            ts = run.started_at.strftime("%Y%m%d_%H%M%S") if run.started_at else "unknown"
+            ts = (
+                run.started_at.strftime("%Y%m%d_%H%M%S")
+                if run.started_at
+                else "unknown"
+            )
             filename = f"{slug}_{ts}"
             if label_slug:
                 filename += f"_{label_slug}"
@@ -2212,7 +2435,9 @@ def _build_markdown_download(run, kit_name, sorted_steps, step_display_names):
     if run.started_at:
         lines.append(f"**Started:** {run.started_at.strftime('%Y-%m-%d %H:%M:%S UTC')}")
     if run.completed_at:
-        lines.append(f"**Completed:** {run.completed_at.strftime('%Y-%m-%d %H:%M:%S UTC')}")
+        lines.append(
+            f"**Completed:** {run.completed_at.strftime('%Y-%m-%d %H:%M:%S UTC')}"
+        )
     lines.append(f"**Storage Mode:** {run.storage_mode}")
     lines.append("")
 
@@ -2280,7 +2505,9 @@ def _build_json_download(run, kit_name, sorted_steps, step_display_names):
                 "model_used": step.model_used,
                 "tokens_used": step.tokens_used,
                 "latency_ms": step.latency_ms,
-                "executed_at": step.executed_at.isoformat() if step.executed_at else None,
+                "executed_at": step.executed_at.isoformat()
+                if step.executed_at
+                else None,
             }
         )
 
@@ -2320,7 +2547,11 @@ async def list_kits_json(
 
     if config.is_database_configured:
         try:
-            from ...db import BookmarkRepository, ReasoningKitRepository, get_async_session
+            from ...db import (
+                BookmarkRepository,
+                ReasoningKitRepository,
+                get_async_session,
+            )
 
             async with get_async_session() as session:
                 repo = ReasoningKitRepository(session)
@@ -2330,7 +2561,9 @@ async def list_kits_json(
                 bookmarked_ids: set = set()
                 if user:
                     bm_repo = BookmarkRepository(session)
-                    bookmarked_ids = await bm_repo.get_bookmarked_kit_ids(UUID(user["id"]))
+                    bookmarked_ids = await bm_repo.get_bookmarked_kit_ids(
+                        UUID(user["id"])
+                    )
 
                 for kit in db_kits:
                     kits.append(
@@ -2339,8 +2572,12 @@ async def list_kits_json(
                             "name": kit.name,
                             "description": kit.description,
                             "is_public": kit.is_public,
-                            "created_at": kit.created_at.isoformat() if kit.created_at else None,
-                            "updated_at": kit.updated_at.isoformat() if kit.updated_at else None,
+                            "created_at": kit.created_at.isoformat()
+                            if kit.created_at
+                            else None,
+                            "updated_at": kit.updated_at.isoformat()
+                            if kit.updated_at
+                            else None,
                             "owner_id": str(kit.owner_id) if kit.owner_id else None,
                             "is_bookmarked": kit.id in bookmarked_ids,
                         }
@@ -2369,7 +2606,13 @@ async def list_kits_json(
         except Exception:
             pass
 
-    return {"kits": kits}
+    # Cache public kit list for 30 seconds
+    headers = {
+        "Cache-Control": "public, max-age=30",
+        "CDN-Cache-Control": "public, max-age=60",
+        "Vercel-CDN-Cache-Control": "public, max-age=60",
+    }
+    return JSONResponse(content={"kits": kits}, headers=headers)
 
 
 @router.get("/kits/search")
@@ -2389,7 +2632,11 @@ async def search_kits_json(
     if filter == "mine" and user:
         if config.is_database_configured:
             try:
-                from ...db import BookmarkRepository, ReasoningKitRepository, get_async_session
+                from ...db import (
+                    BookmarkRepository,
+                    ReasoningKitRepository,
+                    get_async_session,
+                )
 
                 async with get_async_session() as session:
                     repo = ReasoningKitRepository(session)
@@ -2404,7 +2651,8 @@ async def search_kits_json(
                         )
                         # Keep only owned OR bookmarked kits
                         db_kits = [
-                            k for k in db_kits
+                            k
+                            for k in db_kits
                             if str(k.owner_id) == user["id"] or k.id in bookmarked_ids
                         ]
                     else:
@@ -2428,8 +2676,12 @@ async def search_kits_json(
                                 "name": kit.name,
                                 "description": kit.description,
                                 "is_public": kit.is_public,
-                                "created_at": kit.created_at.isoformat() if kit.created_at else None,
-                                "updated_at": kit.updated_at.isoformat() if kit.updated_at else None,
+                                "created_at": kit.created_at.isoformat()
+                                if kit.created_at
+                                else None,
+                                "updated_at": kit.updated_at.isoformat()
+                                if kit.updated_at
+                                else None,
                                 "owner_id": str(kit.owner_id) if kit.owner_id else None,
                                 "is_bookmarked": kit.id in bookmarked_ids,
                             }
@@ -2440,7 +2692,11 @@ async def search_kits_json(
 
     if config.is_database_configured and q.strip():
         try:
-            from ...db import BookmarkRepository, ReasoningKitRepository, get_async_session
+            from ...db import (
+                BookmarkRepository,
+                ReasoningKitRepository,
+                get_async_session,
+            )
 
             async with get_async_session() as session:
                 repo = ReasoningKitRepository(session)
@@ -2449,7 +2705,9 @@ async def search_kits_json(
                 bookmarked_ids: set = set()
                 if user:
                     bm_repo = BookmarkRepository(session)
-                    bookmarked_ids = await bm_repo.get_bookmarked_kit_ids(UUID(user["id"]))
+                    bookmarked_ids = await bm_repo.get_bookmarked_kit_ids(
+                        UUID(user["id"])
+                    )
 
                 for kit in db_kits:
                     kits.append(
@@ -2458,8 +2716,12 @@ async def search_kits_json(
                             "name": kit.name,
                             "description": kit.description,
                             "is_public": kit.is_public,
-                            "created_at": kit.created_at.isoformat() if kit.created_at else None,
-                            "updated_at": kit.updated_at.isoformat() if kit.updated_at else None,
+                            "created_at": kit.created_at.isoformat()
+                            if kit.created_at
+                            else None,
+                            "updated_at": kit.updated_at.isoformat()
+                            if kit.updated_at
+                            else None,
                             "owner_id": str(kit.owner_id) if kit.owner_id else None,
                             "is_bookmarked": kit.id in bookmarked_ids,
                         }
@@ -2688,7 +2950,9 @@ async def get_kit_detail_json(
                         "slug": db_kit.slug,
                         "description": db_kit.description,
                         "is_public": db_kit.is_public,
-                        "created_at": db_kit.created_at.isoformat() if db_kit.created_at else None,
+                        "created_at": db_kit.created_at.isoformat()
+                        if db_kit.created_at
+                        else None,
                         "version_number": version.version_number if version else None,
                     }
                     source = "database"
@@ -2699,7 +2963,9 @@ async def get_kit_detail_json(
                     )
 
                     if version:
-                        for r in sorted(version.resources, key=lambda x: x.resource_number):
+                        for r in sorted(
+                            version.resources, key=lambda x: x.resource_number
+                        ):
                             resources.append(
                                 {
                                     "number": r.resource_number,
@@ -2712,7 +2978,9 @@ async def get_kit_detail_json(
                                     "mime_type": r.mime_type,
                                 }
                             )
-                        for s in sorted(version.workflow_steps, key=lambda x: x.step_number):
+                        for s in sorted(
+                            version.workflow_steps, key=lambda x: x.step_number
+                        ):
                             steps.append(
                                 {
                                     "number": s.step_number,
@@ -2722,6 +2990,7 @@ async def get_kit_detail_json(
                                 }
                             )
                         from ...tools import get_tool
+
                         for t in sorted(version.tools, key=lambda x: x.tool_number):
                             tool_def = get_tool(t.tool_name)
                             tools.append(
@@ -2731,7 +3000,9 @@ async def get_kit_detail_json(
                                     "tool_id": t.tool_id,
                                     "display_name": t.display_name,
                                     "configuration": t.configuration,
-                                    "source": getattr(tool_def, "source", "builtin") if tool_def else "unknown",
+                                    "source": getattr(tool_def, "source", "builtin")
+                                    if tool_def
+                                    else "unknown",
                                 }
                             )
         except Exception:
@@ -2782,7 +3053,7 @@ async def get_kit_detail_json(
         except Exception:
             return {"error": f"Kit '{slug}' not found."}
 
-    return {
+    response_data = {
         "kit": kit_data,
         "resources": resources,
         "steps": steps,
@@ -2791,6 +3062,23 @@ async def get_kit_detail_json(
         "is_owner": is_owner,
     }
 
+    # Cache kit details - longer cache for non-owners (public kits)
+    if is_owner:
+        # Private kit - minimal caching
+        headers = {"Cache-Control": "private, max-age=5"}
+    else:
+        # Public kit - can be cached longer
+        headers = {
+            "Cache-Control": "public, max-age=60",
+            "CDN-Cache-Control": "public, max-age=300",
+            "Vercel-CDN-Cache-Control": "public, max-age=300",
+        }
+
+    return JSONResponse(content=response_data, headers=headers)
+
+
+# ---------------------------------------------------------------------------
+# MCP Config (Per-User Credentials)
 # ---------------------------------------------------------------------------
 # MCP Config (Per-User Credentials)
 # ---------------------------------------------------------------------------
@@ -2800,8 +3088,11 @@ async def get_kit_detail_json(
 async def get_mcp_configs(user: dict | None = Depends(get_optional_user)):
     """Get all user-specific MCP server configurations."""
     from ...db.config import get_config
+
     if not get_config().is_database_configured:
-        return JSONResponse({"ok": False, "error": "Database not configured"}, status_code=500)
+        return JSONResponse(
+            {"ok": False, "error": "Database not configured"}, status_code=500
+        )
 
     try:
         from ...db import get_async_session
@@ -2811,11 +3102,11 @@ async def get_mcp_configs(user: dict | None = Depends(get_optional_user)):
         async with get_async_session() as session:
             if not user or "id" not in user:
                 return {"ok": True, "configs": []}
-                
+
             stmt = select(McpServerConfig).where(McpServerConfig.user_id == user["id"])
             result = await session.execute(stmt)
             configs = result.scalars().all()
-            
+
             return {
                 "ok": True,
                 "configs": [
@@ -2825,38 +3116,47 @@ async def get_mcp_configs(user: dict | None = Depends(get_optional_user)):
                         "is_active": c.is_active,
                     }
                     for c in configs
-                ]
+                ],
             }
     except Exception as e:
-        return JSONResponse({"ok": False, "error": f"Error fetching MCP configs: {e}"}, status_code=500)
+        return JSONResponse(
+            {"ok": False, "error": f"Error fetching MCP configs: {e}"}, status_code=500
+        )
 
 
 @router.put("/mcp/config/{server_name}")
-async def update_mcp_config(request: Request, server_name: str, user: dict | None = Depends(get_optional_user)):
+async def update_mcp_config(
+    request: Request, server_name: str, user: dict | None = Depends(get_optional_user)
+):
     """Update or create a user-specific MCP server configuration."""
     from ...db.config import get_config
+
     if not get_config().is_database_configured:
-        return JSONResponse({"ok": False, "error": "Database not configured"}, status_code=500)
+        return JSONResponse(
+            {"ok": False, "error": "Database not configured"}, status_code=500
+        )
 
     try:
         data = await request.json()
         env_vars = data.get("env_vars", {})
-        
+
         from ...db import get_async_session
         from ...db.models import McpServerConfig
         from sqlalchemy import select
-        
+
         async with get_async_session() as session:
             if not user or "id" not in user:
-                return JSONResponse({"ok": False, "error": "Unauthorized"}, status_code=401)
-                
+                return JSONResponse(
+                    {"ok": False, "error": "Unauthorized"}, status_code=401
+                )
+
             stmt = select(McpServerConfig).where(
                 McpServerConfig.user_id == user["id"],
-                McpServerConfig.server_name == server_name
+                McpServerConfig.server_name == server_name,
             )
             result = await session.execute(stmt)
             config = result.scalar_one_or_none()
-            
+
             if config:
                 config.env_vars = env_vars
                 if "is_active" in data:
@@ -2866,50 +3166,178 @@ async def update_mcp_config(request: Request, server_name: str, user: dict | Non
                     user_id=user["id"],
                     server_name=server_name,
                     env_vars=env_vars,
-                    is_active=data.get("is_active", False)
+                    is_active=data.get("is_active", False),
                 )
                 session.add(config)
-                
+
             await session.commit()
             return {"ok": True}
     except Exception as e:
-        return JSONResponse({"ok": False, "error": f"Error updating MCP config: {e}"}, status_code=500)
+        return JSONResponse(
+            {"ok": False, "error": f"Error updating MCP config: {e}"}, status_code=500
+        )
 
 
 @router.delete("/mcp/config/{server_name}")
-async def delete_mcp_config(server_name: str, user: dict | None = Depends(get_optional_user)):
+async def delete_mcp_config(
+    server_name: str, user: dict | None = Depends(get_optional_user)
+):
     """Delete a user-specific MCP server configuration."""
     from ...db.config import get_config
+
     if not get_config().is_database_configured:
-        return JSONResponse({"ok": False, "error": "Database not configured"}, status_code=500)
+        return JSONResponse(
+            {"ok": False, "error": "Database not configured"}, status_code=500
+        )
 
     try:
         from ...db import get_async_session
         from ...db.models import McpServerConfig
         from sqlalchemy import select
-        
+
         async with get_async_session() as session:
             if not user or "id" not in user:
-                return JSONResponse({"ok": False, "error": "Unauthorized"}, status_code=401)
-                
+                return JSONResponse(
+                    {"ok": False, "error": "Unauthorized"}, status_code=401
+                )
+
             stmt = select(McpServerConfig).where(
                 McpServerConfig.user_id == user["id"],
-                McpServerConfig.server_name == server_name
+                McpServerConfig.server_name == server_name,
             )
             result = await session.execute(stmt)
             config = result.scalar_one_or_none()
-            
+
             if config:
                 await session.delete(config)
                 await session.commit()
             return {"ok": True}
     except Exception as e:
-        return JSONResponse({"ok": False, "error": f"Error deleting MCP config: {e}"}, status_code=500)
+        return JSONResponse(
+            {"ok": False, "error": f"Error deleting MCP config: {e}"}, status_code=500
+        )
+
+
+# ---------------------------------------------------------------------------
+# LLM Provider Config (Per-User)
+# ---------------------------------------------------------------------------
+
+
+@router.get("/llm/config")
+async def get_llm_configs(user: dict | None = Depends(get_optional_user)):
+    """Get all user-specific LLM provider configurations."""
+    from ...db.config import get_config
+
+    if not get_config().is_database_configured:
+        return JSONResponse(
+            {"ok": False, "error": "Database not configured"}, status_code=500
+        )
+
+    try:
+        from ...db import get_async_session
+        from ...db.models import LlmProviderConfig
+        from sqlalchemy import select
+
+        async with get_async_session() as session:
+            if not user or "id" not in user:
+                return {"ok": True, "configs": []}
+
+            stmt = select(LlmProviderConfig).where(
+                LlmProviderConfig.user_id == user["id"]
+            )
+            result = await session.execute(stmt)
+            configs = result.scalars().all()
+
+            return {
+                "ok": True,
+                "configs": [
+                    {
+                        "provider_name": c.provider_name,
+                        "env_vars": c.env_vars,
+                        "selected_model": c.selected_model,
+                        "is_active": c.is_active,
+                    }
+                    for c in configs
+                ],
+            }
+    except Exception as e:
+        return JSONResponse(
+            {"ok": False, "error": f"Error fetching LLM configs: {e}"}, status_code=500
+        )
+
+
+@router.put("/llm/config/{provider_name}")
+async def update_llm_config(
+    request: Request, provider_name: str, user: dict | None = Depends(get_optional_user)
+):
+    """Update or create a user-specific LLM provider configuration."""
+    from ...db.config import get_config
+
+    if not get_config().is_database_configured:
+        return JSONResponse(
+            {"ok": False, "error": "Database not configured"}, status_code=500
+        )
+
+    try:
+        data = await request.json()
+        env_vars = data.get("env_vars", {})
+        selected_model = data.get("selected_model")
+        is_active = data.get("is_active", False)
+
+        from ...db import get_async_session
+        from ...db.models import LlmProviderConfig
+        from sqlalchemy import select, update
+
+        async with get_async_session() as session:
+            if not user or "id" not in user:
+                return JSONResponse(
+                    {"ok": False, "error": "Unauthorized"}, status_code=401
+                )
+
+            # If setting this one to active, we might want to deactivate others
+            # But we leave that to frontend or keep multiple active if supported (usually 1 active at a time)
+            if is_active:
+                await session.execute(
+                    update(LlmProviderConfig)
+                    .where(LlmProviderConfig.user_id == user["id"])
+                    .values(is_active=False)
+                )
+
+            stmt = select(LlmProviderConfig).where(
+                LlmProviderConfig.user_id == user["id"],
+                LlmProviderConfig.provider_name == provider_name,
+            )
+            result = await session.execute(stmt)
+            config = result.scalar_one_or_none()
+
+            if config:
+                config.env_vars = env_vars
+                if "selected_model" in data:
+                    config.selected_model = selected_model
+                if "is_active" in data:
+                    config.is_active = is_active
+            else:
+                config = LlmProviderConfig(
+                    user_id=user["id"],
+                    provider_name=provider_name,
+                    env_vars=env_vars,
+                    selected_model=selected_model,
+                    is_active=is_active,
+                )
+                session.add(config)
+
+            await session.commit()
+            return {"ok": True}
+    except Exception as e:
+        return JSONResponse(
+            {"ok": False, "error": f"Error updating LLM config: {e}"}, status_code=500
+        )
 
 
 # =============================================================================
 # DOCUMENTATION
 # =============================================================================
+
 
 @router.get("/docs")
 async def list_docs():
@@ -2917,11 +3345,11 @@ async def list_docs():
     docs_dir = Path("docs")
     if not docs_dir.exists():
         return {"docs": []}
-        
+
     docs = []
     for file_path in docs_dir.rglob("*.md"):
         rel_path = file_path.relative_to(docs_dir)
-        
+
         # Try to extract the first h1 header for the title
         title = rel_path.stem.replace("_", " ").title()
         try:
@@ -2932,18 +3360,17 @@ async def list_docs():
                     break
         except Exception:
             pass
-            
-        docs.append({
-            "path": str(rel_path),
-            "slug": str(rel_path.with_suffix("")),
-            "title": title,
-        })
-        
+
+        docs.append(
+            {
+                "path": str(rel_path),
+                "slug": str(rel_path.with_suffix("")),
+                "title": title,
+            }
+        )
+
     # Sort docs: README first, then alphabetically
-    docs.sort(key=lambda x: (
-        0 if x["slug"] == "README" else 1,
-        x["title"]
-    ))
+    docs.sort(key=lambda x: (0 if x["slug"] == "README" else 1, x["title"]))
     return {"docs": docs}
 
 
@@ -2952,13 +3379,17 @@ async def get_doc(slug: str):
     """Get the raw markdown content of a documentation file."""
     docs_dir = Path("docs")
     file_path = docs_dir / f"{slug}.md"
-    
+
     if not file_path.exists() or not file_path.is_file():
         # Prevent directory traversal attacks
-        return JSONResponse({"ok": False, "error": "Document not found"}, status_code=404)
-        
+        return JSONResponse(
+            {"ok": False, "error": "Document not found"}, status_code=404
+        )
+
     try:
         content = file_path.read_text(encoding="utf-8")
         return {"content": content}
     except Exception as e:
-        return JSONResponse({"ok": False, "error": f"Error reading document: {e}"}, status_code=500)
+        return JSONResponse(
+            {"ok": False, "error": f"Error reading document: {e}"}, status_code=500
+        )

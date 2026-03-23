@@ -216,16 +216,16 @@ function DocViewer({ slug }: { slug: string }) {
     }
 
     return (
-        <div className="prose prose-slate max-w-none dark:prose-invert prose-code:before:content-none prose-code:after:content-none">
-            <ReactMarkdown 
+        <div className="prose prose-slate max-w-none prose-code:before:content-none prose-code:after:content-none">
+            <ReactMarkdown
                 remarkPlugins={[remarkGfm]}
                 components={{
-                    h1: ({node, ...props}) => <h1 className="!text-4xl !font-extrabold !tracking-tight text-black dark:text-white !mt-16 !mb-10 pb-2" {...props} />,
-                    h2: ({node, ...props}) => <h2 className="!text-3xl !font-bold tracking-tight text-black dark:text-white !mt-14 !mb-8" {...props} />,
-                    h3: ({node, ...props}) => <h3 className="!text-2xl !font-semibold tracking-tight text-black dark:text-white !mt-12 !mb-6" {...props} />,
-                    p: ({node, ...props}) => <p className="leading-8 text-foreground dark:text-slate-300 !my-6 text-lg" {...props} />,
-                    ul: ({node, ...props}) => <ul className="list-disc pl-8 !my-6 space-y-3 text-lg text-foreground dark:text-slate-300" {...props} />,
-                    ol: ({node, ...props}) => <ol className="list-decimal pl-8 !my-6 space-y-3 text-lg text-foreground dark:text-slate-300" {...props} />,
+                    h1: ({node, ...props}) => <h1 className="!text-4xl !font-extrabold !tracking-tight text-black !mt-16 !mb-10 pb-2" {...props} />,
+                    h2: ({node, ...props}) => <h2 className="!text-3xl !font-bold tracking-tight text-black !mt-14 !mb-8" {...props} />,
+                    h3: ({node, ...props}) => <h3 className="!text-2xl !font-semibold tracking-tight text-black !mt-12 !mb-6" {...props} />,
+                    p: ({node, ...props}) => <p className="leading-8 text-foreground !my-6 text-lg" {...props} />,
+                    ul: ({node, ...props}) => <ul className="list-disc pl-8 !my-6 space-y-3 text-lg text-foreground" {...props} />,
+                    ol: ({node, ...props}) => <ol className="list-decimal pl-8 !my-6 space-y-3 text-lg text-foreground" {...props} />,
                     li: ({node, ...props}) => <li className="leading-8" {...props} />,
                     table: ({ node, ...props }) => (
                         <div className="my-8 w-full overflow-y-auto">
@@ -233,10 +233,10 @@ function DocViewer({ slug }: { slug: string }) {
                         </div>
                     ),
                     th: ({ node, ...props }) => (
-                        <th className="border-b-2 border-slate-200 dark:border-slate-800 px-4 py-3 font-semibold text-slate-800 dark:text-slate-200" {...props} />
+                        <th className="border-b-2 border-slate-200 px-4 py-3 font-semibold text-slate-800" {...props} />
                     ),
                     td: ({ node, ...props }) => (
-                        <td className="border-b border-slate-100 dark:border-slate-800 px-4 py-3 text-slate-600 dark:text-slate-400" {...props} />
+                        <td className="border-b border-slate-100 px-4 py-3 text-slate-600" {...props} />
                     ),
                     pre: ({ node, children, ...props }: any) => {
                         const extractText = (child: any): string => {

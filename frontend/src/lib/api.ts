@@ -471,3 +471,38 @@ export async function getDocContent(slug: string): Promise<{ content: string }> 
     return handleResponse(res);
 }
 
+
+// ---------------------------------------------------------------------------
+// LLM Provider Configurations
+// ---------------------------------------------------------------------------
+
+export interface LlmConfig {
+    provider_name: string;
+    env_vars: Record<string, string>;
+    selected_model?: string;
+    is_active?: boolean;
+}
+
+export async function getLlmConfigs(): Promise<{ configs: LlmConfig[] }> {
+    const res = await fetch(`${API_BASE}/llm/config`);
+    return handleResponse(res);
+}
+
+export async function updateLlmConfig(
+    provider_name: string,
+    env_vars: Record<string, string>,
+    selected_model?: string,
+    is_active: boolean = false
+): Promise<{ ok: boolean }> {
+    const payload: any = { env_vars, is_active };
+    if (selected_model) payload.selected_model = selected_model;
+
+    const res = await fetch(`${API_BASE}/llm/config/${provider_name}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+    });
+    return handleResponse(res);
+}
+
+

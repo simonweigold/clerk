@@ -1,7 +1,8 @@
-import { useEffect, useState, useRef } from 'react';
+import { useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { listKits, searchKits, toggleBookmark, type Kit } from '../lib/api';
+import { toggleBookmark, type Kit } from '../lib/api';
 import { useAuth } from '../hooks/useAuth';
+import { useKitList, usePrefetchKit } from '../hooks/useKits';
 
 /* ── Icons ─────────────────────────────────────────────────────────────── */
 
@@ -47,22 +48,32 @@ function KitCard({
     kit,
     userId,
     onToggleBookmark,
+    onHover,
 }: {
     kit: Kit;
     userId?: string;
     onToggleBookmark?: (slug: string) => void;
+    onHover?: (slug: string) => void;
 }) {
     const isOwn = userId != null && kit.owner_id === userId;
     const isSaved = !isOwn && kit.is_bookmarked === true;
 
     const handleBookmarkClick = (e: React.MouseEvent) => {
-        e.preventDefault(); // Don't navigate to kit detail
+        e.preventDefault();
         e.stopPropagation();
         onToggleBookmark?.(kit.slug);
     };
 
+    const handleMouseEnter = () => {
+        onHover?.(kit.slug);
+    };
+
     return (
-        <Link to={`/kit/${kit.slug}`} className="card card-hoverable p-5 flex flex-col">
+        <Link 
+            to={`/kit/${kit.slug}`} 
+            className="card card-hoverable p-5 flex flex-col"
+            onMouseEnter={handleMouseEnter}
+        >
             <h3 className="text-lg font-semibold text-foreground mb-1 tracking-tight">
                 {kit.name}
             </h3>
@@ -90,7 +101,6 @@ function KitCard({
                     <span className="badge badge-primary">v{kit.version_number}</span>
                 )}
 
-                {/* Bookmark button — only for non-owned kits when logged in */}
                 {userId && !isOwn && (
                     <button
                         type="button"
@@ -110,92 +120,44 @@ function KitCard({
 
 export default function HomePage() {
     const { user } = useAuth();
-    const [kits, setKits] = useState<Kit[]>([]);
-    const [loading, setLoading] = useState(true);       // initial full-page load
-    const [refreshing, setRefreshing] = useState(false); // background refresh (subtle)
     const [query, setQuery] = useState('');
     const [filter, setFilter] = useState<'all' | 'mine'>('all');
     const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
-
-    // Client-side cache: avoids re-fetching when toggling back
-    const cacheRef = useRef<Record<string, Kit[]>>({});
-
-    const cacheKey = (q: string, f: string) => `${f}:${q}`;
-
-    // Initial load
-    useEffect(() => {
-        listKits()
-            .then((data) => {
-                setKits(data.kits);
-                cacheRef.current[cacheKey('', 'all')] = data.kits;
-            })
-            .catch(console.error)
-            .finally(() => setLoading(false));
-    }, []);
-
-    // Fetch kits — uses cache if available, otherwise fetches with subtle loading
-    const fetchKits = async (q: string, f: 'all' | 'mine') => {
-        const key = cacheKey(q, f);
-
-        // Instant switch if cached
-        const cached = cacheRef.current[key];
-        if (cached) {
-            setKits(cached);
-            // Still refresh in background (silent, no loading indicator)
-            try {
-                const data = q.trim() || f === 'mine'
-                    ? await searchKits(q, f)
-                    : await listKits();
-                cacheRef.current[key] = data.kits;
-                setKits(data.kits);
-            } catch { /* silent */ }
-            return;
-        }
-
-        // Not cached — show subtle refresh indicator
-        setRefreshing(true);
-        try {
-            const data = q.trim() || f === 'mine'
-                ? await searchKits(q, f)
-                : await listKits();
-            cacheRef.current[key] = data.kits;
-            setKits(data.kits);
-        } catch (err) {
-            console.error(err);
-        } finally {
-            setRefreshing(false);
-        }
-    };
+    
+    // React Query hook for kit list with caching
+    const { data, isLoading, isFetching } = useKitList(query, filter);
+    const kits = data?.kits ?? [];
+    
+    // Prefetch hook for kit details on hover
+    const prefetchKit = usePrefetchKit();
 
     const handleSearch = (value: string) => {
         setQuery(value);
         if (debounceRef.current) clearTimeout(debounceRef.current);
-        debounceRef.current = setTimeout(() => fetchKits(value, filter), 300);
+        debounceRef.current = setTimeout(() => {
+            // Query will automatically refetch due to queryKey change
+        }, 300);
     };
 
     const handleFilterChange = (f: 'all' | 'mine') => {
-        if (f === filter) return; // no-op if already on this tab
+        if (f === filter) return;
         setFilter(f);
-        fetchKits(query, f);
     };
 
     const handleToggleBookmark = async (slug: string) => {
         try {
             const result = await toggleBookmark(slug);
             if (result.ok) {
-                // Update the kit in current list
-                setKits((prev) =>
-                    prev.map((k) =>
-                        k.slug === slug ? { ...k, is_bookmarked: result.is_bookmarked } : k
-                    )
-                );
-                // Invalidate cache so next fetch gets fresh data
-                cacheRef.current = {};
+                // Optimistic update would be better, but for now just refetch
+                window.location.reload();
             }
         } catch (err) {
             console.error(err);
         }
     };
+
+    const loading = isLoading;
+    const refreshing = isFetching && !isLoading;
 
     return (
         <div className="fade-in">
@@ -339,6 +301,7 @@ export default function HomePage() {
                             kit={kit}
                             userId={user?.id}
                             onToggleBookmark={handleToggleBookmark}
+                            onHover={prefetchKit}
                         />
                     ))}
                 </div>

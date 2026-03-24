@@ -75,7 +75,12 @@ Plans:
 4. Repository has at least 3 issues labeled "good first issue" with clear acceptance criteria
 5. Branch protection enforces CI pass requirement; no direct pushes to main allowed
 
-**Plans:** TBD
+**Plans:** 3 plans ready
+
+Plans:
+- [ ] 02-01-PLAN.md — GitHub Templates (issue templates, PR template)
+- [ ] 02-02-PLAN.md — Pre-commit Hooks (Ruff, mypy configuration)
+- [ ] 02-03-PLAN.md — CI and Quality Gates (GitHub Actions, branch protection docs)
 
 ---
 

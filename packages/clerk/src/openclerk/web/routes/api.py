@@ -21,9 +21,7 @@ router = APIRouter()
 def _check_auth(user: dict | None) -> JSONResponse | None:
     """Return a 401 JSON response if user is not logged in, else None."""
     if not user:
-        return JSONResponse(
-            {"ok": False, "error": "Sign in to manage kits."}, status_code=401
-        )
+        return JSONResponse({"ok": False, "error": "Sign in to manage kits."}, status_code=401)
     return None
 
 
@@ -55,22 +53,16 @@ async def create_kit(
     try:
         body = await request.json()
     except Exception:
-        return JSONResponse(
-            {"ok": False, "error": "Invalid JSON body"}, status_code=400
-        )
+        return JSONResponse({"ok": False, "error": "Invalid JSON body"}, status_code=400)
 
     name = body.get("name", "").strip()
     description = body.get("description", "").strip()
     if not name:
-        return JSONResponse(
-            {"ok": False, "error": "Kit name is required."}, status_code=400
-        )
+        return JSONResponse({"ok": False, "error": "Kit name is required."}, status_code=400)
 
     slug = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
     if not slug:
-        return JSONResponse(
-            {"ok": False, "error": "Invalid kit name."}, status_code=400
-        )
+        return JSONResponse({"ok": False, "error": "Invalid kit name."}, status_code=400)
 
     from ...db.config import get_config
 
@@ -105,9 +97,7 @@ async def create_kit(
             return {"ok": True, "slug": slug}
 
         except Exception as e:
-            return JSONResponse(
-                {"ok": False, "error": f"Error creating kit: {e}"}, status_code=500
-            )
+            return JSONResponse({"ok": False, "error": f"Error creating kit: {e}"}, status_code=500)
     else:
         try:
             kit_path = Path("reasoning_kits") / slug
@@ -119,9 +109,7 @@ async def create_kit(
             kit_path.mkdir(parents=True)
             return {"ok": True, "slug": slug}
         except Exception as e:
-            return JSONResponse(
-                {"ok": False, "error": f"Error creating kit: {e}"}, status_code=500
-            )
+            return JSONResponse({"ok": False, "error": f"Error creating kit: {e}"}, status_code=500)
 
 
 @router.put("/kits/{slug}")
@@ -138,9 +126,7 @@ async def update_kit(
     try:
         body = await request.json()
     except Exception:
-        return JSONResponse(
-            {"ok": False, "error": "Invalid JSON body"}, status_code=400
-        )
+        return JSONResponse({"ok": False, "error": "Invalid JSON body"}, status_code=400)
 
     name = body.get("name", "").strip()
     description = body.get("description", "").strip()
@@ -174,13 +160,9 @@ async def update_kit(
 
             return {"ok": True}
         except Exception as e:
-            return JSONResponse(
-                {"ok": False, "error": f"Error updating kit: {e}"}, status_code=500
-            )
+            return JSONResponse({"ok": False, "error": f"Error updating kit: {e}"}, status_code=500)
 
-    return JSONResponse(
-        {"ok": False, "error": "Database not configured"}, status_code=500
-    )
+    return JSONResponse({"ok": False, "error": "Database not configured"}, status_code=500)
 
 
 @router.delete("/kits/{slug}")
@@ -219,9 +201,7 @@ async def delete_kit(
 
             return {"ok": True}
         except Exception as e:
-            return JSONResponse(
-                {"ok": False, "error": f"Error deleting kit: {e}"}, status_code=500
-            )
+            return JSONResponse({"ok": False, "error": f"Error deleting kit: {e}"}, status_code=500)
     else:
         import shutil
 
@@ -230,9 +210,7 @@ async def delete_kit(
             shutil.rmtree(kit_path)
             return {"ok": True}
         else:
-            return JSONResponse(
-                {"ok": False, "error": f"Kit '{slug}' not found."}, status_code=404
-            )
+            return JSONResponse({"ok": False, "error": f"Kit '{slug}' not found."}, status_code=404)
 
 
 # =============================================================================
@@ -305,8 +283,7 @@ async def add_resource(
                 resource_number = 1
                 if db_kit.current_version and db_kit.current_version.resources:
                     resource_number = (
-                        max(r.resource_number for r in db_kit.current_version.resources)
-                        + 1
+                        max(r.resource_number for r in db_kit.current_version.resources) + 1
                     )
 
                 commit_msg = f"Added resource: {filename}"
@@ -351,9 +328,7 @@ async def add_resource(
                 storage = StorageService(use_service_key=True)
                 import tempfile
 
-                with tempfile.NamedTemporaryFile(
-                    delete=False, suffix=Path(filename).suffix
-                ) as tmp:
+                with tempfile.NamedTemporaryFile(delete=False, suffix=Path(filename).suffix) as tmp:
                     tmp.write(file_content)
                     tmp_path = Path(tmp.name)
 
@@ -566,9 +541,7 @@ async def update_resource(
             new_filename = None
             if text_content.strip():
                 new_file_content = text_content.encode("utf-8")
-                safe_name = (display_name.strip() or f"resource_{number}").replace(
-                    " ", "_"
-                )
+                safe_name = (display_name.strip() or f"resource_{number}").replace(" ", "_")
                 new_filename = f"{safe_name}.txt"
             elif file and file.filename:
                 new_file_content = await file.read()
@@ -602,9 +575,7 @@ async def update_resource(
 
                         if new_file_content and new_filename:
                             mime_type = detect_mime_type_from_filename(new_filename)
-                            extracted = extract_text_from_bytes(
-                                new_file_content, mime_type
-                            )
+                            extracted = extract_text_from_bytes(new_file_content, mime_type)
 
                             storage = StorageService(use_service_key=True)
                             import tempfile
@@ -702,9 +673,7 @@ async def update_resource(
                 {"ok": False, "error": f"Error updating resource: {e}"}, status_code=500
             )
 
-    return JSONResponse(
-        {"ok": False, "error": "Database not configured"}, status_code=500
-    )
+    return JSONResponse({"ok": False, "error": "Database not configured"}, status_code=500)
 
 
 # =============================================================================
@@ -726,17 +695,13 @@ async def add_step(
     try:
         body = await request.json()
     except Exception:
-        return JSONResponse(
-            {"ok": False, "error": "Invalid JSON body"}, status_code=400
-        )
+        return JSONResponse({"ok": False, "error": "Invalid JSON body"}, status_code=400)
 
     prompt = body.get("prompt", "")
     display_name = body.get("display_name", "")
 
     if not prompt:
-        return JSONResponse(
-            {"ok": False, "error": "Prompt is required."}, status_code=400
-        )
+        return JSONResponse({"ok": False, "error": "Prompt is required."}, status_code=400)
 
     from ...db.config import get_config
 
@@ -767,10 +732,7 @@ async def add_step(
                 step_number = 1
                 if db_kit.current_version and db_kit.current_version.workflow_steps:
                     step_number = (
-                        max(
-                            s.step_number for s in db_kit.current_version.workflow_steps
-                        )
-                        + 1
+                        max(s.step_number for s in db_kit.current_version.workflow_steps) + 1
                     )
 
                 version = await version_repo.create(
@@ -834,9 +796,7 @@ async def add_step(
             return {"ok": True}
 
         except Exception as e:
-            return JSONResponse(
-                {"ok": False, "error": f"Error adding step: {e}"}, status_code=500
-            )
+            return JSONResponse({"ok": False, "error": f"Error adding step: {e}"}, status_code=500)
     else:
         try:
             kit_path = Path("reasoning_kits") / slug
@@ -857,9 +817,7 @@ async def add_step(
             dest.write_text(prompt)
             return {"ok": True}
         except Exception as e:
-            return JSONResponse(
-                {"ok": False, "error": f"Error adding step: {e}"}, status_code=500
-            )
+            return JSONResponse({"ok": False, "error": f"Error adding step: {e}"}, status_code=500)
 
 
 @router.post("/kits/{slug}/steps/{number}/update")
@@ -877,10 +835,7 @@ async def update_step(
 
     # Handle both FormData and JSON for smooth frontend migration
     content_type = request.headers.get("content-type", "")
-    if (
-        "multipart/form-data" in content_type
-        or "application/x-www-form-urlencoded" in content_type
-    ):
+    if "multipart/form-data" in content_type or "application/x-www-form-urlencoded" in content_type:
         form = await request.form()
         prompt = form.get("prompt", "")
         display_name = form.get("display_name", "")
@@ -890,14 +845,10 @@ async def update_step(
             prompt = body.get("prompt", "")
             display_name = body.get("display_name", "")
         except Exception:
-            return JSONResponse(
-                {"ok": False, "error": "Invalid request body"}, status_code=400
-            )
+            return JSONResponse({"ok": False, "error": "Invalid request body"}, status_code=400)
 
     if not prompt:
-        return JSONResponse(
-            {"ok": False, "error": "Prompt is required."}, status_code=400
-        )
+        return JSONResponse({"ok": False, "error": "Prompt is required."}, status_code=400)
 
     from ...db.config import get_config
 
@@ -952,9 +903,7 @@ async def update_step(
                 for s in db_kit.current_version.workflow_steps:
                     template = prompt if s.step_number == number else s.prompt_template
                     step_display = (
-                        display_name.strip() or None
-                        if s.step_number == number
-                        else s.display_name
+                        display_name.strip() or None if s.step_number == number else s.display_name
                     )
                     steps_to_add.append(
                         {
@@ -1160,18 +1109,14 @@ async def add_tool(
     try:
         body = await request.json()
     except Exception:
-        return JSONResponse(
-            {"ok": False, "error": "Invalid JSON body"}, status_code=400
-        )
+        return JSONResponse({"ok": False, "error": "Invalid JSON body"}, status_code=400)
 
     tool_name = body.get("tool_name", "")
     display_name = body.get("display_name", "")
     configuration = body.get("configuration")
 
     if not tool_name:
-        return JSONResponse(
-            {"ok": False, "error": "tool_name is required."}, status_code=400
-        )
+        return JSONResponse({"ok": False, "error": "tool_name is required."}, status_code=400)
 
     # Verify tool exists in global registry
     from ...tools import get_tool as get_global_tool
@@ -1210,9 +1155,7 @@ async def add_tool(
 
                 tool_number = 1
                 if db_kit.current_version and db_kit.current_version.tools:
-                    tool_number = (
-                        max(t.tool_number for t in db_kit.current_version.tools) + 1
-                    )
+                    tool_number = max(t.tool_number for t in db_kit.current_version.tools) + 1
 
                 version = await version_repo.create(
                     kit_id=db_kit.id,
@@ -1276,13 +1219,9 @@ async def add_tool(
             return {"ok": True}
 
         except Exception as e:
-            return JSONResponse(
-                {"ok": False, "error": f"Error adding tool: {e}"}, status_code=500
-            )
+            return JSONResponse({"ok": False, "error": f"Error adding tool: {e}"}, status_code=500)
 
-    return JSONResponse(
-        {"ok": False, "error": "Database not configured"}, status_code=500
-    )
+    return JSONResponse({"ok": False, "error": "Database not configured"}, status_code=500)
 
 
 @router.post("/kits/{slug}/tools/{number}/update")
@@ -1300,9 +1239,7 @@ async def update_tool(
     try:
         body = await request.json()
     except Exception:
-        return JSONResponse(
-            {"ok": False, "error": "Invalid JSON body"}, status_code=400
-        )
+        return JSONResponse({"ok": False, "error": "Invalid JSON body"}, status_code=400)
 
     display_name = body.get("display_name")
     configuration = body.get("configuration")
@@ -1397,9 +1334,7 @@ async def update_tool(
         except Exception as e:
             return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
 
-    return JSONResponse(
-        {"ok": False, "error": "Database not configured"}, status_code=500
-    )
+    return JSONResponse({"ok": False, "error": "Database not configured"}, status_code=500)
 
 
 @router.delete("/kits/{slug}/tools/{number}")
@@ -1418,9 +1353,7 @@ async def delete_tool(
 
     config = get_config()
     if not config.is_database_configured:
-        return JSONResponse(
-            {"ok": False, "error": "Database not configured"}, status_code=500
-        )
+        return JSONResponse({"ok": False, "error": "Database not configured"}, status_code=500)
 
     try:
         from ...db import (
@@ -1586,9 +1519,7 @@ async def start_execution(
                 repo = ReasoningKitRepository(session)
                 db_kit = await repo.get_by_slug(slug)
                 if db_kit and not db_kit.is_public:
-                    if not user or (
-                        db_kit.owner_id and str(db_kit.owner_id) != user["id"]
-                    ):
+                    if not user or (db_kit.owner_id and str(db_kit.owner_id) != user["id"]):
                         return {"error": "This kit is private."}
         except Exception:
             pass
@@ -1619,9 +1550,7 @@ async def start_execution(
             resource.content = dynamic_resources[resource.resource_id]
 
     # Validate all dynamic resources are provided
-    missing = [
-        r.resource_id for r in kit.resources.values() if r.is_dynamic and not r.content
-    ]
+    missing = [r.resource_id for r in kit.resources.values() if r.is_dynamic and not r.content]
     if missing:
         return {"error": f"Missing dynamic resources: {', '.join(missing)}"}
 
@@ -1707,9 +1636,7 @@ async def resume_execution(
                 past_outputs[output_id] = step.output_text
 
             # Highest step number done
-            highest_step = max(
-                [s.step_number for s in db_run.step_executions], default=0
-            )
+            highest_step = max([s.step_number for s in db_run.step_executions], default=0)
 
         # We must load the kit matching the exact DB version we are resuming
         loaded = await load_reasoning_kit_from_db(slug, version_id=version_id)
@@ -1877,9 +1804,7 @@ async def execute_kit_stream(
             try:
                 if openai_tools:
                     # Tool-aware execution: bind tools and handle call loop
-                    llm_with_tools = llm.bind_tools(
-                        [t["function"] for t in openai_tools]
-                    )
+                    llm_with_tools = llm.bind_tools([t["function"] for t in openai_tools])
                     messages = [HumanMessage(content=clean_prompt)]
                     response = await llm_with_tools.ainvoke(messages)
                     messages.append(response)
@@ -2194,12 +2119,8 @@ async def list_executions(
                         "id": str(run.id),
                         "status": run.status,
                         "label": run.label,
-                        "started_at": run.started_at.isoformat()
-                        if run.started_at
-                        else None,
-                        "completed_at": run.completed_at.isoformat()
-                        if run.completed_at
-                        else None,
+                        "started_at": run.started_at.isoformat() if run.started_at else None,
+                        "completed_at": run.completed_at.isoformat() if run.completed_at else None,
                         "storage_mode": run.storage_mode,
                         "total_steps": len(run.step_executions),
                         "error_message": run.error_message,
@@ -2258,18 +2179,14 @@ async def get_execution(
                     {
                         "step_number": step.step_number,
                         "display_name": ws_info.get("display_name"),
-                        "output_id": ws_info.get(
-                            "output_id", f"workflow_{step.step_number}"
-                        ),
+                        "output_id": ws_info.get("output_id", f"workflow_{step.step_number}"),
                         "input_text": step.input_text,
                         "output_text": step.output_text,
                         "evaluation_score": step.evaluation_score,
                         "model_used": step.model_used,
                         "tokens_used": step.tokens_used,
                         "latency_ms": step.latency_ms,
-                        "executed_at": step.executed_at.isoformat()
-                        if step.executed_at
-                        else None,
+                        "executed_at": step.executed_at.isoformat() if step.executed_at else None,
                     }
                 )
 
@@ -2284,9 +2201,7 @@ async def get_execution(
                 "label": run.label,
                 "storage_mode": run.storage_mode,
                 "started_at": run.started_at.isoformat() if run.started_at else None,
-                "completed_at": run.completed_at.isoformat()
-                if run.completed_at
-                else None,
+                "completed_at": run.completed_at.isoformat() if run.completed_at else None,
                 "error_message": run.error_message,
                 "steps": steps,
             }
@@ -2346,24 +2261,16 @@ async def download_execution(
             sorted_steps = sorted(run.step_executions, key=lambda s: s.step_number)
 
             if format == "json":
-                content = _build_json_download(
-                    run, kit_name, sorted_steps, step_display_names
-                )
+                content = _build_json_download(run, kit_name, sorted_steps, step_display_names)
                 media_type = "application/json"
                 ext = "json"
             else:
-                content = _build_markdown_download(
-                    run, kit_name, sorted_steps, step_display_names
-                )
+                content = _build_markdown_download(run, kit_name, sorted_steps, step_display_names)
                 media_type = "text/markdown"
                 ext = "md"
 
             label_slug = run.label.replace(" ", "_").lower() if run.label else ""
-            ts = (
-                run.started_at.strftime("%Y%m%d_%H%M%S")
-                if run.started_at
-                else "unknown"
-            )
+            ts = run.started_at.strftime("%Y%m%d_%H%M%S") if run.started_at else "unknown"
             filename = f"{slug}_{ts}"
             if label_slug:
                 filename += f"_{label_slug}"
@@ -2435,9 +2342,7 @@ def _build_markdown_download(run, kit_name, sorted_steps, step_display_names):
     if run.started_at:
         lines.append(f"**Started:** {run.started_at.strftime('%Y-%m-%d %H:%M:%S UTC')}")
     if run.completed_at:
-        lines.append(
-            f"**Completed:** {run.completed_at.strftime('%Y-%m-%d %H:%M:%S UTC')}"
-        )
+        lines.append(f"**Completed:** {run.completed_at.strftime('%Y-%m-%d %H:%M:%S UTC')}")
     lines.append(f"**Storage Mode:** {run.storage_mode}")
     lines.append("")
 
@@ -2505,9 +2410,7 @@ def _build_json_download(run, kit_name, sorted_steps, step_display_names):
                 "model_used": step.model_used,
                 "tokens_used": step.tokens_used,
                 "latency_ms": step.latency_ms,
-                "executed_at": step.executed_at.isoformat()
-                if step.executed_at
-                else None,
+                "executed_at": step.executed_at.isoformat() if step.executed_at else None,
             }
         )
 
@@ -2561,9 +2464,7 @@ async def list_kits_json(
                 bookmarked_ids: set = set()
                 if user:
                     bm_repo = BookmarkRepository(session)
-                    bookmarked_ids = await bm_repo.get_bookmarked_kit_ids(
-                        UUID(user["id"])
-                    )
+                    bookmarked_ids = await bm_repo.get_bookmarked_kit_ids(UUID(user["id"]))
 
                 for kit in db_kits:
                     kits.append(
@@ -2572,12 +2473,8 @@ async def list_kits_json(
                             "name": kit.name,
                             "description": kit.description,
                             "is_public": kit.is_public,
-                            "created_at": kit.created_at.isoformat()
-                            if kit.created_at
-                            else None,
-                            "updated_at": kit.updated_at.isoformat()
-                            if kit.updated_at
-                            else None,
+                            "created_at": kit.created_at.isoformat() if kit.created_at else None,
+                            "updated_at": kit.updated_at.isoformat() if kit.updated_at else None,
                             "owner_id": str(kit.owner_id) if kit.owner_id else None,
                             "is_bookmarked": kit.id in bookmarked_ids,
                         }
@@ -2705,9 +2602,7 @@ async def search_kits_json(
                 bookmarked_ids: set = set()
                 if user:
                     bm_repo = BookmarkRepository(session)
-                    bookmarked_ids = await bm_repo.get_bookmarked_kit_ids(
-                        UUID(user["id"])
-                    )
+                    bookmarked_ids = await bm_repo.get_bookmarked_kit_ids(UUID(user["id"]))
 
                 for kit in db_kits:
                     kits.append(
@@ -2716,12 +2611,8 @@ async def search_kits_json(
                             "name": kit.name,
                             "description": kit.description,
                             "is_public": kit.is_public,
-                            "created_at": kit.created_at.isoformat()
-                            if kit.created_at
-                            else None,
-                            "updated_at": kit.updated_at.isoformat()
-                            if kit.updated_at
-                            else None,
+                            "created_at": kit.created_at.isoformat() if kit.created_at else None,
+                            "updated_at": kit.updated_at.isoformat() if kit.updated_at else None,
                             "owner_id": str(kit.owner_id) if kit.owner_id else None,
                             "is_bookmarked": kit.id in bookmarked_ids,
                         }
@@ -2798,9 +2689,7 @@ async def login_json(request: Request):
         from ...db.config import get_supabase_client
 
         client = get_supabase_client()
-        response = client.auth.sign_in_with_password(
-            {"email": email, "password": password}
-        )
+        response = client.auth.sign_in_with_password({"email": email, "password": password})
 
         if response.user:
             request.session["user"] = {
@@ -2950,9 +2839,7 @@ async def get_kit_detail_json(
                         "slug": db_kit.slug,
                         "description": db_kit.description,
                         "is_public": db_kit.is_public,
-                        "created_at": db_kit.created_at.isoformat()
-                        if db_kit.created_at
-                        else None,
+                        "created_at": db_kit.created_at.isoformat() if db_kit.created_at else None,
                         "version_number": version.version_number if version else None,
                     }
                     source = "database"
@@ -2963,9 +2850,7 @@ async def get_kit_detail_json(
                     )
 
                     if version:
-                        for r in sorted(
-                            version.resources, key=lambda x: x.resource_number
-                        ):
+                        for r in sorted(version.resources, key=lambda x: x.resource_number):
                             resources.append(
                                 {
                                     "number": r.resource_number,
@@ -2978,9 +2863,7 @@ async def get_kit_detail_json(
                                     "mime_type": r.mime_type,
                                 }
                             )
-                        for s in sorted(
-                            version.workflow_steps, key=lambda x: x.step_number
-                        ):
+                        for s in sorted(version.workflow_steps, key=lambda x: x.step_number):
                             steps.append(
                                 {
                                     "number": s.step_number,
@@ -3090,9 +2973,7 @@ async def get_mcp_configs(user: dict | None = Depends(get_optional_user)):
     from ...db.config import get_config
 
     if not get_config().is_database_configured:
-        return JSONResponse(
-            {"ok": False, "error": "Database not configured"}, status_code=500
-        )
+        return JSONResponse({"ok": False, "error": "Database not configured"}, status_code=500)
 
     try:
         from ...db import get_async_session
@@ -3132,9 +3013,7 @@ async def update_mcp_config(
     from ...db.config import get_config
 
     if not get_config().is_database_configured:
-        return JSONResponse(
-            {"ok": False, "error": "Database not configured"}, status_code=500
-        )
+        return JSONResponse({"ok": False, "error": "Database not configured"}, status_code=500)
 
     try:
         data = await request.json()
@@ -3146,9 +3025,7 @@ async def update_mcp_config(
 
         async with get_async_session() as session:
             if not user or "id" not in user:
-                return JSONResponse(
-                    {"ok": False, "error": "Unauthorized"}, status_code=401
-                )
+                return JSONResponse({"ok": False, "error": "Unauthorized"}, status_code=401)
 
             stmt = select(McpServerConfig).where(
                 McpServerConfig.user_id == user["id"],
@@ -3179,16 +3056,12 @@ async def update_mcp_config(
 
 
 @router.delete("/mcp/config/{server_name}")
-async def delete_mcp_config(
-    server_name: str, user: dict | None = Depends(get_optional_user)
-):
+async def delete_mcp_config(server_name: str, user: dict | None = Depends(get_optional_user)):
     """Delete a user-specific MCP server configuration."""
     from ...db.config import get_config
 
     if not get_config().is_database_configured:
-        return JSONResponse(
-            {"ok": False, "error": "Database not configured"}, status_code=500
-        )
+        return JSONResponse({"ok": False, "error": "Database not configured"}, status_code=500)
 
     try:
         from ...db import get_async_session
@@ -3197,9 +3070,7 @@ async def delete_mcp_config(
 
         async with get_async_session() as session:
             if not user or "id" not in user:
-                return JSONResponse(
-                    {"ok": False, "error": "Unauthorized"}, status_code=401
-                )
+                return JSONResponse({"ok": False, "error": "Unauthorized"}, status_code=401)
 
             stmt = select(McpServerConfig).where(
                 McpServerConfig.user_id == user["id"],
@@ -3229,9 +3100,7 @@ async def get_llm_configs(user: dict | None = Depends(get_optional_user)):
     from ...db.config import get_config
 
     if not get_config().is_database_configured:
-        return JSONResponse(
-            {"ok": False, "error": "Database not configured"}, status_code=500
-        )
+        return JSONResponse({"ok": False, "error": "Database not configured"}, status_code=500)
 
     try:
         from ...db import get_async_session
@@ -3242,9 +3111,7 @@ async def get_llm_configs(user: dict | None = Depends(get_optional_user)):
             if not user or "id" not in user:
                 return {"ok": True, "configs": []}
 
-            stmt = select(LlmProviderConfig).where(
-                LlmProviderConfig.user_id == user["id"]
-            )
+            stmt = select(LlmProviderConfig).where(LlmProviderConfig.user_id == user["id"])
             result = await session.execute(stmt)
             configs = result.scalars().all()
 
@@ -3274,9 +3141,7 @@ async def update_llm_config(
     from ...db.config import get_config
 
     if not get_config().is_database_configured:
-        return JSONResponse(
-            {"ok": False, "error": "Database not configured"}, status_code=500
-        )
+        return JSONResponse({"ok": False, "error": "Database not configured"}, status_code=500)
 
     try:
         data = await request.json()
@@ -3290,9 +3155,7 @@ async def update_llm_config(
 
         async with get_async_session() as session:
             if not user or "id" not in user:
-                return JSONResponse(
-                    {"ok": False, "error": "Unauthorized"}, status_code=401
-                )
+                return JSONResponse({"ok": False, "error": "Unauthorized"}, status_code=401)
 
             # If setting this one to active, we might want to deactivate others
             # But we leave that to frontend or keep multiple active if supported (usually 1 active at a time)
@@ -3384,14 +3247,27 @@ async def get_doc(slug: str):
 
     if not file_path.exists() or not file_path.is_file():
         # Prevent directory traversal attacks
-        return JSONResponse(
-            {"ok": False, "error": "Document not found"}, status_code=404
-        )
+        return JSONResponse({"ok": False, "error": "Document not found"}, status_code=404)
 
     try:
         content = file_path.read_text(encoding="utf-8")
         return {"content": content}
     except Exception as e:
-        return JSONResponse(
-            {"ok": False, "error": f"Error reading document: {e}"}, status_code=500
-        )
+        return JSONResponse({"ok": False, "error": f"Error reading document: {e}"}, status_code=500)
+
+
+@router.get("/openapi.json")
+async def get_openapi_spec() -> dict:
+    """Return the OpenAPI specification for the API."""
+    from ...web.app import create_app
+    from fastapi.openapi.utils import get_openapi
+
+    app_instance = create_app()
+    openapi_schema = get_openapi(
+        title=app_instance.title,
+        version=app_instance.version,
+        openapi_version=app_instance.openapi_version,
+        description=app_instance.description,
+        routes=app_instance.routes,
+    )
+    return openapi_schema

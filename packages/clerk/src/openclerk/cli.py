@@ -103,9 +103,7 @@ def main() -> None:
     # DB COMMAND GROUP
     # =========================================================================
     db_parser = subparsers.add_parser("db", help="Database management commands")
-    db_subparsers = db_parser.add_subparsers(
-        dest="db_command", help="Database commands"
-    )
+    db_subparsers = db_parser.add_subparsers(dest="db_command", help="Database commands")
 
     # db migrate
     db_migrate_parser = db_subparsers.add_parser(
@@ -132,14 +130,10 @@ def main() -> None:
     sync_parser = subparsers.add_parser(
         "sync", help="Sync reasoning kits between local and database"
     )
-    sync_subparsers = sync_parser.add_subparsers(
-        dest="sync_command", help="Sync commands"
-    )
+    sync_subparsers = sync_parser.add_subparsers(dest="sync_command", help="Sync commands")
 
     # sync push
-    sync_push_parser = sync_subparsers.add_parser(
-        "push", help="Push a local kit to database"
-    )
+    sync_push_parser = sync_subparsers.add_parser("push", help="Push a local kit to database")
     sync_push_parser.add_argument("kit", type=str, help="Name of the local kit to push")
     sync_push_parser.add_argument(
         "--base-path",
@@ -155,12 +149,8 @@ def main() -> None:
     )
 
     # sync pull
-    sync_pull_parser = sync_subparsers.add_parser(
-        "pull", help="Pull a kit from database to local"
-    )
-    sync_pull_parser.add_argument(
-        "kit", type=str, help="Slug of the kit to pull from database"
-    )
+    sync_pull_parser = sync_subparsers.add_parser("pull", help="Pull a kit from database to local")
+    sync_pull_parser.add_argument("kit", type=str, help="Slug of the kit to pull from database")
     sync_pull_parser.add_argument(
         "--base-path",
         type=str,
@@ -174,15 +164,11 @@ def main() -> None:
     # =========================================================================
     # KIT COMMAND GROUP
     # =========================================================================
-    kit_parser = subparsers.add_parser(
-        "kit", help="Create and manage reasoning kit definitions"
-    )
+    kit_parser = subparsers.add_parser("kit", help="Create and manage reasoning kit definitions")
     kit_subparsers = kit_parser.add_subparsers(dest="kit_command", help="Kit commands")
 
     # kit create
-    kit_create_parser = kit_subparsers.add_parser(
-        "create", help="Create a new reasoning kit"
-    )
+    kit_create_parser = kit_subparsers.add_parser("create", help="Create a new reasoning kit")
     kit_create_parser.add_argument("name", type=str, help="Name of the kit to create")
     kit_create_parser.add_argument(
         "--description",
@@ -197,9 +183,7 @@ def main() -> None:
     )
 
     # kit delete
-    kit_delete_parser = kit_subparsers.add_parser(
-        "delete", help="Delete a reasoning kit"
-    )
+    kit_delete_parser = kit_subparsers.add_parser("delete", help="Delete a reasoning kit")
     kit_delete_parser.add_argument("name", type=str, help="Name of the kit to delete")
     kit_delete_parser.add_argument(
         "--base-path",
@@ -268,9 +252,7 @@ def main() -> None:
         "edit-resource", help="Edit a resource in a reasoning kit"
     )
     kit_edit_resource_parser.add_argument("kit", type=str, help="Name of the kit")
-    kit_edit_resource_parser.add_argument(
-        "number", type=int, help="Resource number to edit"
-    )
+    kit_edit_resource_parser.add_argument("number", type=int, help="Resource number to edit")
     kit_edit_resource_parser.add_argument(
         "--file",
         type=str,
@@ -316,9 +298,7 @@ def main() -> None:
         "delete-resource", help="Delete a resource from a reasoning kit"
     )
     kit_delete_resource_parser.add_argument("kit", type=str, help="Name of the kit")
-    kit_delete_resource_parser.add_argument(
-        "number", type=int, help="Resource number to delete"
-    )
+    kit_delete_resource_parser.add_argument("number", type=int, help="Resource number to delete")
     kit_delete_resource_parser.add_argument(
         "--base-path",
         type=str,
@@ -331,9 +311,7 @@ def main() -> None:
         "delete-step", help="Delete a workflow step from a reasoning kit"
     )
     kit_delete_step_parser.add_argument("kit", type=str, help="Name of the kit")
-    kit_delete_step_parser.add_argument(
-        "number", type=int, help="Step number to delete"
-    )
+    kit_delete_step_parser.add_argument("number", type=int, help="Step number to delete")
     kit_delete_step_parser.add_argument(
         "--base-path",
         type=str,
@@ -365,6 +343,24 @@ def main() -> None:
     )
 
     # =========================================================================
+    # DOCS COMMAND GROUP
+    # =========================================================================
+    docs_parser = subparsers.add_parser("docs", help="Documentation commands")
+    docs_subparsers = docs_parser.add_subparsers(dest="docs_command", help="Documentation commands")
+
+    # docs generate-openapi
+    docs_generate_parser = docs_subparsers.add_parser(
+        "generate-openapi", help="Generate OpenAPI specification from FastAPI app"
+    )
+    docs_generate_parser.add_argument(
+        "--output",
+        "-o",
+        type=str,
+        default="openapi.json",
+        help="Output file path (default: openapi.json)",
+    )
+
+    # =========================================================================
     # PARSE AND DISPATCH
     # =========================================================================
     args = parser.parse_args()
@@ -383,6 +379,8 @@ def main() -> None:
         _cmd_kit(args)
     elif args.command == "web":
         _cmd_web(args)
+    elif args.command == "docs":
+        _cmd_docs(args)
     else:
         parser.print_help()
 
@@ -407,9 +405,7 @@ def _cmd_list(args: argparse.Namespace) -> None:
         # List from database
         config = get_config()
         if not config.is_database_configured:
-            print(
-                "Database not configured. Use --local flag or configure DATABASE_URL."
-            )
+            print("Database not configured. Use --local flag or configure DATABASE_URL.")
             print("Falling back to local listing...")
             kits = list_reasoning_kits(args.path)
             if kits:
@@ -492,9 +488,7 @@ def _cmd_run(args: argparse.Namespace) -> None:
                         continue
                     try:
                         resource.content = path.read_text()
-                        print(
-                            f"    Loaded {len(resource.content)} characters from {path.name}"
-                        )
+                        print(f"    Loaded {len(resource.content)} characters from {path.name}")
                         break
                     except Exception as e:
                         print(f"    Error reading file: {e}. Please try again.")
@@ -700,9 +694,7 @@ def _db_setup() -> None:
         ensure_bucket_exists(use_service_key=True)
     except Exception as e:
         print(f"Warning: Could not create storage bucket: {e}")
-        print(
-            "You may need to create the 'reasoning-kits' bucket manually in Supabase."
-        )
+        print("You may need to create the 'reasoning-kits' bucket manually in Supabase.")
     print()
 
     print("Database setup complete!")
@@ -814,9 +806,7 @@ async def _sync_push(kit_name: str, base_path: str, message: str | None) -> None
             )
             print(f"  - Added step {num}")
 
-    print(
-        f"\nSuccessfully pushed '{local_kit.name}' as version {version.version_number}"
-    )
+    print(f"\nSuccessfully pushed '{local_kit.name}' as version {version.version_number}")
 
 
 async def _sync_pull(slug: str, base_path: str) -> None:
@@ -1060,9 +1050,7 @@ def _kit_create(args: argparse.Namespace) -> None:
     # Validate kit name
     if not validate_kit_name(kit_name):
         print(f"Error: Invalid kit name '{kit_name}'")
-        print(
-            "Kit names must contain only lowercase letters, numbers, hyphens, and underscores"
-        )
+        print("Kit names must contain only lowercase letters, numbers, hyphens, and underscores")
         sys.exit(1)
 
     # Create kit directory
@@ -1335,9 +1323,7 @@ def _kit_delete_resource(args: argparse.Namespace) -> None:
     try:
         existing_file.unlink()
         print(f"Deleted resource_{args.number} from '{args.kit}'")
-        print(
-            "Note: Remaining resources are NOT renumbered to preserve workflow references"
-        )
+        print("Note: Remaining resources are NOT renumbered to preserve workflow references")
 
     except Exception as e:
         print(f"Error deleting resource: {e}")
@@ -1402,6 +1388,45 @@ def _cmd_web(args: argparse.Namespace) -> None:
             port=args.port,
             log_level="info",
         )
+
+
+# =============================================================================
+# DOCS COMMAND
+# =============================================================================
+
+
+def _cmd_docs(args: argparse.Namespace) -> None:
+    """Handle documentation commands."""
+    if args.docs_command == "generate-openapi":
+        _docs_generate_openapi(args.output)
+    else:
+        print("Usage: clerk docs [generate-openapi]")
+        sys.exit(1)
+
+
+def _docs_generate_openapi(output_path: str) -> None:
+    """Generate OpenAPI specification from FastAPI app."""
+    import json
+
+    from fastapi.openapi.utils import get_openapi
+
+    from .web.app import create_app
+
+    app_instance = create_app()
+    openapi_schema = get_openapi(
+        title=app_instance.title,
+        version=app_instance.version,
+        openapi_version=app_instance.openapi_version,
+        description=app_instance.description,
+        routes=app_instance.routes,
+    )
+
+    output = Path(output_path)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    with open(output, "w") as f:
+        json.dump(openapi_schema, f, indent=2)
+
+    print(f"OpenAPI spec written to {output}")
 
 
 if __name__ == "__main__":

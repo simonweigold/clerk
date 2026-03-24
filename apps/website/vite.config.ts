@@ -9,6 +9,7 @@ export default defineConfig({
       '/api': {
         target: 'http://localhost:8000',
         changeOrigin: true,
+        credentials: 'include',  // Required for session cookies
       },
     },
   },

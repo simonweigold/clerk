@@ -3342,7 +3342,8 @@ async def update_llm_config(
 @router.get("/docs")
 async def list_docs():
     """List all documentation markdown files."""
-    docs_dir = Path("docs")
+    # Docs are at repo root, 6 levels up from this file
+    docs_dir = Path(__file__).parents[6] / "docs"
     if not docs_dir.exists():
         return {"docs": []}
 
@@ -3377,7 +3378,8 @@ async def list_docs():
 @router.get("/docs/{slug:path}")
 async def get_doc(slug: str):
     """Get the raw markdown content of a documentation file."""
-    docs_dir = Path("docs")
+    # Docs are at repo root, 6 levels up from this file
+    docs_dir = Path(__file__).parents[6] / "docs"
     file_path = docs_dir / f"{slug}.md"
 
     if not file_path.exists() or not file_path.is_file():

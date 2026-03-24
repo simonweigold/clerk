@@ -206,6 +206,17 @@ async def get_async_session(
         await session.close()
 
 
+async def init_engines() -> None:
+    """Initialize database engines. Call on application startup.
+
+    This ensures engines are created and connections can be established.
+    Engines are created lazily, so this is mainly for explicit initialization.
+    """
+    # Engines are created lazily by get_async_engine()
+    # This function exists for explicit lifecycle management
+    pass
+
+
 async def close_engines() -> None:
     """Close all database engines. Call on application shutdown."""
     global _engine, _engine_direct

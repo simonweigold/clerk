@@ -4,7 +4,7 @@ import { ToastContainer } from '../hooks/useToast';
 import { Settings, LogOut } from 'lucide-react';
 
 export default function Layout() {
-    const { user, supabaseConfigured } = useAuth();
+    const { user, supabaseConfigured, loading } = useAuth();
     const location = useLocation();
 
     const isActive = (path: string) => {
@@ -42,7 +42,12 @@ export default function Layout() {
 
                             </>
                         )}
-                        {supabaseConfigured && (
+                        {loading ? (
+                            // Loading indicator while auth is being verified
+                            <div className="flex items-center justify-center ml-2 w-8 h-8">
+                                <span className="pulse-dot" />
+                            </div>
+                        ) : supabaseConfigured ? (
                             <>
                                 {user ? (
                                     <>
@@ -59,7 +64,7 @@ export default function Layout() {
                                     </Link>
                                 )}
                             </>
-                        )}
+                        ) : null}
                     </nav>
                 </div>
             </header>

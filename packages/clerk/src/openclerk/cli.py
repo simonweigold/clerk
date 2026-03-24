@@ -1386,7 +1386,7 @@ def _cmd_web(args: argparse.Namespace) -> None:
     if args.reload:
         print("Auto-reload enabled — watching for file changes...")
         uvicorn.run(
-            "clerk.web.app:create_app",
+            "openclerk.web.app:create_app",
             factory=True,
             host=args.host,
             port=args.port,

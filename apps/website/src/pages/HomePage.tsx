@@ -119,11 +119,11 @@ function KitCard({
 /* ── Home Page ─────────────────────────────────────────────────────────── */
 
 export default function HomePage() {
-    const { user } = useAuth();
+    const { user, loading: authLoading } = useAuth();
     const [query, setQuery] = useState('');
     const [filter, setFilter] = useState<'all' | 'mine'>('all');
     const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
-    
+
     // React Query hook for kit list with caching
     const { data, isLoading, isFetching } = useKitList(query, filter);
     const kits = data?.kits ?? [];
@@ -156,7 +156,7 @@ export default function HomePage() {
         }
     };
 
-    const loading = isLoading;
+    const loading = authLoading || isLoading;
     const refreshing = isFetching && !isLoading;
 
     return (

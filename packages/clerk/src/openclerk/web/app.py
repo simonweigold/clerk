@@ -1,45 +1,67 @@
-"""FastAPI application factory for CLERK web UI."""
+"""FastAPI application factory for OpenClerk API."""
 
-from contextlib import asynccontextmanager
+import os
 from collections.abc import AsyncGenerator
-from pathlib import Path
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
-from fastapi.responses import FileResponse
-from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 
-from ..db.config import close_engines, get_config
-from ..mcp_client import close_mcp_servers, init_mcp_servers
-
-# Paths
-WEB_DIR = Path(__file__).parent
-# React SPA build output
-SPA_DIR = Path(__file__).resolve().parent.parent.parent.parent / "frontend" / "dist"
+from openclerk.db.config import close_engines, init_engines, get_config
+from openclerk.mcp_client import close_mcp_servers, init_mcp_servers
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Application lifespan: startup and shutdown."""
+    # Initialize database engines
+    await init_engines()
+    # Initialize MCP servers
     await init_mcp_servers()
     yield
+    # Cleanup
     await close_mcp_servers()
     await close_engines()
 
 
-def create_app() -> FastAPI:
-    """Create and configure the FastAPI application.
+class AuthStateMiddleware(BaseHTTPMiddleware):
+    """Middleware to copy session user to request.state for auth dependencies."""
 
-    Returns:
-        Configured FastAPI app
-    """
+    async def dispatch(self, request: Request, call_next):
+        # Copy user from session to state so get_optional_user can find it
+        user = request.session.get("user")
+        if user:
+            request.state.user = user
+        return await call_next(request)
+
+
+def create_app() -> FastAPI:
+    """Create and configure the FastAPI application."""
     app = FastAPI(
-        title="CLERK",
-        description="Community Library of Executable Reasoning Kits",
+        title="OpenClerk API",
+        description="API for Community Library of Executable Reasoning Kits",
+        version="0.1.0",
+        docs_url="/docs" if os.getenv("ENV") == "development" else None,
+        redoc_url="/redoc" if os.getenv("ENV") == "development" else None,
         lifespan=lifespan,
     )
 
-    # Session middleware for auth cookies
+    # CORS middleware for web frontend (add first - runs last/wraps everything)
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=os.getenv("CORS_ORIGINS", "*").split(","),
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+    # Auth state middleware - copies session user to request.state
+    # Must be added before SessionMiddleware so it runs AFTER SessionMiddleware
+    app.add_middleware(AuthStateMiddleware)
+
+    # Session middleware for auth cookies (add last - runs first/innermost)
     app.add_middleware(
         SessionMiddleware,
         secret_key=get_config().session_secret_key,
@@ -47,44 +69,18 @@ def create_app() -> FastAPI:
         max_age=60 * 60 * 24 * 7,  # 1 week
     )
 
+    # Health check endpoint
+    @app.get("/health")
+    async def health_check() -> dict[str, str]:
+        return {"status": "healthy", "service": "openclerk-api"}
+
     # Register API routes
-    from .routes.api import router as api_router
+    from openclerk.web.routes.api import router as api_router
 
+    # Include API router with version prefix
+    app.include_router(api_router, prefix="/api/v1")
+
+    # Also include at /api for backwards compatibility during transition
     app.include_router(api_router, prefix="/api")
-
-    # Serve React SPA
-    spa_index = SPA_DIR / "index.html"
-    if not (SPA_DIR.is_dir() and spa_index.is_file()):
-        raise RuntimeError(
-            f"React SPA build not found at {SPA_DIR}. "
-            "Run 'cd frontend && npm run build' first."
-        )
-
-    # Serve SPA static assets (JS, CSS, images)
-    app.mount(
-        "/assets",
-        StaticFiles(directory=str(SPA_DIR / "assets")),
-        name="spa-assets",
-    )
-    # Serve files from SPA public dir (fonts, vite.svg, etc.)
-    app.mount(
-        "/fonts",
-        StaticFiles(directory=str(SPA_DIR / "fonts")),
-        name="spa-fonts",
-    )
-
-    # SPA fallback: serve index.html for all non-API, non-static routes
-    @app.get("/{full_path:path}")
-    async def spa_fallback(request: Request, full_path: str) -> FileResponse:
-        """Serve React SPA for client-side routing."""
-        # Never intercept API routes — let FastAPI handle them
-        if full_path.startswith("api/"):
-            from fastapi.responses import JSONResponse
-            return JSONResponse({"error": "Not found"}, status_code=404)
-        # Check if a specific file exists in dist
-        file_path = SPA_DIR / full_path
-        if full_path and file_path.is_file():
-            return FileResponse(file_path)
-        return FileResponse(spa_index)
 
     return app

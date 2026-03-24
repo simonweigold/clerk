@@ -1,52 +1,5 @@
-[project]
-name = "clerk"
-version = "0.1.0"
-description = "Community Library of Executable Reasoning Kits"
-readme = "README.md"
-requires-python = ">=3.13"
-dependencies = [
-    # LLM Framework
-    "langchain>=1.2.4",
-    "langchain-openai>=1.1.7",
-    "langgraph>=1.0.6",
-    # Utilities
-    "python-dotenv>=1.2.1",
-    # Database
-    "sqlalchemy[asyncio]>=2.0.36",
-    "alembic>=1.14.0",
-    "asyncpg>=0.30.0",
-    "supabase>=2.11.0",
-    # Text extraction
-    "pypdf>=5.1.0",
-    "openpyxl>=3.1.5",
-    # Web UI
-    "fastapi>=0.115.0",
-    "uvicorn[standard]>=0.32.0",
-    "python-multipart>=0.0.12",
-    "itsdangerous>=2.2.0",
-    "sse-starlette>=2.1.0",
-    "pgvector>=0.3.6",
-    "langchain-postgres>=0.0.17",
-    # Tool support
-    "httpx>=0.27.0",
-    "beautifulsoup4>=4.12.0",
-    "mcp>=1.26.0",
-    "langchain-anthropic>=1.3.5",
-    "langchain-mistralai>=1.1.2",
-    "langchain-google-genai>=4.2.1",
-    "langchain-google-vertexai>=3.2.2",
-]
+[tool.uv.workspace]
+members = ["packages/*"]
 
-[project.scripts]
-clerk = "clerk.cli:main"
-
-[build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
-
-[tool.hatch.build.targets.wheel]
-packages = ["src/clerk"]
-
-[tool.uv]
-package = true
-
+[tool.uv.sources]
+openclerk = { workspace = true }

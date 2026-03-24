@@ -28,6 +28,14 @@ async function handleResponse<T>(response: Response): Promise<T> {
     return response.json();
 }
 
+// Wrapper for fetch that always includes credentials (cookies)
+async function apiFetch(url: string, options: RequestInit = {}): Promise<Response> {
+    return fetch(url, {
+        ...options,
+        credentials: 'include',  // Required for session cookies
+    });
+}
+
 // ─── Auth ────────────────────────────────────────────────────────────────────
 
 export interface User {
@@ -44,7 +52,7 @@ export interface AuthResponse {
 }
 
 export async function login(email: string, password: string): Promise<AuthResponse> {
-    const res = await fetch(`${API_BASE}/auth/login`, {
+    const res = await apiFetch(`${API_BASE}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
@@ -53,7 +61,7 @@ export async function login(email: string, password: string): Promise<AuthRespon
 }
 
 export async function signup(email: string, password: string): Promise<AuthResponse> {
-    const res = await fetch(`${API_BASE}/auth/signup`, {
+    const res = await apiFetch(`${API_BASE}/auth/signup`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
@@ -62,12 +70,12 @@ export async function signup(email: string, password: string): Promise<AuthRespo
 }
 
 export async function logout(): Promise<AuthResponse> {
-    const res = await fetch(`${API_BASE}/auth/logout`, { method: 'POST' });
+    const res = await apiFetch(`${API_BASE}/auth/logout`, { method: 'POST' });
     return handleResponse<AuthResponse>(res);
 }
 
 export async function resetPassword(email: string): Promise<AuthResponse> {
-    const res = await fetch(`${API_BASE}/auth/reset-password`, {
+    const res = await apiFetch(`${API_BASE}/auth/reset-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email }),
@@ -76,7 +84,7 @@ export async function resetPassword(email: string): Promise<AuthResponse> {
 }
 
 export async function getMe(): Promise<{ user: User | null; supabase_configured: boolean }> {
-    const res = await fetch(`${API_BASE}/auth/me`);
+    const res = await apiFetch(`${API_BASE}/auth/me`);
     return handleResponse(res);
 }
 
@@ -145,28 +153,28 @@ export interface KitDetail {
 }
 
 export async function listKits(): Promise<{ kits: Kit[] }> {
-    const res = await fetch(`${API_BASE}/kits`);
+    const res = await apiFetch(`${API_BASE}/kits`);
     return handleResponse(res);
 }
 
 export async function searchKits(query: string, filter: string = 'all'): Promise<{ kits: Kit[] }> {
     const params = new URLSearchParams({ q: query, filter });
-    const res = await fetch(`${API_BASE}/kits/search?${params.toString()}`);
+    const res = await apiFetch(`${API_BASE}/kits/search?${params.toString()}`);
     return handleResponse(res);
 }
 
 export async function getKit(slug: string): Promise<KitDetail> {
-    const res = await fetch(`${API_BASE}/kits/${slug}/detail`);
+    const res = await apiFetch(`${API_BASE}/kits/${slug}/detail`);
     return handleResponse(res);
 }
 
 export async function toggleBookmark(slug: string): Promise<{ ok: boolean; is_bookmarked: boolean }> {
-    const res = await fetch(`${API_BASE}/kits/${slug}/bookmark`, { method: 'POST' });
+    const res = await apiFetch(`${API_BASE}/kits/${slug}/bookmark`, { method: 'POST' });
     return handleResponse(res);
 }
 
 export async function createKit(name: string, description: string): Promise<{ ok: boolean; slug: string }> {
-    const res = await fetch(`${API_BASE}/kits`, {
+    const res = await apiFetch(`${API_BASE}/kits`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name, description }),
@@ -175,7 +183,7 @@ export async function createKit(name: string, description: string): Promise<{ ok
 }
 
 export async function updateKit(slug: string, name: string, description: string): Promise<{ ok: boolean }> {
-    const res = await fetch(`${API_BASE}/kits/${slug}`, {
+    const res = await apiFetch(`${API_BASE}/kits/${slug}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name, description }),
@@ -184,7 +192,7 @@ export async function updateKit(slug: string, name: string, description: string)
 }
 
 export async function deleteKit(slug: string): Promise<{ ok: boolean }> {
-    const res = await fetch(`${API_BASE}/kits/${slug}`, { method: 'DELETE' });
+    const res = await apiFetch(`${API_BASE}/kits/${slug}`, { method: 'DELETE' });
     return handleResponse(res);
 }
 
@@ -194,7 +202,7 @@ export async function addResource(
     slug: string,
     data: FormData
 ): Promise<{ ok: boolean }> {
-    const res = await fetch(`${API_BASE}/kits/${slug}/resources`, {
+    const res = await apiFetch(`${API_BASE}/kits/${slug}/resources`, {
         method: 'POST',
         body: data,
     });
@@ -206,7 +214,7 @@ export async function updateResource(
     number: number,
     data: FormData
 ): Promise<{ ok: boolean }> {
-    const res = await fetch(`${API_BASE}/kits/${slug}/resources/${number}/update`, {
+    const res = await apiFetch(`${API_BASE}/kits/${slug}/resources/${number}/update`, {
         method: 'POST',
         body: data,
     });
@@ -214,14 +222,14 @@ export async function updateResource(
 }
 
 export async function deleteResource(slug: string, number: number): Promise<{ ok: boolean }> {
-    const res = await fetch(`${API_BASE}/kits/${slug}/resources/${number}`, { method: 'DELETE' });
+    const res = await apiFetch(`${API_BASE}/kits/${slug}/resources/${number}`, { method: 'DELETE' });
     return handleResponse(res);
 }
 
 // ─── Tools ───────────────────────────────────────────────────────────────────
 
 export async function getAvailableTools(): Promise<{ tools: AvailableTool[] }> {
-    const res = await fetch(`${API_BASE}/tools/available`);
+    const res = await apiFetch(`${API_BASE}/tools/available`);
     return handleResponse(res);
 }
 
@@ -235,7 +243,7 @@ export async function addTool(
     if (displayName) payload.display_name = displayName;
     if (configuration) payload.configuration = configuration;
 
-    const res = await fetch(`${API_BASE}/kits/${slug}/tools`, {
+    const res = await apiFetch(`${API_BASE}/kits/${slug}/tools`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -255,7 +263,7 @@ export async function updateTool(
     if (displayName) payload.display_name = displayName;
     if (configuration) payload.configuration = configuration;
 
-    const res = await fetch(`${API_BASE}/kits/${slug}/tools/${number}/update`, {
+    const res = await apiFetch(`${API_BASE}/kits/${slug}/tools/${number}/update`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -266,7 +274,7 @@ export async function updateTool(
 }
 
 export async function deleteTool(slug: string, number: number): Promise<{ ok: boolean }> {
-    const res = await fetch(`${API_BASE}/kits/${slug}/tools/${number}`, { method: 'DELETE' });
+    const res = await apiFetch(`${API_BASE}/kits/${slug}/tools/${number}`, { method: 'DELETE' });
     return handleResponse(res);
 }
 
@@ -277,7 +285,7 @@ export async function addStep(
     prompt: string,
     displayName: string
 ): Promise<{ ok: boolean }> {
-    const res = await fetch(`${API_BASE}/kits/${slug}/steps`, {
+    const res = await apiFetch(`${API_BASE}/kits/${slug}/steps`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt, display_name: displayName }),
@@ -294,7 +302,7 @@ export async function updateStep(
     const fd = new FormData();
     fd.append('prompt', prompt);
     fd.append('display_name', displayName);
-    const res = await fetch(`${API_BASE}/kits/${slug}/steps/${number}/update`, {
+    const res = await apiFetch(`${API_BASE}/kits/${slug}/steps/${number}/update`, {
         method: 'POST',
         body: fd,
     });
@@ -302,7 +310,7 @@ export async function updateStep(
 }
 
 export async function deleteStep(slug: string, number: number): Promise<{ ok: boolean }> {
-    const res = await fetch(`${API_BASE}/kits/${slug}/steps/${number}`, { method: 'DELETE' });
+    const res = await apiFetch(`${API_BASE}/kits/${slug}/steps/${number}`, { method: 'DELETE' });
     return handleResponse(res);
 }
 
@@ -333,14 +341,14 @@ export async function startExecution(
                 }
             }
         }
-        const res = await fetch(`${API_BASE}/kits/${slug}/execute`, {
+        const res = await apiFetch(`${API_BASE}/kits/${slug}/execute`, {
             method: 'POST',
             body: fd,
         });
         return handleResponse(res);
     }
 
-    const res = await fetch(`${API_BASE}/kits/${slug}/execute`, {
+    const res = await apiFetch(`${API_BASE}/kits/${slug}/execute`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(config),
@@ -354,7 +362,7 @@ export async function submitEvaluation(
     step: number,
     score: number
 ): Promise<{ ok: boolean }> {
-    const res = await fetch(`${API_BASE}/kits/${slug}/evaluate-step`, {
+    const res = await apiFetch(`${API_BASE}/kits/${slug}/evaluate-step`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ execution_id: executionId, step, score }),
@@ -367,14 +375,14 @@ export function getSSEUrl(slug: string, executionId: string): string {
 }
 
 export async function pauseExecution(slug: string, executionId: string): Promise<{ ok: boolean; error?: string }> {
-    const res = await fetch(`${API_BASE}/kits/${slug}/executions/${executionId}/pause`, {
+    const res = await apiFetch(`${API_BASE}/kits/${slug}/executions/${executionId}/pause`, {
         method: 'POST',
     });
     return handleResponse(res);
 }
 
 export async function resumeExecution(slug: string, runId: string): Promise<{ execution_id: string; error?: string }> {
-    const res = await fetch(`${API_BASE}/kits/${slug}/execute/resume`, {
+    const res = await apiFetch(`${API_BASE}/kits/${slug}/execute/resume`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ run_id: runId }),
@@ -383,7 +391,7 @@ export async function resumeExecution(slug: string, runId: string): Promise<{ ex
 }
 
 export async function deleteExecution(slug: string, runId: string): Promise<{ ok: boolean; error?: string }> {
-    const res = await fetch(`${API_BASE}/kits/${slug}/executions/${runId}`, {
+    const res = await apiFetch(`${API_BASE}/kits/${slug}/executions/${runId}`, {
         method: 'DELETE',
     });
     return handleResponse(res);
@@ -402,12 +410,12 @@ export interface ExecutionRun {
 }
 
 export async function listExecutions(slug: string): Promise<{ runs: ExecutionRun[] }> {
-    const res = await fetch(`${API_BASE}/kits/${slug}/executions`);
+    const res = await apiFetch(`${API_BASE}/kits/${slug}/executions`);
     return handleResponse(res);
 }
 
 export async function getExecution(slug: string, runId: string): Promise<Record<string, unknown>> {
-    const res = await fetch(`${API_BASE}/kits/${slug}/executions/${runId}`);
+    const res = await apiFetch(`${API_BASE}/kits/${slug}/executions/${runId}`);
     return handleResponse(res);
 }
 
@@ -416,7 +424,7 @@ export async function updateExecutionLabel(
     runId: string,
     label: string
 ): Promise<{ ok: boolean }> {
-    const res = await fetch(`${API_BASE}/kits/${slug}/executions/${runId}/label`, {
+    const res = await apiFetch(`${API_BASE}/kits/${slug}/executions/${runId}/label`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ label }),
@@ -438,12 +446,12 @@ export interface McpConfig {
 }
 
 export async function getMcpConfigs(): Promise<{ configs: McpConfig[] }> {
-    const res = await fetch(`${API_BASE}/mcp/config`);
+    const res = await apiFetch(`${API_BASE}/mcp/config`);
     return handleResponse(res);
 }
 
 export async function updateMcpConfig(server_name: string, env_vars: Record<string, string>, is_active: boolean = false): Promise<{ ok: boolean }> {
-    const res = await fetch(`${API_BASE}/mcp/config/${server_name}`, {
+    const res = await apiFetch(`${API_BASE}/mcp/config/${server_name}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ env_vars, is_active }),
@@ -462,12 +470,12 @@ export interface DocItem {
 }
 
 export async function getDocsList(): Promise<{ docs: DocItem[] }> {
-    const res = await fetch(`${API_BASE}/docs`);
+    const res = await apiFetch(`${API_BASE}/docs`);
     return handleResponse(res);
 }
 
 export async function getDocContent(slug: string): Promise<{ content: string }> {
-    const res = await fetch(`${API_BASE}/docs/${slug}`);
+    const res = await apiFetch(`${API_BASE}/docs/${slug}`);
     return handleResponse(res);
 }
 
@@ -484,7 +492,7 @@ export interface LlmConfig {
 }
 
 export async function getLlmConfigs(): Promise<{ configs: LlmConfig[] }> {
-    const res = await fetch(`${API_BASE}/llm/config`);
+    const res = await apiFetch(`${API_BASE}/llm/config`);
     return handleResponse(res);
 }
 
@@ -497,7 +505,7 @@ export async function updateLlmConfig(
     const payload: any = { env_vars, is_active };
     if (selected_model) payload.selected_model = selected_model;
 
-    const res = await fetch(`${API_BASE}/llm/config/${provider_name}`, {
+    const res = await apiFetch(`${API_BASE}/llm/config/${provider_name}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),

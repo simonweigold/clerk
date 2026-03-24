@@ -1,17 +1,27 @@
-# CLERK
+# OpenClerk
+
 Community Library of Executable Reasoning Kits
 
-## Setup
+[![PyPI](https://img.shields.io/pypi/v/openclerk.svg)](https://pypi.org/project/openclerk/)
+[![Docs](https://img.shields.io/badge/docs-openclerk.dev-blue.svg)](https://openclerk.dev/docs)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-1. Install dependencies with UV:
+## Overview
+
+Clerk is a Python framework for multi-step LLM reasoning workflows with a React frontend. It provides a declarative way to define and execute modular, reusable reasoning workflows using Large Language Models (LLMs).
+
+## Installation
+
 ```bash
+# Install from PyPI (when published)
+pip install openclerk
+
+# Or install from source
+git clone https://github.com/simonweigold/clerk.git
+cd clerk
 uv sync
-```
-
-2. Create a `.env` file with your OpenAI API key:
-```bash
-cp .env.example .env
-# Edit .env and add your OPENAI_API_KEY
+cd packages/clerk
+uv pip install -e .
 ```
 
 ## Usage
@@ -20,37 +30,64 @@ cp .env.example .env
 
 List available reasoning kits:
 ```bash
-uv run clerk list
+clerk list
 ```
 
 Show info about a reasoning kit:
 ```bash
-uv run clerk info demo
+clerk info demo
 ```
 
 Run a reasoning kit:
 ```bash
-uv run clerk run demo
+clerk run demo
 ```
 
 Run web app:
-(optional):
 ```bash
-npx tailwindcss@3 -i src/clerk/web/static/css/tailwind.input.css -o src/clerk/web/static/css/tailwind.built.css --minify
+clerk web
 ```
-Mandatory:
+
+Or using UV directly:
 ```bash
-uv run clerk web
+uv run python -m openclerk list
+uv run python -m openclerk run demo
+uv run python -m openclerk web
 ```
 
 ### Programmatic Usage
 
 ```python
-from clerk.loader import load_reasoning_kit
-from clerk.graph import run_reasoning_kit
+from openclerk.loader import load_reasoning_kit
+from openclerk.graph import run_reasoning_kit
 
 kit = load_reasoning_kit("reasoning_kits/demo")
 outputs = run_reasoning_kit(kit)
+```
+
+## Repository Structure
+
+This is a monorepo containing:
+
+- `packages/clerk/` - Python package (`pip install openclerk`)
+- `apps/website/` - Next.js website (openclerk.ch)
+- `docs/` - Documentation
+- `reasoning_kits/` - Example reasoning kits
+
+## Development
+
+### Python Package
+```bash
+cd packages/clerk
+uv pip install -e ".[dev]"
+pytest
+```
+
+### Website
+```bash
+cd apps/website
+npm install
+npm run dev
 ```
 
 ## Creating New Reasoning Kits
@@ -96,7 +133,7 @@ Please provide a summary.
 
 The abstract overview of a reasoning kit:
 
-```
+```json
 {
     "resources": {
         "1": {
@@ -109,7 +146,7 @@ The abstract overview of a reasoning kit:
             "link": "https://blob-storage.cloud-provider.com/file.pdf",
             "resource_id": "resource_2"
         }
-    }
+    },
     "workflow": {
         "1": {
             "type": "instruction",
@@ -120,7 +157,7 @@ The abstract overview of a reasoning kit:
         "2": {
             "type": "instruction",
             "prompt": "Look up a definition for this classification:\n{workflow_1}\nfrom this resource:\n{resource_2}",
-            "evalaution": "",
+            "evaluation": "",
             "output_id": "workflow_2"
         },
         "3": {
@@ -137,41 +174,44 @@ The abstract overview of a reasoning kit:
 The workflow runs chronologically. Steps are executed in order (1, 2, 3, ...) with each step's output available to subsequent steps via placeholders.
 
 ## MCP
-CLERK can be connected to other LLMs via MCP. The LLM can create new Reasoning Kits, edit and execute them. In order to be able to do this, it needs to be instructed via prompts.
+Clerk can be connected to other LLMs via MCP. The LLM can create new Reasoning Kits, edit and execute them. In order to be able to do this, it needs to be instructed via prompts.
 
-## General Tasks
-- [x] Langchain logic, which executes all steps from the workflow
-- [x] After final event, present all results back to user
-- [x] For evaluation steps, interrupt logic and ask for user feedback
-- [x] Database layer, which centralizes the storage for reasoning kits
+## Roadmap
+
+### Completed
+- [x] LangChain logic for executing workflow steps
+- [x] Present all results back to user after final event
+- [x] Evaluation steps with user feedback interruption
+- [x] Database layer for kit storage
 - [x] Reasoning Kit definition layer (via terminal)
-- [x] UI, which can be launched via `clerk web`
-    - [x] wraps the Reasoning Kit definition layer in an intuitive way
-    - [x] allows execution of Kits (including evaluation if desired)
-- [ ] Spin up local db for storage (as alternative to Supabase) --> launch with `clerk web --local`
-- [ ] MCP logic
-    - [ ] Log in to Supabase if desired
-    - [ ] If not: use local db instance
+- [x] Web UI (`clerk web`)
+- [x] Monorepo structure with package/website separation
+
+### In Progress
+- [ ] Spin up local db for storage (as alternative to Supabase) → launch with `clerk web --local`
+- [ ] MCP logic with Supabase login
 - [ ] New type: resources, workflows, tools!
 - [ ] Batch execution mode
 - [ ] Docker implementation
 
-## Tasks (to be implemented another time)
-- [ ] change reasoning_kits/demo/resource_1.txt to pdf and add pdf support for resources.
-- [ ] collect some more practical use cases for showcasing
+### Future Ideas
+- [ ] PDF support for resources
+- [ ] More practical use cases for showcasing
+- [ ] Allow resources to be websites
+- [ ] Password reset and user management improvements
+- [ ] Resizable text input fields when editing workflow steps
+- [ ] Allow editing outputs during execution
+- [ ] View entire prompt option during execution
+- [ ] Save workflow executions to db for later access
+- [ ] Download results option
 
+## Links
 
+- [Documentation](https://openclerk.ch/docs)
+- [Website](https://openclerk.ch)
+- [PyPI](https://pypi.org/project/openclerk/)
+- [Issues](https://github.com/simonweigold/clerk/issues)
 
+## License
 
-- I3 allow resources to be a website
-
-- add option to reset password for supabase when signing in
-- when user with mail address already exists in supabase tell the user
-
-- allow resizing of text input fields when editing workflow steps
-
-- when executing a kit, allow user to edit an output (important in case it is referenced in future steps)
-- when executing a kit, add option to view entire prompt
-
-- save workflow executions to db and allow user to access them again even after quitting
-- add download results option
+MIT License

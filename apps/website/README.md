@@ -1,73 +1,98 @@
-# React + TypeScript + Vite
+# OpenClerk Website
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+The official website for OpenClerk - built with React, TypeScript, and Vite.
 
-Currently, two official plugins are available:
+## Overview
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+This is the website application for openclerk.dev, providing:
 
-## React Compiler
+- Documentation and guides
+- Interactive reasoning kit browser
+- Kit execution interface
+- User authentication and settings
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Tech Stack
 
-## Expanding the ESLint configuration
+- **Framework**: React 19 + TypeScript
+- **Build Tool**: Vite
+- **Styling**: Tailwind CSS
+- **Routing**: React Router
+- **UI Components**: Custom components with Tailwind
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## Development
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+### Prerequisites
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+- Node.js 20+
+- npm or yarn
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+### Setup
+
+```bash
+cd apps/website
+npm install
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+### Development Server
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm run dev
 ```
+
+This starts the development server at `http://localhost:5173`.
+
+### Build
+
+```bash
+npm run build
+```
+
+This creates a production build in the `dist/` directory.
+
+### Preview Build
+
+```bash
+npm run preview
+```
+
+Preview the production build locally.
+
+### Linting
+
+```bash
+npm run lint
+```
+
+## Project Structure
+
+```
+apps/website/
+├── src/
+│   ├── components/     # Reusable UI components
+│   ├── pages/         # Route/page components
+│   ├── hooks/         # Custom React hooks
+│   ├── lib/           # Utilities and API clients
+│   ├── App.tsx        # Main app component with routing
+│   └── main.tsx       # Entry point
+├── public/            # Static assets
+├── index.html         # HTML template
+└── vite.config.ts     # Vite configuration
+```
+
+## Environment Variables
+
+Create a `.env` file in `apps/website/` with:
+
+```
+VITE_API_URL=http://localhost:8000
+```
+
+## Deployment
+
+The website is deployed to openclerk.dev via [deployment platform].
+
+## Links
+
+- [Live Site](https://openclerk.dev)
+- [Main Repository](../../README.md)
+- [Python Package](../../packages/clerk/README.md)

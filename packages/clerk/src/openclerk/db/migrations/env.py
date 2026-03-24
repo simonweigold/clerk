@@ -20,7 +20,7 @@ sys.path.insert(0, str(src_path))
 load_dotenv()
 
 # Import our models
-from clerk.db.models import Base  # noqa: E402
+from openclerk.db.models import Base  # noqa: E402
 
 # Alembic Config object
 config = context.config

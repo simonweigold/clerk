@@ -18,7 +18,7 @@ const AuthContext = createContext<AuthContextType>({
 export function AuthProvider({ children }: { children: ReactNode }) {
     const [user, setUser] = useState<User | null>(null);
     const [supabaseConfigured, setSupabaseConfigured] = useState(false);
-    const [loading, setLoading] = useState(false);
+    const [loading, setLoading] = useState(true);
 
     const refresh = async () => {
         setLoading(true);
@@ -34,7 +34,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
 
     useEffect(() => {
-        // Non-blocking auth check - start with null user, verify in background
+        // Initial auth check - wait for result before rendering auth-dependent UI
         getMe()
             .then((data) => {
                 setUser(data.user);
@@ -42,6 +42,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             })
             .catch(() => {
                 setUser(null);
+            })
+            .finally(() => {
+                setLoading(false);
             });
     }, []);
 

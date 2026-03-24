@@ -19,10 +19,10 @@
 
 - [x] **GHUB-01**: Issue templates exist for bug reports and feature requests
 - [x] **GHUB-02**: Pull request template includes checklist (tests, docs, linked issue)
-- [ ] **GHUB-03**: GitHub Actions CI runs tests on PRs
-- [ ] **GHUB-04**: GitHub Actions CI runs linting (Ruff) on PRs
-- [ ] **GHUB-05**: Branch protection requires CI to pass before merge
-- [ ] **GHUB-06**: "Good first issue" labels applied to beginner-friendly issues
+- [x] **GHUB-03**: GitHub Actions CI runs tests on PRs
+- [x] **GHUB-04**: GitHub Actions CI runs linting (Ruff) on PRs
+- [x] **GHUB-05**: Branch protection requires CI to pass before merge
+- [x] **GHUB-06**: "Good first issue" labels applied to beginner-friendly issues
 
 ### Developer Tooling
 
@@ -97,10 +97,10 @@
 | DOCS-07 | Phase 3 | Pending |
 | GHUB-01 | Phase 2 | Complete |
 | GHUB-02 | Phase 2 | Complete |
-| GHUB-03 | Phase 2 | Pending |
-| GHUB-04 | Phase 2 | Pending |
-| GHUB-05 | Phase 2 | Pending |
-| GHUB-06 | Phase 2 | Pending |
+| GHUB-03 | Phase 2 | Complete |
+| GHUB-04 | Phase 2 | Complete |
+| GHUB-05 | Phase 2 | Complete |
+| GHUB-06 | Phase 2 | Complete |
 | TOOL-01 | Phase 1 | Complete |
 | TOOL-02 | Phase 1 | Complete |
 | TOOL-03 | Phase 1 | Complete |

@@ -23,6 +23,29 @@ For zero local setup, use the dev container:
 - VS Code: "Reopen in Container"
 - GitHub: Click "Code" → "Codespaces" → "Create codespace"
 
+### Pre-commit Hooks
+
+We use pre-commit to run linting and type checks before each commit.
+
+1. Install pre-commit:
+   ```bash
+   uv pip install pre-commit
+   ```
+
+2. Install the hooks:
+   ```bash
+   pre-commit install
+   ```
+
+3. (Optional) Run on all files once:
+   ```bash
+   pre-commit run --all-files
+   ```
+
+The hooks will now run automatically on every commit, checking:
+- Ruff linting and formatting
+- mypy type checking
+
 ## Development Workflow
 
 1. **Create a branch**: `git checkout -b feature/your-feature-name`

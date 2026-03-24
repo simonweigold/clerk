@@ -45,10 +45,10 @@
 4. Code follows consistent style automatically (Ruff, mypy configured and passing)
 5. Devcontainer configuration allows zero-local-setup contributions via VS Code or GitHub Codespaces
 
-**Plans:** 1/3 plans executed
+**Plans:** 2/3 plans executed
 
 Plans:
-- [ ] 01-01-PLAN.md — Documentation (LICENSE, README, CONTRIBUTING, CODE_OF_CONDUCT, CHANGELOG)
+- [x] 01-01-PLAN.md — Documentation (LICENSE, README, CONTRIBUTING, CODE_OF_CONDUCT, CHANGELOG)
 - [x] 01-02-PLAN.md — Python Tooling (Ruff, pytest, mypy, Justfile)
 - [ ] 01-03-PLAN.md — Dev Environment (dev container, VS Code settings)
 
@@ -129,7 +129,7 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation | 1/3 | In Progress|  |
+| 1. Foundation | 2/3 | In Progress|  |
 | 2. Contributor Experience | 0/3 | Not started | - |
 | 3. Frontend & Integration | 0/2 | Not started | - |
 | 4. Distribution | 0/3 | Not started | - |

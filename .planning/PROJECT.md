@@ -18,16 +18,16 @@ Developers can set up Clerk in under 5 minutes and contribute meaningfully in un
 - ✓ React frontend with Tailwind CSS — existing
 - ✓ CLI for running kits — existing
 - ✓ Evaluation system — existing
+- ✓ Clear, structured contributor onboarding — Phase 1
+- ✓ Improved documentation structure — Phase 1
+- ✓ Development environment setup automation — Phase 1
+- ✓ Contributing guidelines and templates — Phase 1
+- ✓ License and legal framework for open source — Phase 1
 
 ### Active
 
-- [ ] Clear, structured contributor onboarding
 - [ ] Self-hosted deployment documentation and tooling
 - [ ] Integration guide for existing applications
-- [ ] Improved documentation structure
-- [ ] Development environment setup automation
-- [ ] Contributing guidelines and templates
-- [ ] License and legal framework for open source
 
 ### Out of Scope
 
@@ -39,11 +39,12 @@ Developers can set up Clerk in under 5 minutes and contribute meaningfully in un
 ## Context
 
 **Current State:**
-- Solo-developed project with limited documentation
-- No clear onboarding path for contributors
-- Docker setup exists but not documented
-- No clear path for self-hosting vs integration
-- AGENTS.md provides some context but not comprehensive
+- Phase 1 complete: Foundation documentation and tooling in place
+- MIT License, CONTRIBUTING.md, CODE_OF_CONDUCT.md all published
+- Just task runner configured with setup/test/lint/format commands
+- Dev container enables zero-setup contributions
+- Clear separation: docs/user-guide/, docs/integration/, docs/contributing/
+- Ready to accept external contributions
 
 **Target Audience:**
 - Developers wanting to add LLM reasoning workflows to their apps
@@ -68,10 +69,12 @@ Developers can set up Clerk in under 5 minutes and contribute meaningfully in un
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| Self-hosted first | Easier to contribute, clearer value prop | — Pending |
-| UV for Python tooling | Modern, fast, lockfile support | — Pending |
-| Mono-repo structure | Backend + frontend in one repo | — Pending |
-| MIT License | Permissive, contributor-friendly | — Pending |
+| Self-hosted first | Easier to contribute, clearer value prop | ✓ Good — enables open source launch |
+| UV for Python tooling | Modern, fast, lockfile support | ✓ Good — 10-100x faster than pip |
+| Mono-repo structure | Backend + frontend in one repo | ✓ Good — single repo for all work |
+| MIT License | Permissive, contributor-friendly | ✓ Good — MIT added in Phase 1 |
+| Just task runner | Cross-platform, modern Make alternative | ✓ Good — just setup works everywhere |
+| Dev container approach | Zero-setup contributions | ✓ Good — GitHub Codespaces ready |
 
 ## Evolution
 
@@ -91,4 +94,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2025-03-24 after initialization*
+*Last updated: 2026-03-24 after Phase 1 completion*

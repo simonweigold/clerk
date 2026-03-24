@@ -105,7 +105,7 @@ Plans:
 
 Plans:
 - [ ] 03-01-PLAN.md — Documentation Structure & API Spec (user guide, integration guide, OpenAPI generation)
-- [ ] 03-02-PLAN.md — FastAPI Integration Example (embedding example with auth, execution, results)
+- [x] 03-02-PLAN.md — FastAPI Integration Example (embedding example with auth, execution, results)
 
 **UI hint**: yes
 

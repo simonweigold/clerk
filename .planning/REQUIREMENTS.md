@@ -49,8 +49,8 @@
 
 ### Integration Support
 
-- [ ] **INTEG-01**: FastAPI integration example with working code
-- [ ] **INTEG-02**: Integration guide explains embedding Clerk in existing apps
+- [x] **INTEG-01**: FastAPI integration example with working code
+- [x] **INTEG-02**: Integration guide explains embedding Clerk in existing apps
 - [ ] **INTEG-03**: API documentation generated from FastAPI OpenAPI
 
 ## v2 Requirements
@@ -115,8 +115,8 @@
 | DEPLOY-01 | Phase 4 | Pending |
 | DEPLOY-02 | Phase 4 | Pending |
 | DEPLOY-03 | Phase 4 | Pending |
-| INTEG-01 | Phase 3 | Pending |
-| INTEG-02 | Phase 3 | Pending |
+| INTEG-01 | Phase 3 | Complete |
+| INTEG-02 | Phase 3 | Complete |
 | INTEG-03 | Phase 3 | Pending |
 
 **Coverage:**

@@ -17,8 +17,8 @@
 
 ### GitHub Setup
 
-- [ ] **GHUB-01**: Issue templates exist for bug reports and feature requests
-- [ ] **GHUB-02**: Pull request template includes checklist (tests, docs, linked issue)
+- [x] **GHUB-01**: Issue templates exist for bug reports and feature requests
+- [x] **GHUB-02**: Pull request template includes checklist (tests, docs, linked issue)
 - [ ] **GHUB-03**: GitHub Actions CI runs tests on PRs
 - [ ] **GHUB-04**: GitHub Actions CI runs linting (Ruff) on PRs
 - [ ] **GHUB-05**: Branch protection requires CI to pass before merge
@@ -95,8 +95,8 @@
 | DOCS-05 | Phase 1 | Complete |
 | DOCS-06 | Phase 1 | Complete |
 | DOCS-07 | Phase 3 | Pending |
-| GHUB-01 | Phase 2 | Pending |
-| GHUB-02 | Phase 2 | Pending |
+| GHUB-01 | Phase 2 | Complete |
+| GHUB-02 | Phase 2 | Complete |
 | GHUB-03 | Phase 2 | Pending |
 | GHUB-04 | Phase 2 | Pending |
 | GHUB-05 | Phase 2 | Pending |

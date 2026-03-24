@@ -26,12 +26,12 @@
 
 ### Developer Tooling
 
-- [ ] **TOOL-01**: UV workspace configured for Python dependency management
-- [ ] **TOOL-02**: Ruff configured for linting and formatting in pyproject.toml
-- [ ] **TOOL-03**: pytest configured with coverage reporting
-- [ ] **TOOL-04**: mypy configured for type checking
+- [x] **TOOL-01**: UV workspace configured for Python dependency management
+- [x] **TOOL-02**: Ruff configured for linting and formatting in pyproject.toml
+- [x] **TOOL-03**: pytest configured with coverage reporting
+- [x] **TOOL-04**: mypy configured for type checking
 - [ ] **TOOL-05**: pre-commit hooks configured (Ruff, mypy, commit message check)
-- [ ] **TOOL-06**: Just task runner configured for common commands (test, lint, format)
+- [x] **TOOL-06**: Just task runner configured for common commands (test, lint, format)
 - [ ] **TOOL-07**: Dev container configuration enables zero-setup contributions
 - [ ] **TOOL-08**: VS Code settings/extensions configured for the project
 
@@ -101,12 +101,12 @@
 | GHUB-04 | Phase 2 | Pending |
 | GHUB-05 | Phase 2 | Pending |
 | GHUB-06 | Phase 2 | Pending |
-| TOOL-01 | Phase 1 | Pending |
-| TOOL-02 | Phase 1 | Pending |
-| TOOL-03 | Phase 1 | Pending |
-| TOOL-04 | Phase 1 | Pending |
+| TOOL-01 | Phase 1 | Complete |
+| TOOL-02 | Phase 1 | Complete |
+| TOOL-03 | Phase 1 | Complete |
+| TOOL-04 | Phase 1 | Complete |
 | TOOL-05 | Phase 2 | Pending |
-| TOOL-06 | Phase 1 | Pending |
+| TOOL-06 | Phase 1 | Complete |
 | TOOL-07 | Phase 1 | Pending |
 | TOOL-08 | Phase 1 | Pending |
 | SETUP-01 | Phase 4 | Pending |

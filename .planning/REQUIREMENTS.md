@@ -30,7 +30,7 @@
 - [x] **TOOL-02**: Ruff configured for linting and formatting in pyproject.toml
 - [x] **TOOL-03**: pytest configured with coverage reporting
 - [x] **TOOL-04**: mypy configured for type checking
-- [ ] **TOOL-05**: pre-commit hooks configured (Ruff, mypy, commit message check)
+- [x] **TOOL-05**: pre-commit hooks configured (Ruff, mypy, commit message check)
 - [x] **TOOL-06**: Just task runner configured for common commands (test, lint, format)
 - [ ] **TOOL-07**: Dev container configuration enables zero-setup contributions
 - [ ] **TOOL-08**: VS Code settings/extensions configured for the project
@@ -105,7 +105,7 @@
 | TOOL-02 | Phase 1 | Complete |
 | TOOL-03 | Phase 1 | Complete |
 | TOOL-04 | Phase 1 | Complete |
-| TOOL-05 | Phase 2 | Pending |
+| TOOL-05 | Phase 2 | Complete |
 | TOOL-06 | Phase 1 | Complete |
 | TOOL-07 | Phase 1 | Pending |
 | TOOL-08 | Phase 1 | Pending |

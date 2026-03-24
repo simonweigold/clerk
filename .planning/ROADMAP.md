@@ -79,7 +79,7 @@ Plans:
 
 Plans:
 - [ ] 02-01-PLAN.md — GitHub Templates (issue templates, PR template)
-- [ ] 02-02-PLAN.md — Pre-commit Hooks (Ruff, mypy configuration)
+- [x] 02-02-PLAN.md — Pre-commit Hooks (Ruff, mypy configuration)
 - [ ] 02-03-PLAN.md — CI and Quality Gates (GitHub Actions, branch protection docs)
 
 ---

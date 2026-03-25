@@ -118,7 +118,8 @@ function DocsSidebar() {
         'ui': 'UI Features',
         'user-guide': 'User Guide',
         'integration': 'Integration',
-        'contributing': 'Contributing'
+        'contributing': 'Contributing',
+        'deployment': 'Deployment'
     };
 
     const groupedDocs: Record<string, DocItem[]> = {};
@@ -134,7 +135,7 @@ function DocsSidebar() {
     });
 
     // Custom order - User-centric docs first
-    const order = ['User Guide', 'Integration', 'Contributing', 'General', 'CLI Commands', 'UI Features'];
+    const order = ['User Guide', 'Integration', 'Deployment', 'Contributing', 'General', 'CLI Commands', 'UI Features'];
     const groups = Object.keys(groupedDocs).sort((a, b) => {
         const indexA = order.indexOf(a);
         const indexB = order.indexOf(b);

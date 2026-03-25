@@ -37,15 +37,15 @@
 
 ### Setup Automation
 
-- [ ] **SETUP-01**: One-command setup script installs all dependencies
+- [x] **SETUP-01**: One-command setup script installs all dependencies
 - [ ] **SETUP-02**: Database setup is automated via CLI command
-- [ ] **SETUP-03**: Dev environment starts with single command (backend + frontend)
+- [x] **SETUP-03**: Dev environment starts with single command (backend + frontend)
 
 ### Deployment Documentation
 
-- [ ] **DEPLOY-01**: Self-hosted deployment guide with Docker Compose
-- [ ] **DEPLOY-02**: Environment variables fully documented
-- [ ] **DEPLOY-03**: Production considerations documented (security, scaling)
+- [x] **DEPLOY-01**: Self-hosted deployment guide with Docker Compose
+- [x] **DEPLOY-02**: Environment variables fully documented
+- [x] **DEPLOY-03**: Production considerations documented (security, scaling)
 
 ### Integration Support
 
@@ -109,12 +109,12 @@
 | TOOL-06 | Phase 1 | Complete |
 | TOOL-07 | Phase 1 | Pending |
 | TOOL-08 | Phase 1 | Pending |
-| SETUP-01 | Phase 4 | Pending |
+| SETUP-01 | Phase 4 | Complete |
 | SETUP-02 | Phase 4 | Pending |
-| SETUP-03 | Phase 4 | Pending |
-| DEPLOY-01 | Phase 4 | Pending |
-| DEPLOY-02 | Phase 4 | Pending |
-| DEPLOY-03 | Phase 4 | Pending |
+| SETUP-03 | Phase 4 | Complete |
+| DEPLOY-01 | Phase 4 | Complete |
+| DEPLOY-02 | Phase 4 | Complete |
+| DEPLOY-03 | Phase 4 | Complete |
 | INTEG-01 | Phase 3 | Complete |
 | INTEG-02 | Phase 3 | Complete |
 | INTEG-03 | Phase 3 | Pending |

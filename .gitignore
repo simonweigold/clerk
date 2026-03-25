@@ -209,3 +209,10 @@ __marimo__/
 # AI Coding
 .github/workflows/opencode.yml
 .opencode
+
+# Fonts
+fonts/
+
+# MCP Stuff
+tmp_airtable_mcp/
+tmp_mcp_030/

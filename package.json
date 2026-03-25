@@ -1,0 +1,20 @@
+{
+  "name": "openclerk-workspace",
+  "private": true,
+  "version": "1.0.0",
+  "description": "OpenClerk mono-repo workspace",
+  "scripts": {
+    "dev": "concurrently \"npm:dev:backend\" \"npm:dev:frontend\" --names \"API,UI\" --prefix-colors \"blue,green\"",
+    "dev:backend": "cd packages/clerk && uv run clerk web --port 8000",
+    "dev:frontend": "cd apps/website && npm run dev",
+    "setup": "./scripts/setup.sh",
+    "build": "cd apps/website && npm run build",
+    "lint": "cd apps/website && npm run lint"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

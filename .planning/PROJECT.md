@@ -27,11 +27,15 @@ Developers can set up Clerk in under 5 minutes and contribute meaningfully in un
 - ✓ CI/CD workflow with tests and linting — Phase 2
 - ✓ Pre-commit hooks for code quality — Phase 2
 - ✓ Branch protection and contribution workflow — Phase 2
+- ✓ Self-hosted deployment documentation and tooling — Phase 4
+- ✓ Integration guide for existing applications — Phase 3
+- ✓ API documentation with OpenAPI spec — Phase 3
+- ✓ PyPI package ready for distribution — Phase 4
+- ✓ Docker Compose production deployment — Phase 4
 
 ### Active
 
-- [ ] Self-hosted deployment documentation and tooling
-- [ ] Integration guide for existing applications
+_None — all v1 requirements complete_
 
 ### Out of Scope
 
@@ -43,14 +47,15 @@ Developers can set up Clerk in under 5 minutes and contribute meaningfully in un
 ## Context
 
 **Current State:**
-- Phase 1 complete: Foundation documentation and tooling in place
-- Phase 2 complete: Quality gates and contribution workflow operational
-- GitHub templates (bug report, feature request, PR checklist) configured
-- CI/CD with GitHub Actions (test, lint, type-check) running on PRs
-- Pre-commit hooks (Ruff, mypy) prevent bad commits
-- Branch protection documented, ready for enforcement
-- 3 "good first issue" templates created for new contributors
-- Ready to accept external contributions with automated quality checks
+- All 4 phases complete: Clerk is ready for open source launch
+- Foundation (Phase 1): Documentation, tooling, contributor guidelines in place
+- Contributor Experience (Phase 2): CI/CD, quality gates, GitHub workflows operational
+- Frontend & Integration (Phase 3): API docs, integration examples, FastAPI guide complete
+- Distribution (Phase 4): PyPI ready, Docker Compose, deployment guides complete
+- One-command setup: `./scripts/setup.sh` installs all dependencies
+- One-command dev start: `npm run dev` starts backend + frontend
+- Production deployment: `docker-compose up` for self-hosted deployment
+- Ready to accept contributions and users
 
 **Target Audience:**
 - Developers wanting to add LLM reasoning workflows to their apps
@@ -100,4 +105,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-03-24 after Phase 2 completion*
+*Last updated: 2026-03-25 after Phase 4 completion — v1.0 milestone achieved*

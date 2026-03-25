@@ -131,7 +131,12 @@ Plans:
 4. Production guide covers HTTPS setup, database migrations, log management, and scaling considerations
 5. CLI provides `clerk setup` command for automated database initialization and configuration
 
-**Plans:** TBD
+**Plans:** 3 plans defined
+
+Plans:
+- [ ] 04-01-PLAN.md — Setup Automation & PyPI Configuration (setup script, dev command, pyproject.toml, .env.example)
+- [ ] 04-02-PLAN.md — Docker Compose & Production Deployment (multi-container setup, Dockerfiles, nginx config)
+- [ ] 04-03-PLAN.md — Environment Documentation & Production Guide (deployment docs, environment reference)
 
 ---
 
@@ -142,7 +147,7 @@ Plans:
 | 1. Foundation | 3/3 | Completed| 2026-03-24 |
 | 2. Contributor Experience | 3/3 | Completed| 2026-03-24 |
 | 3. Frontend & Integration | 2/2 | Completed| 2026-03-24 |
-| 4. Distribution | 0/3 | Not started | - |
+| 4. Distribution | 0/3 | Planned | - |
 
 ---
 

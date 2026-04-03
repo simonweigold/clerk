@@ -9,7 +9,7 @@ from src.clerk.graph import run_reasoning_kit
 def main():
     """Run the demo reasoning kit."""
     load_dotenv()
-    
+
     kit = load_reasoning_kit("reasoning_kits/demo")
     outputs = run_reasoning_kit(kit)
     return outputs
@@ -17,5 +17,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-

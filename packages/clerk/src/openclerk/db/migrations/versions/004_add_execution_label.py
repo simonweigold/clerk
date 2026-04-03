@@ -16,9 +16,7 @@ depends_on = None
 
 def upgrade() -> None:
     """Add label column to execution_runs."""
-    op.add_column(
-        "execution_runs", sa.Column("label", sa.String(255), nullable=True)
-    )
+    op.add_column("execution_runs", sa.Column("label", sa.String(255), nullable=True))
 
 
 def downgrade() -> None:

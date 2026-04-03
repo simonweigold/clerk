@@ -85,12 +85,8 @@ async def _read_url(args: dict[str, Any]) -> str:
         return "Error: No URL provided."
 
     async def _fetch(verify: bool = True) -> httpx.Response:
-        async with httpx.AsyncClient(
-            follow_redirects=True, timeout=30.0, verify=verify
-        ) as client:
-            resp = await client.get(
-                url, headers={"User-Agent": "CLERK/1.0 (Reasoning Kit Tool)"}
-            )
+        async with httpx.AsyncClient(follow_redirects=True, timeout=30.0, verify=verify) as client:
+            resp = await client.get(url, headers={"User-Agent": "CLERK/1.0 (Reasoning Kit Tool)"})
             resp.raise_for_status()
             return resp
 
@@ -162,9 +158,7 @@ async def _jina_reader(args: dict[str, Any]) -> str:
     jina_url = f"https://r.jina.ai/{url}"
 
     try:
-        async with httpx.AsyncClient(
-            follow_redirects=True, timeout=60.0, verify=False
-        ) as client:
+        async with httpx.AsyncClient(follow_redirects=True, timeout=60.0, verify=False) as client:
             resp = await client.get(
                 jina_url, headers={"User-Agent": "CLERK/1.0", "Accept": "text/markdown"}
             )

@@ -21,9 +21,7 @@ def upgrade() -> None:
     """Add is_dynamic boolean column to resources table."""
     op.add_column(
         "resources",
-        sa.Column(
-            "is_dynamic", sa.Boolean(), nullable=False, server_default=sa.text("false")
-        ),
+        sa.Column("is_dynamic", sa.Boolean(), nullable=False, server_default=sa.text("false")),
     )
 
 

@@ -12,8 +12,8 @@ from typing import Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
-from starlette.datastructures import UploadFile as StarletteUploadFile
 from fastapi.responses import JSONResponse, StreamingResponse
+from starlette.datastructures import UploadFile as StarletteUploadFile
 
 from ..dependencies import get_optional_user
 
@@ -1555,7 +1555,11 @@ async def start_execution(
 
     # Validate all dynamic resources were submitted (check presence, not content — empty
     # extraction e.g. from a scanned PDF is still a valid submission)
-    missing = [r.resource_id for r in kit.resources.values() if r.is_dynamic and r.resource_id not in dynamic_resources]
+    missing = [
+        r.resource_id
+        for r in kit.resources.values()
+        if r.is_dynamic and r.resource_id not in dynamic_resources
+    ]
     if missing:
         return {"error": f"Missing dynamic resources: {', '.join(missing)}"}
 

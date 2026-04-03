@@ -82,9 +82,7 @@ async def get_llm(
             from langchain_openai import ChatOpenAI
 
             api_key = env_vars.get("OPENAI_API_KEY")
-            return ChatOpenAI(
-                model=target_model, temperature=temperature, api_key=api_key
-            )
+            return ChatOpenAI(model=target_model, temperature=temperature, api_key=api_key)
 
         elif provider == "anthropic":
             from langchain_anthropic import ChatAnthropic
@@ -132,9 +130,7 @@ async def get_llm(
 
                 try:
                     cred_dict = json.loads(credentials_json)
-                    credentials = service_account.Credentials.from_service_account_info(
-                        cred_dict
-                    )
+                    credentials = service_account.Credentials.from_service_account_info(cred_dict)
                     # We might need project from JSON too
                     project = cred_dict.get("project_id")
                     return ChatVertexAI(
@@ -148,9 +144,7 @@ async def get_llm(
 
             # Fallback to default auth if no json or error
             project = env_vars.get("GOOGLE_CLOUD_PROJECT")
-            return ChatVertexAI(
-                model=target_model, temperature=temperature, project=project
-            )
+            return ChatVertexAI(model=target_model, temperature=temperature, project=project)
 
     # Global Fallbacks (using OS env vars)
     target_model = model or DEFAULT_MODELS["openai"]
@@ -194,9 +188,7 @@ async def get_llm(
             from langchain_google_vertexai import ChatVertexAI
 
             project = os.environ.get("GOOGLE_CLOUD_PROJECT")
-            return ChatVertexAI(
-                model=target_model, temperature=temperature, project=project
-            )
+            return ChatVertexAI(model=target_model, temperature=temperature, project=project)
 
     elif inferred_provider == "openrouter" and os.environ.get("OPENROUTER_API_KEY"):
         from langchain_openai import ChatOpenAI

@@ -10,3 +10,4 @@ repos:
     hooks:
       - id: mypy
         additional_dependencies: []
+        exclude: "^(main\\.py|test_.*\\.py|clean_kit\\.py|examples/)"

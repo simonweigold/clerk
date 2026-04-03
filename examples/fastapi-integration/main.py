@@ -5,18 +5,17 @@ Demonstrates embedding Clerk into an existing FastAPI application.
 Shows mounting, authentication, kit execution, and results retrieval.
 """
 
-import os
 from contextlib import asynccontextmanager
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 
 # Load environment variables
 load_dotenv()
 
 # Import Clerk's FastAPI app factory
-from openclerk.web.app import create_app as create_clerk_app
+from openclerk.web.app import create_app as create_clerk_app  # noqa: E402
 
 
 # ============================================================================

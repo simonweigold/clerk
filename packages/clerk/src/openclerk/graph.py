@@ -4,7 +4,7 @@ import asyncio
 import re
 import time
 from pathlib import Path
-from typing import Annotated, Any, TypedDict
+from typing import Annotated, Any, Coroutine, TypedDict, cast
 from uuid import UUID
 
 from langchain_core.vectorstores import InMemoryVectorStore
@@ -56,6 +56,7 @@ class State(TypedDict):
     # Tool fields
     tools: dict[str, dict]  # tool_number -> {tool_name, tool_id, ...}
     user_id: str | None  # Add user ID for tool context
+
 
 def create_initial_state(
     kit: ReasoningKit,
@@ -140,7 +141,9 @@ def chunk_text(text: str, max_size: int = 2000, overlap: int = 200) -> list[str]
             if current_chunk:
                 chunks.append(current_chunk.strip())
                 # Start new chunk with overlap from previous chunk
-                overlap_text = current_chunk[-overlap:] if len(current_chunk) > overlap else current_chunk
+                overlap_text = (
+                    current_chunk[-overlap:] if len(current_chunk) > overlap else current_chunk
+                )
                 current_chunk = overlap_text + p + "\n\n"
             else:
                 # Paragraph is larger than max_size, need to split by line or chars
@@ -151,16 +154,24 @@ def chunk_text(text: str, max_size: int = 2000, overlap: int = 200) -> list[str]
                     else:
                         if current_chunk:
                             chunks.append(current_chunk.strip())
-                            overlap_text = current_chunk[-overlap:] if len(current_chunk) > overlap else current_chunk
+                            overlap_text = (
+                                current_chunk[-overlap:]
+                                if len(current_chunk) > overlap
+                                else current_chunk
+                            )
                             current_chunk = overlap_text + line + "\n"
                         else:
                             # Line is larger than max_size, split by chars
                             for i in range(0, len(line), max_size - overlap):
-                                chunk_part = line[i:i + max_size]
+                                chunk_part = line[i : i + max_size]
                                 chunks.append(chunk_part)
                             # Handle overlap for the last part
                             if chunks:
-                                current_chunk = chunks[-1][-overlap:] if len(chunks[-1]) > overlap else chunks[-1]
+                                current_chunk = (
+                                    chunks[-1][-overlap:]
+                                    if len(chunks[-1]) > overlap
+                                    else chunks[-1]
+                                )
 
     if current_chunk and current_chunk.strip():
         chunks.append(current_chunk.strip())
@@ -223,8 +234,11 @@ def remove_tool_placeholders(text: str, kit_tools: dict[str, dict] | None = None
 
 
 def resolve_placeholders(
-    text: str, resources: dict[str, str], outputs: dict[str, str],
-    resource_size_threshold: int = 4000, max_chunks: int = 4
+    text: str,
+    resources: dict[str, str],
+    outputs: dict[str, str],
+    resource_size_threshold: int = 4000,
+    max_chunks: int = 4,
 ) -> str:
     """Resolve {placeholder} references in text, using RAG for large resources.
 
@@ -263,11 +277,17 @@ def resolve_placeholders(
                     results = vectorstore.similarity_search(search_query, k=max_chunks)
 
                     # Combine relevant chunks
-                    relevant_content = "\n\n... [Context skipped] ...\n\n".join([doc.page_content for doc in results])
+                    relevant_content = "\n\n... [Context skipped] ...\n\n".join(
+                        [doc.page_content for doc in results]
+                    )
                     text = text.replace(f"{{{placeholder}}}", relevant_content)
-                    print(f"RAG triggered for {placeholder}: chunked {len(content)} chars into {len(chunks)} parts, retrieved {len(results)} chunks.")
+                    print(
+                        f"RAG triggered for {placeholder}: chunked {len(content)} chars into {len(chunks)} parts, retrieved {len(results)} chunks."
+                    )
                 except Exception as e:
-                    print(f"Warning: RAG failed for {placeholder}, falling back to full text. Error: {e}")
+                    print(
+                        f"Warning: RAG failed for {placeholder}, falling back to full text. Error: {e}"
+                    )
                     text = text.replace(f"{{{placeholder}}}", content)
             else:
                 text = text.replace(f"{{{placeholder}}}", content)
@@ -279,8 +299,11 @@ def resolve_placeholders(
 
 
 async def aresolve_placeholders(
-    text: str, resources: dict[str, str], outputs: dict[str, str],
-    resource_size_threshold: int = 4000, max_chunks: int = 4
+    text: str,
+    resources: dict[str, str],
+    outputs: dict[str, str],
+    resource_size_threshold: int = 4000,
+    max_chunks: int = 4,
 ) -> str:
     """Async version of resolve_placeholders for non-blocking execution."""
     placeholders = re.findall(r"\{(\w+)\}", text)
@@ -301,18 +324,21 @@ async def aresolve_placeholders(
                         session_factory = get_async_session_factory()
                         # Wrap the OpenAI embeddings with our database cache handler
                         embeddings = CachedEmbeddings(
-                            underlying_embeddings=base_embeddings,
-                            session_factory=session_factory
+                            underlying_embeddings=base_embeddings, session_factory=session_factory
                         )
 
                     chunks = chunk_text(content)
                     vectorstore = await InMemoryVectorStore.afrom_texts(chunks, embeddings)
                     results = await vectorstore.asimilarity_search(search_query, k=max_chunks)
 
-                    relevant_content = "\n\n... [Context skipped] ...\n\n".join([doc.page_content for doc in results])
+                    relevant_content = "\n\n... [Context skipped] ...\n\n".join(
+                        [doc.page_content for doc in results]
+                    )
                     text = text.replace(f"{{{placeholder}}}", relevant_content)
                 except Exception as e:
-                    print(f"Warning: async RAG failed for {placeholder}, falling back to full text. Error: {e}")
+                    print(
+                        f"Warning: async RAG failed for {placeholder}, falling back to full text. Error: {e}"
+                    )
                     text = text.replace(f"{{{placeholder}}}", content)
             else:
                 text = text.replace(f"{{{placeholder}}}", content)
@@ -350,17 +376,19 @@ def execute_step(state: State) -> dict[str, Any]:
     # Execute with LLM (using the factory and waiting for the async result)
     try:
         loop = asyncio.get_event_loop()
-        llm = loop.run_until_complete(get_llm(user_id=state.get("user_id"), model=state["model_used"], temperature=0))
+        llm = loop.run_until_complete(
+            get_llm(user_id=state.get("user_id"), model=state["model_used"], temperature=0)
+        )
     except RuntimeError:
-        llm = asyncio.run(get_llm(user_id=state.get("user_id"), model=state["model_used"], temperature=0))
+        llm = asyncio.run(
+            get_llm(user_id=state.get("user_id"), model=state["model_used"], temperature=0)
+        )
 
     if openai_tools:
         # Tool-aware execution
         from langchain_core.messages import HumanMessage, ToolMessage
 
-        llm_with_tools = llm.bind_tools(
-            [t["function"] for t in openai_tools]
-        )
+        llm_with_tools = llm.bind_tools([t["function"] for t in openai_tools])
         messages: list[Any] = [HumanMessage(content=clean_prompt)]
         response = llm_with_tools.invoke(messages)
         messages.append(response)
@@ -375,7 +403,12 @@ def execute_step(state: State) -> dict[str, Any]:
                 tool_def = get_tool(tool_call["name"])
                 if tool_def:
                     try:
-                        tool_result: str = asyncio.run(tool_def.execute(tool_call["args"], user_id=state.get("user_id")))  # type: ignore[arg-type]
+                        tool_result: str = asyncio.run(
+                            cast(
+                                Coroutine[Any, Any, str],
+                                tool_def.execute(tool_call["args"], user_id=state.get("user_id")),
+                            )
+                        )
                     except Exception as te:
                         tool_result = f"Error executing tool: {te}"
                 else:
@@ -414,7 +447,11 @@ def execute_step(state: State) -> dict[str, Any]:
     print(f"\n{'=' * 60}")
     print(f"Step {current_step} - Output ID: {output_id}")
     print(f"{'=' * 60}")
-    print(f"Prompt:\n{clean_prompt[:200]}..." if len(clean_prompt) > 200 else f"Prompt:\n{clean_prompt}")
+    print(
+        f"Prompt:\n{clean_prompt[:200]}..."
+        if len(clean_prompt) > 200
+        else f"Prompt:\n{clean_prompt}"
+    )
     print(f"\nResult:\n{result}")
     print(f"{'=' * 60}\n")
 
@@ -583,9 +620,7 @@ def run_reasoning_kit(
     db_run_id: UUID | None = None
     if save_to_db:
         if db_version_id is None:
-            print(
-                "Warning: save_to_db=True but no db_version_id provided, skipping DB tracking"
-            )
+            print("Warning: save_to_db=True but no db_version_id provided, skipping DB tracking")
             save_to_db = False
         else:
             try:
@@ -745,9 +780,7 @@ async def run_reasoning_kit_async(
                 # Tool-aware execution
                 from langchain_core.messages import HumanMessage, ToolMessage
 
-                llm_with_tools = llm.bind_tools(
-                    [t["function"] for t in openai_tools]
-                )
+                llm_with_tools = llm.bind_tools([t["function"] for t in openai_tools])
                 messages: list[Any] = [HumanMessage(content=clean_prompt)]
                 response = await llm_with_tools.ainvoke(messages)
                 messages.append(response)
@@ -762,7 +795,9 @@ async def run_reasoning_kit_async(
                         tool_def = get_tool(tool_call["name"])
                         if tool_def:
                             try:
-                                tool_result = await tool_def.execute(tool_call["args"], user_id=user_id)
+                                tool_result = await tool_def.execute(
+                                    tool_call["args"], user_id=user_id
+                                )
                             except Exception as te:
                                 tool_result = f"Error executing tool: {te}"
                         else:

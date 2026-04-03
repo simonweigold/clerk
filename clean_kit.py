@@ -8,7 +8,7 @@ if "SUPABASE_URL" not in os.environ:
     print("Error: SUPABASE_URL not found in environment!")
     exit(1)
 
-from openclerk.db import get_async_session, ReasoningKitRepository, KitVersionRepository
+from openclerk.db import get_async_session, ReasoningKitRepository, KitVersionRepository  # noqa: E402
 
 
 async def clean_and_create():

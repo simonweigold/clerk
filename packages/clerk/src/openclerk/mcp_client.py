@@ -24,9 +24,7 @@ _sessions: list[ClientSession] = []
 async def init_mcp_servers(config_path: str = "mcp_servers.json") -> None:
     """Initialize MCP servers from a configuration file and register their tools."""
     if not os.path.exists(config_path):
-        logger.info(
-            f"No MCP config found at {config_path}. Skipping MCP initialization."
-        )
+        logger.info(f"No MCP config found at {config_path}. Skipping MCP initialization.")
         return
 
     try:
@@ -58,13 +56,9 @@ async def init_mcp_servers(config_path: str = "mcp_servers.json") -> None:
 
         try:
             logger.info(f"Starting MCP server: {name} ({command} {' '.join(args)})")
-            server_params = StdioServerParameters(
-                command=command, args=args, env=server_env
-            )
+            server_params = StdioServerParameters(command=command, args=args, env=server_env)
 
-            stdio_transport = await _exit_stack.enter_async_context(
-                stdio_client(server_params)
-            )
+            stdio_transport = await _exit_stack.enter_async_context(stdio_client(server_params))
             read, write = stdio_transport
             session = await _exit_stack.enter_async_context(ClientSession(read, write))
 
@@ -106,8 +100,7 @@ async def init_mcp_servers(config_path: str = "mcp_servers.json") -> None:
 
                                     async with get_async_session() as db_session:
                                         stmt = select(McpServerConfig).where(
-                                            McpServerConfig.user_id
-                                            == uuid.UUID(user_id),
+                                            McpServerConfig.user_id == uuid.UUID(user_id),
                                             McpServerConfig.server_name == server_name,
                                         )
                                         result = await db_session.execute(stmt)
@@ -130,16 +123,12 @@ async def init_mcp_servers(config_path: str = "mcp_servers.json") -> None:
                                                 env=user_env,
                                             )
 
-                                            stdio_transport = (
-                                                await temp_stack.enter_async_context(
-                                                    stdio_client(server_params)
-                                                )
+                                            stdio_transport = await temp_stack.enter_async_context(
+                                                stdio_client(server_params)
                                             )
                                             read, write = stdio_transport
-                                            session_to_use = (
-                                                await temp_stack.enter_async_context(
-                                                    ClientSession(read, write)
-                                                )
+                                            session_to_use = await temp_stack.enter_async_context(
+                                                ClientSession(read, write)
                                             )
                                             await session_to_use.initialize()
                                 except Exception as e:
@@ -182,9 +171,7 @@ async def init_mcp_servers(config_path: str = "mcp_servers.json") -> None:
                         name=tool.name,  # tool.name must be unique across all servers in the current implementation
                         description=tool.description or f"MCP tool: {tool.name}",
                         parameters=tool.inputSchema,
-                        execute=make_execute(
-                            name, command, args, server_env, session, tool.name
-                        ),
+                        execute=make_execute(name, command, args, server_env, session, tool.name),
                         source=name,
                     )
                 )

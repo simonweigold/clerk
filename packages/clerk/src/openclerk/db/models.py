@@ -36,17 +36,13 @@ class UserProfile(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True)
     display_name: Mapped[str | None] = mapped_column(String(255))
     is_premium: Mapped[bool] = mapped_column(Boolean, default=False)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=datetime.utcnow
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow
     )
 
     # Relationships
-    owned_kits: Mapped[list["ReasoningKit"]] = relationship(
-        back_populates="owner", lazy="selectin"
-    )
+    owned_kits: Mapped[list["ReasoningKit"]] = relationship(back_populates="owner", lazy="selectin")
     created_versions: Mapped[list["KitVersion"]] = relationship(
         back_populates="created_by_user", lazy="selectin"
     )
@@ -64,9 +60,7 @@ class ReasoningKit(Base):
 
     __tablename__ = "reasoning_kits"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     slug: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str | None] = mapped_column(Text)
@@ -79,17 +73,13 @@ class ReasoningKit(Base):
         UUID(as_uuid=True),
         ForeignKey("kit_versions.id", use_alter=True, ondelete="SET NULL"),
     )
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=datetime.utcnow
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow
     )
 
     # Relationships
-    owner: Mapped["UserProfile | None"] = relationship(
-        back_populates="owned_kits", lazy="selectin"
-    )
+    owner: Mapped["UserProfile | None"] = relationship(back_populates="owned_kits", lazy="selectin")
     versions: Mapped[list["KitVersion"]] = relationship(
         back_populates="kit",
         foreign_keys="KitVersion.kit_id",
@@ -112,13 +102,9 @@ class KitVersion(Base):
     """
 
     __tablename__ = "kit_versions"
-    __table_args__ = (
-        UniqueConstraint("kit_id", "version_number", name="uq_kit_version"),
-    )
+    __table_args__ = (UniqueConstraint("kit_id", "version_number", name="uq_kit_version"),)
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     kit_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("reasoning_kits.id", ondelete="CASCADE"),
@@ -130,9 +116,7 @@ class KitVersion(Base):
         UUID(as_uuid=True),
         ForeignKey("user_profiles.id", ondelete="SET NULL"),
     )
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=datetime.utcnow
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
     is_draft: Mapped[bool] = mapped_column(Boolean, default=False)
 
     # Relationships
@@ -175,13 +159,9 @@ class Resource(Base):
     """
 
     __tablename__ = "resources"
-    __table_args__ = (
-        UniqueConstraint("version_id", "resource_number", name="uq_resource_number"),
-    )
+    __table_args__ = (UniqueConstraint("version_id", "resource_number", name="uq_resource_number"),)
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     version_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("kit_versions.id", ondelete="CASCADE"),
@@ -195,14 +175,10 @@ class Resource(Base):
     file_size_bytes: Mapped[int | None] = mapped_column(Integer)
     is_dynamic: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     display_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=datetime.utcnow
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
 
     # Relationships
-    version: Mapped["KitVersion"] = relationship(
-        back_populates="resources", lazy="selectin"
-    )
+    version: Mapped["KitVersion"] = relationship(back_populates="resources", lazy="selectin")
 
     @property
     def resource_id(self) -> str:
@@ -218,13 +194,9 @@ class WorkflowStep(Base):
     """
 
     __tablename__ = "workflow_steps"
-    __table_args__ = (
-        UniqueConstraint("version_id", "step_number", name="uq_step_number"),
-    )
+    __table_args__ = (UniqueConstraint("version_id", "step_number", name="uq_step_number"),)
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     version_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("kit_versions.id", ondelete="CASCADE"),
@@ -233,14 +205,10 @@ class WorkflowStep(Base):
     step_number: Mapped[int] = mapped_column(Integer, nullable=False)
     prompt_template: Mapped[str] = mapped_column(Text, nullable=False)
     display_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=datetime.utcnow
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
 
     # Relationships
-    version: Mapped["KitVersion"] = relationship(
-        back_populates="workflow_steps", lazy="selectin"
-    )
+    version: Mapped["KitVersion"] = relationship(back_populates="workflow_steps", lazy="selectin")
 
     @property
     def output_id(self) -> str:
@@ -258,13 +226,9 @@ class Tool(Base):
     """
 
     __tablename__ = "tools"
-    __table_args__ = (
-        UniqueConstraint("version_id", "tool_number", name="uq_tool_number"),
-    )
+    __table_args__ = (UniqueConstraint("version_id", "tool_number", name="uq_tool_number"),)
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     version_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("kit_versions.id", ondelete="CASCADE"),
@@ -274,14 +238,10 @@ class Tool(Base):
     tool_name: Mapped[str] = mapped_column(String(255), nullable=False)
     display_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     configuration: Mapped[str | None] = mapped_column(Text, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=datetime.utcnow
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
 
     # Relationships
-    version: Mapped["KitVersion"] = relationship(
-        back_populates="tools", lazy="selectin"
-    )
+    version: Mapped["KitVersion"] = relationship(back_populates="tools", lazy="selectin")
 
     @property
     def tool_id(self) -> str:
@@ -297,17 +257,11 @@ class ExecutionRun(Base):
 
     __tablename__ = "execution_runs"
     __table_args__ = (
-        CheckConstraint(
-            "storage_mode IN ('transparent', 'anonymous')", name="ck_storage_mode"
-        ),
-        CheckConstraint(
-            "status IN ('running', 'paused', 'completed', 'failed')", name="ck_status"
-        ),
+        CheckConstraint("storage_mode IN ('transparent', 'anonymous')", name="ck_storage_mode"),
+        CheckConstraint("status IN ('running', 'paused', 'completed', 'failed')", name="ck_status"),
     )
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     version_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("kit_versions.id", ondelete="CASCADE"),
@@ -319,17 +273,13 @@ class ExecutionRun(Base):
     )
     storage_mode: Mapped[str] = mapped_column(String(20), nullable=False)
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="running")
-    started_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=datetime.utcnow
-    )
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     error_message: Mapped[str | None] = mapped_column(Text)
     label: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
     # Relationships
-    version: Mapped["KitVersion"] = relationship(
-        back_populates="execution_runs", lazy="selectin"
-    )
+    version: Mapped["KitVersion"] = relationship(back_populates="execution_runs", lazy="selectin")
     user: Mapped["UserProfile | None"] = relationship(
         back_populates="execution_runs", lazy="selectin"
     )
@@ -359,9 +309,7 @@ class StepExecution(Base):
         ),
     )
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     run_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("execution_runs.id", ondelete="CASCADE"),
@@ -376,14 +324,10 @@ class StepExecution(Base):
     model_used: Mapped[str | None] = mapped_column(String(100))
     tokens_used: Mapped[int | None] = mapped_column(Integer)
     latency_ms: Mapped[int | None] = mapped_column(Integer)
-    executed_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=datetime.utcnow
-    )
+    executed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
 
     # Relationships
-    run: Mapped["ExecutionRun"] = relationship(
-        back_populates="step_executions", lazy="selectin"
-    )
+    run: Mapped["ExecutionRun"] = relationship(back_populates="step_executions", lazy="selectin")
 
 
 class UserKitBookmark(Base):
@@ -394,13 +338,9 @@ class UserKitBookmark(Base):
     """
 
     __tablename__ = "user_kit_bookmarks"
-    __table_args__ = (
-        UniqueConstraint("user_id", "kit_id", name="uq_user_kit_bookmark"),
-    )
+    __table_args__ = (UniqueConstraint("user_id", "kit_id", name="uq_user_kit_bookmark"),)
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("user_profiles.id", ondelete="CASCADE"),
@@ -411,9 +351,7 @@ class UserKitBookmark(Base):
         ForeignKey("reasoning_kits.id", ondelete="CASCADE"),
         nullable=False,
     )
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=datetime.utcnow
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
 
     # Relationships
     user: Mapped["UserProfile"] = relationship(lazy="selectin")
@@ -431,9 +369,7 @@ class EmbeddingCache(Base):
 
     text_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
     embedding: Mapped[list[float]] = mapped_column(Vector(1536), nullable=False)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=datetime.utcnow
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
 
 
 class McpServerConfig(Base):
@@ -444,13 +380,9 @@ class McpServerConfig(Base):
     """
 
     __tablename__ = "mcp_server_configs"
-    __table_args__ = (
-        UniqueConstraint("user_id", "server_name", name="uq_user_mcp_config"),
-    )
+    __table_args__ = (UniqueConstraint("user_id", "server_name", name="uq_user_mcp_config"),)
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("user_profiles.id", ondelete="CASCADE"),
@@ -459,9 +391,7 @@ class McpServerConfig(Base):
     server_name: Mapped[str] = mapped_column(String(255), nullable=False)
     env_vars: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     is_active: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=datetime.utcnow
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow
     )
@@ -478,13 +408,9 @@ class LlmProviderConfig(Base):
     """
 
     __tablename__ = "llm_provider_configs"
-    __table_args__ = (
-        UniqueConstraint("user_id", "provider_name", name="uq_user_llm_config"),
-    )
+    __table_args__ = (UniqueConstraint("user_id", "provider_name", name="uq_user_llm_config"),)
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("user_profiles.id", ondelete="CASCADE"),
@@ -494,13 +420,10 @@ class LlmProviderConfig(Base):
     env_vars: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     selected_model: Mapped[str | None] = mapped_column(String(255), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=datetime.utcnow
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow
     )
 
     # Relationships
     user: Mapped["UserProfile"] = relationship(lazy="selectin")
-

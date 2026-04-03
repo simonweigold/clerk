@@ -1,14 +1,13 @@
 import asyncio
-import os
 import sys
 
 from dotenv import load_dotenv
 
 load_dotenv()
 
-from openclerk.loader import load_reasoning_kit_from_db
-from openclerk.graph import run_reasoning_kit_async
-from openclerk.models import ReasoningKit, Resource, WorkflowStep, Tool
+from openclerk.loader import load_reasoning_kit_from_db  # noqa: E402
+from openclerk.graph import run_reasoning_kit_async  # noqa: E402
+from openclerk.models import ReasoningKit  # noqa: E402
 
 
 async def main():

@@ -157,7 +157,9 @@ async def load_reasoning_kit_from_db(slug: str, version_id: UUID | None = None) 
             version_repo = KitVersionRepository(session)
             target_version = await version_repo.get_by_id(version_id)
             if not target_version or target_version.kit_id != db_kit.id:
-                raise FileNotFoundError(f"Reasoning kit version '{version_id}' not found for kit '{slug}'")
+                raise FileNotFoundError(
+                    f"Reasoning kit version '{version_id}' not found for kit '{slug}'"
+                )
         else:
             target_version = db_kit.current_version
             if target_version is None:
@@ -171,9 +173,7 @@ async def load_reasoning_kit_from_db(slug: str, version_id: UUID | None = None) 
         )
 
 
-async def _convert_db_kit_to_model(
-    db_kit: DBReasoningKit, version: KitVersion
-) -> ReasoningKit:
+async def _convert_db_kit_to_model(db_kit: DBReasoningKit, version: KitVersion) -> ReasoningKit:
     """Convert database kit and version to Pydantic model.
 
     Args:

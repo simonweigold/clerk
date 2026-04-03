@@ -117,15 +117,9 @@ class ReasoningKitRepository:
             select(ReasoningKit)
             .where(ReasoningKit.id == kit_id)
             .options(
-                selectinload(ReasoningKit.current_version).selectinload(
-                    KitVersion.resources
-                ),
-                selectinload(ReasoningKit.current_version).selectinload(
-                    KitVersion.workflow_steps
-                ),
-                selectinload(ReasoningKit.current_version).selectinload(
-                    KitVersion.tools
-                ),
+                selectinload(ReasoningKit.current_version).selectinload(KitVersion.resources),
+                selectinload(ReasoningKit.current_version).selectinload(KitVersion.workflow_steps),
+                selectinload(ReasoningKit.current_version).selectinload(KitVersion.tools),
             )
         )
         result = await self.session.execute(stmt)
@@ -144,15 +138,9 @@ class ReasoningKitRepository:
             select(ReasoningKit)
             .where(ReasoningKit.slug == slug)
             .options(
-                selectinload(ReasoningKit.current_version).selectinload(
-                    KitVersion.resources
-                ),
-                selectinload(ReasoningKit.current_version).selectinload(
-                    KitVersion.workflow_steps
-                ),
-                selectinload(ReasoningKit.current_version).selectinload(
-                    KitVersion.tools
-                ),
+                selectinload(ReasoningKit.current_version).selectinload(KitVersion.resources),
+                selectinload(ReasoningKit.current_version).selectinload(KitVersion.workflow_steps),
+                selectinload(ReasoningKit.current_version).selectinload(KitVersion.tools),
             )
         )
         result = await self.session.execute(stmt)
@@ -288,9 +276,9 @@ class ReasoningKitRepository:
         """
         # Basic search on name and description
         search_pattern = f"%{query}%"
-        search_condition = ReasoningKit.name.ilike(
+        search_condition = ReasoningKit.name.ilike(search_pattern) | ReasoningKit.description.ilike(
             search_pattern
-        ) | ReasoningKit.description.ilike(search_pattern)
+        )
 
         if not include_private:
             # Only public kits matching search
@@ -316,10 +304,7 @@ class ReasoningKitRepository:
         else:
             # All kits matching search (admin mode)
             stmt = (
-                select(ReasoningKit)
-                .where(search_condition)
-                .order_by(ReasoningKit.name)
-                .limit(50)
+                select(ReasoningKit).where(search_condition).order_by(ReasoningKit.name).limit(50)
             )
 
         result = await self.session.execute(stmt)
@@ -378,9 +363,7 @@ class KitVersionRepository:
         Returns:
             Latest version number, or 0 if no versions exist
         """
-        stmt = select(func.max(KitVersion.version_number)).where(
-            KitVersion.kit_id == kit_id
-        )
+        stmt = select(func.max(KitVersion.version_number)).where(KitVersion.kit_id == kit_id)
         result = await self.session.execute(stmt)
         max_version = result.scalar_one_or_none()
         return max_version or 0
@@ -602,12 +585,8 @@ class ExecutionRepository:
             .where(ExecutionRun.id == run_id)
             .options(
                 selectinload(ExecutionRun.step_executions),
-                selectinload(ExecutionRun.version).selectinload(
-                    KitVersion.kit
-                ),
-                selectinload(ExecutionRun.version).selectinload(
-                    KitVersion.workflow_steps
-                ),
+                selectinload(ExecutionRun.version).selectinload(KitVersion.kit),
+                selectinload(ExecutionRun.version).selectinload(KitVersion.workflow_steps),
             )
         )
         result = await self.session.execute(stmt)
@@ -872,9 +851,7 @@ class BookmarkRepository:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 
-    async def toggle(
-        self, user_id: UUID, kit_id: UUID
-    ) -> tuple[bool, UserKitBookmark | None]:
+    async def toggle(self, user_id: UUID, kit_id: UUID) -> tuple[bool, UserKitBookmark | None]:
         """Toggle a bookmark. Returns (is_now_bookmarked, bookmark_or_None)."""
         stmt = select(UserKitBookmark).where(
             UserKitBookmark.user_id == user_id,
@@ -895,15 +872,11 @@ class BookmarkRepository:
 
     async def get_bookmarked_kit_ids(self, user_id: UUID) -> set[UUID]:
         """Get the set of kit IDs bookmarked by a user."""
-        stmt = select(UserKitBookmark.kit_id).where(
-            UserKitBookmark.user_id == user_id
-        )
+        stmt = select(UserKitBookmark.kit_id).where(UserKitBookmark.user_id == user_id)
         result = await self.session.execute(stmt)
         return set(result.scalars().all())
 
-    async def list_bookmarked_kits(
-        self, user_id: UUID
-    ) -> list[ReasoningKit]:
+    async def list_bookmarked_kits(self, user_id: UUID) -> list[ReasoningKit]:
         """List all kits bookmarked by a user."""
         stmt = (
             select(ReasoningKit)

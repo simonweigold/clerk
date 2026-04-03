@@ -178,9 +178,7 @@ class StorageService:
             paths_to_delete = [f"{prefix}{f['name']}" for f in files]
             self.bucket.remove(paths_to_delete)
 
-    def list_version_resources(
-        self, kit_id: UUID, version_id: UUID
-    ) -> list[dict[str, str]]:
+    def list_version_resources(self, kit_id: UUID, version_id: UUID) -> list[dict[str, str]]:
         """List all resources for a version.
 
         Args:

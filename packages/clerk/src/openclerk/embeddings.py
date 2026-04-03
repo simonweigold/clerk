@@ -41,9 +41,7 @@ class CachedEmbeddings(Embeddings):
 
     def embed_query(self, text: str) -> list[float]:
         """Embed query text (synchronous - not implemented for db cache)."""
-        raise NotImplementedError(
-            "CachedEmbeddings only supports async execution via aembed_query"
-        )
+        raise NotImplementedError("CachedEmbeddings only supports async execution via aembed_query")
 
     async def aembed_documents(self, texts: list[str]) -> list[list[float]]:
         """Asynchronously embed search docs, using the database cache when possible."""

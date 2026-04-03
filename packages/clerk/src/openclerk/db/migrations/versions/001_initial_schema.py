@@ -80,9 +80,7 @@ def upgrade() -> None:
     )
 
     # Index for listing public kits
-    op.create_index(
-        "idx_reasoning_kits_public", "reasoning_kits", ["is_public", "name"]
-    )
+    op.create_index("idx_reasoning_kits_public", "reasoning_kits", ["is_public", "name"])
 
     # Index for owner lookup
     op.create_index("idx_reasoning_kits_owner", "reasoning_kits", ["owner_id"])
@@ -235,23 +233,15 @@ def upgrade() -> None:
         ),
         sa.Column("completed_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("error_message", sa.Text(), nullable=True),
-        sa.CheckConstraint(
-            "storage_mode IN ('transparent', 'anonymous')", name="ck_storage_mode"
-        ),
-        sa.CheckConstraint(
-            "status IN ('running', 'completed', 'failed')", name="ck_status"
-        ),
+        sa.CheckConstraint("storage_mode IN ('transparent', 'anonymous')", name="ck_storage_mode"),
+        sa.CheckConstraint("status IN ('running', 'completed', 'failed')", name="ck_status"),
     )
 
     # Index for user's runs
-    op.create_index(
-        "idx_execution_runs_user", "execution_runs", ["user_id", "started_at"]
-    )
+    op.create_index("idx_execution_runs_user", "execution_runs", ["user_id", "started_at"])
 
     # Index for version's runs
-    op.create_index(
-        "idx_execution_runs_version", "execution_runs", ["version_id", "started_at"]
-    )
+    op.create_index("idx_execution_runs_version", "execution_runs", ["version_id", "started_at"])
 
     # ==========================================================================
     # STEP EXECUTIONS

@@ -16,12 +16,8 @@ depends_on = None
 
 def upgrade() -> None:
     """Add display_name columns."""
-    op.add_column(
-        "resources", sa.Column("display_name", sa.String(255), nullable=True)
-    )
-    op.add_column(
-        "workflow_steps", sa.Column("display_name", sa.String(255), nullable=True)
-    )
+    op.add_column("resources", sa.Column("display_name", sa.String(255), nullable=True))
+    op.add_column("workflow_steps", sa.Column("display_name", sa.String(255), nullable=True))
 
 
 def downgrade() -> None:

@@ -14,13 +14,14 @@ jobs:
       - uses: astral-sh/setup-uv@v3
         with:
           version: "0.4.x"
+      - uses: extractions/setup-just@v2
       - name: Run lint
         run: just lint
 
   test:
     strategy:
       matrix:
-        python-version: ['3.13']
+        python-version: ["3.13"]
         os: [ubuntu-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     steps:
@@ -28,5 +29,6 @@ jobs:
       - uses: astral-sh/setup-uv@v3
         with:
           version: "0.4.x"
+      - uses: extractions/setup-just@v2
       - name: Run tests
         run: just test

@@ -10,7 +10,7 @@ Clerk is a mono-repo containing:
 
 - **Backend:** Python FastAPI application with LangGraph workflows
 - **Frontend:** React SPA with TypeScript and Tailwind CSS
-- **Package:** Installable Python package (`clerk-framework`)
+- **Package:** Installable Python package (`openclerk`)
 
 ### System Diagram
 
@@ -79,12 +79,12 @@ Location: `packages/clerk/src/openclerk/web/`
 
 Key components:
 
-| Component | Purpose |
-|-----------|---------|
-| `app.py` | Application factory, middleware setup |
-| `routes/api.py` | API endpoints (kits, execution, auth) |
-| `routes/docs.py` | Documentation serving |
-| `dependencies.py` | FastAPI dependencies (auth, DB) |
+| Component         | Purpose                               |
+| ----------------- | ------------------------------------- |
+| `app.py`          | Application factory, middleware setup |
+| `routes/api.py`   | API endpoints (kits, execution, auth) |
+| `routes/docs.py`  | Documentation serving                 |
+| `dependencies.py` | FastAPI dependencies (auth, DB)       |
 
 ### Database Layer
 
@@ -162,12 +162,12 @@ apps/website/src/
 
 ### Key Pages
 
-| Page | Route | Purpose |
-|------|-------|---------|
-| Home | `/` | Landing, feature overview |
-| Docs | `/docs/*` | Documentation viewer (markdown) |
-| Kits | `/kits` | Browse public kits |
-| Kit Editor | `/kits/:slug/edit` | Create/edit kits |
+| Page       | Route              | Purpose                         |
+| ---------- | ------------------ | ------------------------------- |
+| Home       | `/`                | Landing, feature overview       |
+| Docs       | `/docs/*`          | Documentation viewer (markdown) |
+| Kits       | `/kits`            | Browse public kits              |
+| Kit Editor | `/kits/:slug/edit` | Create/edit kits                |
 
 ---
 
@@ -191,10 +191,12 @@ clerk/
 ### Build Process
 
 1. **Python Package:**
+
    ```bash
    cd packages/clerk
    uv build
    ```
+
    Creates: `dist/clerk_framework-*.whl`
 
 2. **Frontend:**
@@ -225,12 +227,12 @@ clerk/
 
 ### File vs Database Kits
 
-| Aspect | File-based | Database |
-|--------|------------|----------|
-| Storage | Local filesystem | PostgreSQL + Storage |
-| Versioning | Git | Built-in versioning |
-| Sharing | Git/Export | Web UI/Permissions |
-| Use case | Development | Production/Teams |
+| Aspect     | File-based       | Database             |
+| ---------- | ---------------- | -------------------- |
+| Storage    | Local filesystem | PostgreSQL + Storage |
+| Versioning | Git              | Built-in versioning  |
+| Sharing    | Git/Export       | Web UI/Permissions   |
+| Use case   | Development      | Production/Teams     |
 
 ---
 
@@ -243,6 +245,7 @@ Kits start as files (easy to version, edit, share) and can be promoted to databa
 ### 2. LangGraph for Workflows
 
 LangGraph provides:
+
 - Stateful execution
 - Streaming support
 - Branching/conditional logic (future)
@@ -256,6 +259,7 @@ LangGraph provides:
 ### 4. Mono-repo
 
 Single repository for:
+
 - Backend/frontend in sync
 - Shared documentation
 - Atomic changes across stack

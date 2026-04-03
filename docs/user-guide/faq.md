@@ -12,7 +12,7 @@ Frequently asked questions about Clerk.
 
 ```bash
 # Correct
-pip install clerk-framework
+pip install openclerk
 
 # Incorrect (different package)
 pip install clerk
@@ -35,7 +35,7 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 Then try:
 
 ```bash
-uv tool install clerk-framework
+uv tool install openclerk
 ```
 
 ---

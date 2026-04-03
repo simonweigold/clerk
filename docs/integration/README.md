@@ -28,7 +28,7 @@ FastAPI is the recommended way to embed Clerk due to its native ASGI support and
 ### Step 1: Install Clerk
 
 ```bash
-pip install clerk-framework
+pip install openclerk
 ```
 
 ### Step 2: Import and Mount
@@ -123,13 +123,13 @@ Access Clerk at: `http://localhost:8000/clerk`
 
 Once mounted, Clerk's full API is available under the mount path:
 
-| Endpoint | Description |
-|----------|-------------|
-| `GET /clerk/api/kits` | List available kits |
-| `POST /clerk/api/kits` | Create a new kit |
-| `GET /clerk/api/kits/{slug}` | Get kit details |
-| `POST /clerk/api/kits/{slug}/execute` | Execute a kit |
-| `GET /clerk/api/openapi.json` | OpenAPI specification |
+| Endpoint                              | Description           |
+| ------------------------------------- | --------------------- |
+| `GET /clerk/api/kits`                 | List available kits   |
+| `POST /clerk/api/kits`                | Create a new kit      |
+| `GET /clerk/api/kits/{slug}`          | Get kit details       |
+| `POST /clerk/api/kits/{slug}/execute` | Execute a kit         |
+| `GET /clerk/api/openapi.json`         | OpenAPI specification |
 
 See the [API Reference](api-reference.md) for complete documentation.
 

@@ -9,13 +9,13 @@ Welcome to Clerk! This guide will help you get started with the Clerk framework 
 Install Clerk using pip:
 
 ```bash
-pip install clerk-framework
+pip install openclerk
 ```
 
 Or using UV (recommended):
 
 ```bash
-uv add clerk-framework
+uv add openclerk
 ```
 
 ### Verify Installation
@@ -48,7 +48,7 @@ Here's a complete 5-line example:
 
 ```bash
 # 1. Install Clerk
-pip install clerk-framework
+pip install openclerk
 
 # 2. Create a new kit
 clerk kit create my-first-kit --description "My first reasoning workflow"
@@ -77,15 +77,15 @@ Now that you've run your first workflow, explore these resources:
 
 ## Common Commands
 
-| Command | Description |
-|---------|-------------|
-| `clerk list` | List available reasoning kits |
-| `clerk run <kit>` | Run a reasoning kit |
-| `clerk info <kit>` | Show information about a kit |
-| `clerk kit create <name>` | Create a new reasoning kit |
-| `clerk kit add-resource <kit>` | Add a resource to a kit |
-| `clerk kit add-step <kit>` | Add a workflow step to a kit |
-| `clerk web` | Start the web UI server |
+| Command                        | Description                   |
+| ------------------------------ | ----------------------------- |
+| `clerk list`                   | List available reasoning kits |
+| `clerk run <kit>`              | Run a reasoning kit           |
+| `clerk info <kit>`             | Show information about a kit  |
+| `clerk kit create <name>`      | Create a new reasoning kit    |
+| `clerk kit add-resource <kit>` | Add a resource to a kit       |
+| `clerk kit add-step <kit>`     | Add a workflow step to a kit  |
+| `clerk web`                    | Start the web UI server       |
 
 ---
 

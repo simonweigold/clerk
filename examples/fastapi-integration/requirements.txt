@@ -1,5 +1,5 @@
 # Core dependencies
-clerk-framework>=0.1.0
+openclerk>=0.1.0
 fastapi>=0.100.0
 uvicorn[standard]>=0.23.0
 

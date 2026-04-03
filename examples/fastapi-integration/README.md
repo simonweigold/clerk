@@ -18,17 +18,20 @@ This example demonstrates how to embed Clerk into an existing FastAPI applicatio
 ## Setup
 
 1. Clone this example:
+
    ```bash
    cd examples/fastapi-integration
    ```
 
 2. Create virtual environment:
+
    ```bash
    python -m venv .venv
    source .venv/bin/activate  # On Windows: .venv\Scripts\activate
    ```
 
 3. Install dependencies:
+
    ```bash
    pip install -r requirements.txt
    ```
@@ -42,6 +45,7 @@ This example demonstrates how to embed Clerk into an existing FastAPI applicatio
 ## Running
 
 Start the combined application:
+
 ```bash
 uvicorn main:app --reload --port 8000
 ```
@@ -96,7 +100,7 @@ See `main.py` for a complete example.
 
 ## Troubleshooting
 
-**Import errors?** Make sure the `clerk-framework` package is installed and your virtual environment is activated.
+**Import errors?** Make sure the `openclerk` package is installed and your virtual environment is activated.
 
 **Database connection issues?** Set `SUPABASE_URL` and `SUPABASE_KEY` in `.env` or run in file-based mode without them.
 

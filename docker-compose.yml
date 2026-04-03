@@ -1,0 +1,72 @@
+# Production Docker Compose configuration for Clerk
+# Multi-container architecture with database, backend, and frontend services
+# Usage: docker-compose up -d
+
+version: '3.8'
+
+services:
+  # PostgreSQL database
+  db:
+    image: postgres:16-alpine
+    container_name: clerk-db
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-clerk}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-clerk}
+      POSTGRES_DB: ${POSTGRES_DB:-clerk}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-clerk}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - clerk-network
+
+  # Backend API service
+  backend:
+    build:
+      context: .
+      dockerfile: packages/clerk/Dockerfile
+    container_name: clerk-backend
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-clerk}:${POSTGRES_PASSWORD:-clerk}@db:5432/${POSTGRES_DB:-clerk}
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - clerk-network
+
+  # Frontend web service
+  frontend:
+    build:
+      context: ./apps/website
+      dockerfile: Dockerfile
+    container_name: clerk-frontend
+    ports:
+      - "${FRONTEND_PORT:-80}:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+    networks:
+      - clerk-network
+
+# Persistent volume for database
+volumes:
+  postgres_data:
+    driver: local
+
+# Network for service communication
+networks:
+  clerk-network:
+    driver: bridge

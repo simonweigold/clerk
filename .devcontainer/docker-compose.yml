@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: .devcontainer/Dockerfile
+    volumes:
+      - ..:/workspace:cached
+    command: sleep infinity
+    depends_on:
+      - db
+    environment:
+      - DATABASE_URL=postgresql://clerk:clerk@db:5432/clerk
+
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: clerk
+      POSTGRES_PASSWORD: clerk
+      POSTGRES_DB: clerk
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:

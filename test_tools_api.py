@@ -92,11 +92,15 @@ def main():
     r_del = api("DELETE", f"/kits/{SLUG}")
     if r_del.status_code == 200:
         print("  🧹 Deleted existing kit for a fresh test")
-        
-    r = api("POST", "/kits", json={
-        "name": "Tool Test Kit",
-        "description": "Auto-created by test_tools_api.py",
-    })
+
+    r = api(
+        "POST",
+        "/kits",
+        json={
+            "name": "Tool Test Kit",
+            "description": "Auto-created by test_tools_api.py",
+        },
+    )
     data = safe_json(r)
     if data.get("ok"):
         print(f"  ✅ Created kit (slug: {data.get('slug', SLUG)})")
@@ -107,14 +111,18 @@ def main():
 
     # ── 3. Add tool to kit ──
     print(f"\n3. Add tool '{tool_name}' to kit")
-    r = api("POST", f"/kits/{slug}/tools", json={
-        "tool_name": tool_name,
-        "display_name": "URL Reader",
-    })
+    r = api(
+        "POST",
+        f"/kits/{slug}/tools",
+        json={
+            "tool_name": tool_name,
+            "display_name": "URL Reader",
+        },
+    )
     check(f"POST /api/kits/{slug}/tools", r)
 
     # ── 4. Verify tools in kit detail ──
-    print(f"\n4. Verify kit has tool")
+    print("\n4. Verify kit has tool")
     r = api("GET", f"/kits/{slug}/detail")
     detail = safe_json(r)
     kit_tools = detail.get("tools", [])
@@ -134,14 +142,18 @@ def main():
         f"Use {{tool_{tool_number}}} to read the content of https://example.com "
         "and write a one-paragraph summary of what the page contains."
     )
-    r = api("POST", f"/kits/{slug}/steps", json={
-        "prompt": prompt,
-        "display_name": "Summarize example.com",
-    })
+    r = api(
+        "POST",
+        f"/kits/{slug}/steps",
+        json={
+            "prompt": prompt,
+            "display_name": "Summarize example.com",
+        },
+    )
     check(f"POST /api/kits/{slug}/steps", r)
 
     # ── 6. Execute the kit (SSE stream) ──
-    print(f"\n6. Execute kit with tool-calling")
+    print("\n6. Execute kit with tool-calling")
     r = api("POST", f"/kits/{slug}/execute", json={})
     data = safe_json(r)
     execution_id = data.get("execution_id")
@@ -167,17 +179,23 @@ def main():
                     event_data = line[6:]
 
                 if event_type == "start":
-                    print(f"   ▶ Kit: {event_data.get('kit_name')}, "
-                          f"steps: {event_data.get('total_steps')}")
+                    print(
+                        f"   ▶ Kit: {event_data.get('kit_name')}, "
+                        f"steps: {event_data.get('total_steps')}"
+                    )
                 elif event_type == "step-start":
-                    print(f"   ⏳ Step {event_data.get('step')}: "
-                          f"{event_data.get('display_name', '')}")
+                    print(
+                        f"   ⏳ Step {event_data.get('step')}: "
+                        f"{event_data.get('display_name', '')}"
+                    )
                 elif event_type == "step-complete":
                     result = event_data.get("result", "")
                     latency = event_data.get("latency_ms", "?")
                     tokens = event_data.get("tokens_used", "?")
-                    print(f"   ✅ Step {event_data.get('step')} complete "
-                          f"({latency}ms, {tokens} tokens)")
+                    print(
+                        f"   ✅ Step {event_data.get('step')} complete "
+                        f"({latency}ms, {tokens} tokens)"
+                    )
                     preview = result[:200].replace("\n", " ")
                     print(f"      Result: {preview}...")
                 elif event_type == "done":
@@ -188,9 +206,13 @@ def main():
 
     # ── 7. Update tool display name ──
     print(f"\n7. Update tool #{tool_number} display name")
-    r = api("POST", f"/kits/{slug}/tools/{tool_number}/update", json={
-        "display_name": "Updated URL Reader",
-    })
+    r = api(
+        "POST",
+        f"/kits/{slug}/tools/{tool_number}/update",
+        json={
+            "display_name": "Updated URL Reader",
+        },
+    )
     check("Update tool", r)
 
     # Verify
@@ -212,11 +234,15 @@ def main():
         print(f"   ❌ Tool #{tool_number} still present")
 
     # ── 9. Re-add tool so kit remains usable for CLI testing ──
-    print(f"\n9. Re-add tool for CLI testing")
-    r = api("POST", f"/kits/{slug}/tools", json={
-        "tool_name": tool_name,
-        "display_name": "URL Reader",
-    })
+    print("\n9. Re-add tool for CLI testing")
+    r = api(
+        "POST",
+        f"/kits/{slug}/tools",
+        json={
+            "tool_name": tool_name,
+            "display_name": "URL Reader",
+        },
+    )
     check(f"Re-add {tool_name}", r)
 
     # ── Done ──

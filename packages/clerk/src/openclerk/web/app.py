@@ -6,8 +6,8 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.sessions import SessionMiddleware
+from starlette.types import ASGIApp, Receive, Scope, Send
 
 from openclerk.db.config import close_engines, get_config, init_engines
 from openclerk.mcp_client import close_mcp_servers, init_mcp_servers
@@ -26,15 +26,24 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     await close_engines()
 
 
-class AuthStateMiddleware(BaseHTTPMiddleware):
-    """Middleware to copy session user to request.state for auth dependencies."""
+class AuthStateMiddleware:
+    """Middleware to copy session user to request.state for auth dependencies.
 
-    async def dispatch(self, request: Request, call_next):
-        # Copy user from session to state so get_optional_user can find it
-        user = request.session.get("user")
-        if user:
-            request.state.user = user
-        return await call_next(request)
+    Uses pure ASGI (not BaseHTTPMiddleware) so it does not interfere with
+    the receive channel — BaseHTTPMiddleware is known to break file uploads.
+    """
+
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] in ("http", "websocket"):
+            session = scope.get("session", {})
+            user = session.get("user")
+            if user:
+                scope.setdefault("state", {})
+                scope["state"]["user"] = user
+        await self.app(scope, receive, send)
 
 
 def create_app() -> FastAPI:

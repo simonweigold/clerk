@@ -12,6 +12,7 @@ from typing import Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
+from starlette.datastructures import UploadFile as StarletteUploadFile
 from fastapi.responses import JSONResponse, StreamingResponse
 
 from ..dependencies import get_optional_user
@@ -1484,7 +1485,7 @@ async def start_execution(
                 dynamic_resources[res_id] = str(value)
             elif key.startswith("dynamic_resource_file_"):
                 res_id = key.replace("dynamic_resource_file_", "")
-                if isinstance(value, UploadFile) and value.filename:
+                if isinstance(value, StarletteUploadFile) and value.filename:
                     file_bytes = await value.read()
                     try:
                         from ...db import (
@@ -1495,8 +1496,8 @@ async def start_execution(
                         mime_type = detect_mime_type_from_filename(value.filename)
                         extracted = extract_text_from_bytes(file_bytes, mime_type)
                         dynamic_resources[res_id] = extracted or ""
-                    except ImportError:
-                        pass
+                    except Exception:
+                        dynamic_resources[res_id] = ""
     else:
         try:
             body = await request.json()
@@ -1552,8 +1553,9 @@ async def start_execution(
         if resource.is_dynamic and resource.resource_id in dynamic_resources:
             resource.content = dynamic_resources[resource.resource_id]
 
-    # Validate all dynamic resources are provided
-    missing = [r.resource_id for r in kit.resources.values() if r.is_dynamic and not r.content]
+    # Validate all dynamic resources were submitted (check presence, not content — empty
+    # extraction e.g. from a scanned PDF is still a valid submission)
+    missing = [r.resource_id for r in kit.resources.values() if r.is_dynamic and r.resource_id not in dynamic_resources]
     if missing:
         return {"error": f"Missing dynamic resources: {', '.join(missing)}"}
 

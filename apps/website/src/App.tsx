@@ -3,6 +3,9 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from './hooks/useAuth';
 import { ToastProvider } from './hooks/useToast';
 import Layout from './components/Layout';
+import AuthGuard from './components/AuthGuard';
+import LandingPage from './pages/LandingPage';
+import EarlyAccessPage from './pages/EarlyAccessPage';
 import HomePage from './pages/HomePage';
 import LoginPage from './pages/LoginPage';
 import SignupPage from './pages/SignupPage';
@@ -35,7 +38,8 @@ export default function App() {
           <AuthProvider>
             <Routes>
               <Route element={<Layout />}>
-                <Route path="/" element={<HomePage />} />
+                {/* Public landing page */}
+                <Route path="/" element={<LandingPage />} />
 
                 {/* Auth */}
                 <Route path="/auth/login" element={<LoginPage />} />
@@ -43,16 +47,23 @@ export default function App() {
                 <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
                 <Route path="/auth/logout" element={<LogoutPage />} />
 
-                {/* Kit CRUD */}
+                {/* Early Access page - requires auth */}
+                <Route
+                  path="/app"
+                  element={
+                    <AuthGuard>
+                      <EarlyAccessPage />
+                    </AuthGuard>
+                  }
+                />
+
+                {/* App routes - hidden/unlinked for launch */}
+                <Route path="/home" element={<HomePage />} />
                 <Route path="/kit/new" element={<KitCreatePage />} />
                 <Route path="/kit/:slug" element={<KitDetailPage />} />
-
-                {/* Kit Execution */}
                 <Route path="/kit/:slug/run" element={<KitRunPage />} />
                 <Route path="/kit/:slug/history" element={<KitHistoryPage />} />
                 <Route path="/kit/:slug/history/:runId" element={<ExecutionDetailPage />} />
-
-                {/* Settings */}
                 <Route path="/settings" element={<SettingsPage />} />
 
                 {/* Docs */}

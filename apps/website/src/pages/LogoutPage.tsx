@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { logout as apiLogout } from '../lib/api';
+import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
 import { useToast } from '../hooks/useToast';
 
@@ -13,10 +13,15 @@ export default function LogoutPage() {
     const handleLogout = async () => {
         setLoading(true);
         try {
-            await apiLogout();
-            await refresh();
-            addToast('info', 'Signed out.');
-            navigate('/');
+            const { error } = await supabase.auth.signOut();
+
+            if (error) {
+                addToast('error', error.message || 'Sign out failed.');
+            } else {
+                await refresh();
+                addToast('info', 'Signed out.');
+                navigate('/');
+            }
         } catch (err) {
             addToast('error', err instanceof Error ? err.message : 'Sign out failed.');
         } finally {
@@ -40,7 +45,7 @@ export default function LogoutPage() {
                     >
                         {loading ? 'Signing out...' : 'Sign Out'}
                     </button>
-                    <Link to="/" className="btn btn-ghost w-full block text-center">
+                    <Link to="/app" className="btn btn-ghost w-full block text-center">
                         Cancel
                     </Link>
                 </div>

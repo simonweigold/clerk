@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { signup as apiSignup } from '../lib/api';
+import { supabase } from '../lib/supabase';
 import { useToast } from '../hooks/useToast';
 
 export default function SignupPage() {
@@ -14,12 +14,16 @@ export default function SignupPage() {
         e.preventDefault();
         setLoading(true);
         try {
-            const data = await apiSignup(email, password);
-            if (data.ok) {
+            const { data, error } = await supabase.auth.signUp({
+                email,
+                password,
+            });
+
+            if (error) {
+                addToast('error', error.message || 'Could not create account.');
+            } else if (data.user) {
                 addToast('success', 'Account created. Please check your email for confirmation.');
-                navigate('/auth/login');
-            } else {
-                addToast('error', data.error || 'Could not create account.');
+                navigate('/app');
             }
         } catch (err) {
             addToast('error', err instanceof Error ? err.message : 'Sign up failed.');
@@ -34,8 +38,8 @@ export default function SignupPage() {
                 <div className="text-center mb-8">
                     <h1 className="text-3xl font-bold mb-3 tracking-tight">Create Account</h1>
                     <p className="text-muted-foreground">
-                        Create an account to build and manage your own reasoning kits, track
-                        executions, and share workflows with others.
+                        Create an account to join the early access list and be notified
+                        when the full app is available.
                     </p>
                 </div>
 

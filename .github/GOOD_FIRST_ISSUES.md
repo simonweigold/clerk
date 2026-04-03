@@ -9,6 +9,7 @@ Templates for initial "good first issue" labels. Create these in GitHub Issues.
 **Labels:** `good first issue`, `documentation`
 
 **Description:**
+
 ```
 The current README installation section could be clearer for new contributors.
 
@@ -31,6 +32,7 @@ The current README installation section could be clearer for new contributors.
 **Labels:** `good first issue`, `testing`
 
 **Description:**
+
 ```
 The reasoning kit loader (`packages/clerk/src/openclerk/loader.py`) needs better test coverage.
 
@@ -44,27 +46,6 @@ The reasoning kit loader (`packages/clerk/src/openclerk/loader.py`) needs better
 - [ ] All happy paths tested
 - [ ] Edge cases (FileNotFoundError, JSONDecodeError) tested
 - [ ] Coverage report shows >80% for loader.py
-```
-
-## Issue 3: Fix Minor Lint Issues
-
-**Title:** Fix remaining mypy type annotation warnings
-
-**Labels:** `good first issue`, `refactoring`
-
-**Description:**
-```
-There are several minor type annotation issues that mypy reports.
-
-### Task
-- Run `just lint` to see current warnings
-- Fix type annotation issues in non-critical files
-- Focus on files in `packages/clerk/src/openclerk/` (not external deps)
-
-### Acceptance Criteria
-- [ ] `just lint` passes with no mypy errors
-- [ ] No `# type: ignore` comments added (fix properly instead)
-- [ ] All changes are type-only (no runtime behavior changes)
 ```
 
 ## Creating These Issues

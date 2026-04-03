@@ -15,16 +15,16 @@ setup:
 
 # Run all tests with coverage
 test:
-    cd packages/clerk && pytest --cov=src/openclerk --cov-report=term-missing
+    cd packages/clerk && uv run --extra dev pytest --cov=src/openclerk --cov-report=term-missing
 
 # Run linting (Ruff + mypy)
 lint:
-    cd packages/clerk && ruff check src/ tests/
-    cd packages/clerk && mypy src/
+    cd packages/clerk && uv run --extra dev ruff check src/ tests/
+    cd packages/clerk && uv run --extra dev mypy src/
 
 # Format all code
 format:
-    cd packages/clerk && ruff format src/ tests/
+    cd packages/clerk && uv run --extra dev ruff format src/ tests/
 
 # Start full development environment
 dev:

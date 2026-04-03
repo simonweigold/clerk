@@ -209,6 +209,7 @@ __marimo__/
 # AI Coding
 .github/workflows/opencode.yml
 .opencode
+.planning
 
 # Fonts
 fonts/
@@ -216,3 +217,6 @@ fonts/
 # MCP Stuff
 tmp_airtable_mcp/
 tmp_mcp_030/
+
+# Apple
+.DS_Store

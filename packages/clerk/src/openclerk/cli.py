@@ -417,12 +417,13 @@ def _cmd_list(args: argparse.Namespace) -> None:
             return
 
         try:
-            kits = asyncio.run(list_reasoning_kits_from_db())
-            if kits:
+            _raw_kits = asyncio.run(list_reasoning_kits_from_db())
+            db_kits: list[dict[str, str]] = list(_raw_kits)
+            if db_kits:
                 print("Available reasoning kits:")
-                for kit in kits:
-                    desc = f" - {kit['description']}" if kit["description"] else ""
-                    print(f"  - {kit['slug']}: {kit['name']}{desc}")
+                for db_kit in db_kits:
+                    desc = f" - {db_kit['description']}" if db_kit["description"] else ""
+                    print(f"  - {db_kit['slug']}: {db_kit['name']}{desc}")
             else:
                 print("No public reasoning kits found in database")
         except Exception as e:

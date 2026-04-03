@@ -1,5 +1,6 @@
 import json
 import os
+from typing import Any
 from uuid import UUID
 
 from langchain_core.language_models.chat_models import BaseChatModel
@@ -20,7 +21,7 @@ DEFAULT_MODELS = {
 }
 
 
-async def get_active_provider_config(user_id: UUID | None) -> dict[str, str] | None:
+async def get_active_provider_config(user_id: UUID | None) -> dict[str, Any] | None:
     """Get the active LLM provider configuration for a user."""
     if not user_id:
         return None
@@ -89,7 +90,7 @@ async def get_llm(
             from langchain_anthropic import ChatAnthropic
 
             api_key = env_vars.get("ANTHROPIC_API_KEY")
-            return ChatAnthropic(
+            return ChatAnthropic(  # type: ignore[call-arg]
                 model=target_model, temperature=temperature, api_key=api_key
             )
 
@@ -97,7 +98,7 @@ async def get_llm(
             from langchain_mistralai import ChatMistralAI
 
             api_key = env_vars.get("MISTRAL_API_KEY")
-            return ChatMistralAI(
+            return ChatMistralAI(  # type: ignore[call-arg]
                 model=target_model, temperature=temperature, api_key=api_key
             )
 
@@ -177,12 +178,12 @@ async def get_llm(
     elif inferred_provider == "anthropic" and os.environ.get("ANTHROPIC_API_KEY"):
         from langchain_anthropic import ChatAnthropic
 
-        return ChatAnthropic(model=target_model, temperature=temperature)
+        return ChatAnthropic(model=target_model, temperature=temperature)  # type: ignore[call-arg]
 
     elif inferred_provider == "mistral" and os.environ.get("MISTRAL_API_KEY"):
         from langchain_mistralai import ChatMistralAI
 
-        return ChatMistralAI(model=target_model, temperature=temperature)
+        return ChatMistralAI(model=target_model, temperature=temperature)  # type: ignore[call-arg]
 
     elif inferred_provider == "gemini":
         if os.environ.get("GOOGLE_API_KEY"):

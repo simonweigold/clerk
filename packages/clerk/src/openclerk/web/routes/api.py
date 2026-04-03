@@ -8,6 +8,7 @@ import json
 import re
 import time
 from pathlib import Path
+from typing import Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
@@ -837,8 +838,8 @@ async def update_step(
     content_type = request.headers.get("content-type", "")
     if "multipart/form-data" in content_type or "application/x-www-form-urlencoded" in content_type:
         form = await request.form()
-        prompt = form.get("prompt", "")
-        display_name = form.get("display_name", "")
+        prompt = str(form.get("prompt", ""))
+        display_name = str(form.get("display_name", ""))
     else:
         try:
             body = await request.json()
@@ -1483,7 +1484,7 @@ async def start_execution(
                 dynamic_resources[res_id] = str(value)
             elif key.startswith("dynamic_resource_file_"):
                 res_id = key.replace("dynamic_resource_file_", "")
-                if hasattr(value, "filename") and value.filename:
+                if isinstance(value, UploadFile) and value.filename:
                     file_bytes = await value.read()
                     try:
                         from ...db import (
@@ -1493,7 +1494,7 @@ async def start_execution(
 
                         mime_type = detect_mime_type_from_filename(value.filename)
                         extracted = extract_text_from_bytes(file_bytes, mime_type)
-                        dynamic_resources[res_id] = extracted
+                        dynamic_resources[res_id] = extracted or ""
                     except ImportError:
                         pass
     else:
@@ -1810,7 +1811,7 @@ async def execute_kit_stream(
                 if openai_tools:
                     # Tool-aware execution: bind tools and handle call loop
                     llm_with_tools = llm.bind_tools([t["function"] for t in openai_tools])
-                    messages = [HumanMessage(content=clean_prompt)]
+                    messages: list[Any] = [HumanMessage(content=clean_prompt)]
                     response = await llm_with_tools.ainvoke(messages)
                     messages.append(response)
 
@@ -2609,10 +2610,10 @@ async def search_kits_json(
                 repo = ReasoningKitRepository(session)
                 db_kits = await repo.search(q.strip())
 
-                bookmarked_ids: set = set()
+                bookmarked_ids_search: set[Any] = set()
                 if user:
                     bm_repo = BookmarkRepository(session)
-                    bookmarked_ids = await bm_repo.get_bookmarked_kit_ids(UUID(user["id"]))
+                    bookmarked_ids_search = await bm_repo.get_bookmarked_kit_ids(UUID(user["id"]))
 
                 for kit in db_kits:
                     kits.append(
@@ -2624,7 +2625,7 @@ async def search_kits_json(
                             "created_at": kit.created_at.isoformat() if kit.created_at else None,
                             "updated_at": kit.updated_at.isoformat() if kit.updated_at else None,
                             "owner_id": str(kit.owner_id) if kit.owner_id else None,
-                            "is_bookmarked": kit.id in bookmarked_ids,
+                            "is_bookmarked": kit.id in bookmarked_ids_search,
                         }
                     )
         except Exception:
@@ -2920,27 +2921,27 @@ async def get_kit_detail_json(
             }
             source = "local"
             for key in sorted(kit.resources.keys(), key=int):
-                r = kit.resources[key]
+                local_r = kit.resources[key]
                 resources.append(
                     {
                         "number": int(key),
-                        "resource_id": r.resource_id,
-                        "filename": r.file,
-                        "display_name": getattr(r, "display_name", None),
-                        "is_dynamic": getattr(r, "is_dynamic", False),
-                        "extracted_text": r.content,
-                        "file_size_bytes": len(r.content.encode()) if r.content else 0,
+                        "resource_id": local_r.resource_id,
+                        "filename": local_r.file,
+                        "display_name": getattr(local_r, "display_name", None),
+                        "is_dynamic": getattr(local_r, "is_dynamic", False),
+                        "extracted_text": local_r.content,
+                        "file_size_bytes": len(local_r.content.encode()) if local_r.content else 0,
                         "mime_type": "text/plain",
                     }
                 )
             for key in sorted(kit.workflow.keys(), key=int):
-                s = kit.workflow[key]
+                local_s = kit.workflow[key]
                 steps.append(
                     {
                         "number": int(key),
-                        "output_id": s.output_id,
-                        "prompt_template": s.prompt,
-                        "display_name": getattr(s, "display_name", None),
+                        "output_id": local_s.output_id,
+                        "prompt_template": local_s.prompt,
+                        "display_name": getattr(local_s, "display_name", None),
                     }
                 )
         except Exception:

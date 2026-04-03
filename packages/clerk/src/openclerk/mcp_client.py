@@ -153,16 +153,16 @@ async def init_mcp_servers(config_path: str = "mcp_servers.json") -> None:
 
                         try:
                             # call_tool expects arguments as a mapping
-                            result = await session_to_use.call_tool(
+                            tool_result = await session_to_use.call_tool(
                                 t_name, arguments=args_dict
                             )
-                            if result.isError:
+                            if tool_result.isError:
                                 # Sometimes content is plain text, let's extract it safely
-                                error_text = getattr(result, "content", "Unknown error")
+                                error_text = getattr(tool_result, "content", "Unknown error")
                                 return f"Error from MCP tool {t_name}: {error_text}"
 
                             output = []
-                            for content in result.content:
+                            for content in tool_result.content:
                                 if content.type == "text":
                                     output.append(content.text)
                                 else:

@@ -79,12 +79,12 @@ def get_supabase_client(use_service_key: bool = False) -> Client:
             raise ValueError("SUPABASE_SERVICE_ROLE_KEY required for admin operations")
         key = config.supabase_service_key
     else:
-        key = config.supabase_anon_key
+        key = cast(str, config.supabase_anon_key)
 
     # validate() ensures these are not None
     return create_client(
         cast(str, config.supabase_url),
-        cast(str, key),
+        key,
     )
 
 

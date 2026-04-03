@@ -361,7 +361,7 @@ def execute_step(state: State) -> dict[str, Any]:
         llm_with_tools = llm.bind_tools(
             [t["function"] for t in openai_tools]
         )
-        messages = [HumanMessage(content=clean_prompt)]
+        messages: list[Any] = [HumanMessage(content=clean_prompt)]
         response = llm_with_tools.invoke(messages)
         messages.append(response)
 
@@ -375,7 +375,7 @@ def execute_step(state: State) -> dict[str, Any]:
                 tool_def = get_tool(tool_call["name"])
                 if tool_def:
                     try:
-                        tool_result = asyncio.run(tool_def.execute(tool_call["args"], user_id=state.get("user_id")))
+                        tool_result: str = asyncio.run(tool_def.execute(tool_call["args"], user_id=state.get("user_id")))  # type: ignore[arg-type]
                     except Exception as te:
                         tool_result = f"Error executing tool: {te}"
                 else:
@@ -748,7 +748,7 @@ async def run_reasoning_kit_async(
                 llm_with_tools = llm.bind_tools(
                     [t["function"] for t in openai_tools]
                 )
-                messages = [HumanMessage(content=clean_prompt)]
+                messages: list[Any] = [HumanMessage(content=clean_prompt)]
                 response = await llm_with_tools.ainvoke(messages)
                 messages.append(response)
 

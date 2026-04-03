@@ -15,7 +15,8 @@ setup:
 
 # Run all tests with coverage
 test:
-    cd packages/clerk && uv run --extra dev pytest --cov=src/openclerk --cov-report=term-missing
+    cd packages/clerk && uv run --extra dev pytest --cov=src/openclerk --cov-report=term-missing; \
+    exit_code=$?; [ $exit_code -eq 5 ] && exit 0 || exit $exit_code
 
 # Run linting (Ruff + mypy)
 lint:

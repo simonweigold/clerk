@@ -10,7 +10,7 @@ import time
 from pathlib import Path
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Form, Request, UploadFile, File
+from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
 from fastapi.responses import JSONResponse, StreamingResponse
 
 from ..dependencies import get_optional_user
@@ -86,7 +86,7 @@ async def create_kit(
                         status_code=409,
                     )
 
-                kit = await repo.create(
+                await repo.create(
                     slug=slug,
                     name=name,
                     description=description or None,
@@ -1065,14 +1065,15 @@ async def list_available_tools(
     active_mcp_servers = set()
     if user and "id" in user:
         try:
+            from sqlalchemy import select
+
             from ...db import get_async_session
             from ...db.models import McpServerConfig
-            from sqlalchemy import select
 
             async with get_async_session() as session:
                 stmt = select(McpServerConfig.server_name).where(
                     McpServerConfig.user_id == user["id"],
-                    McpServerConfig.is_active == True,
+                    McpServerConfig.is_active,
                 )
                 result = await session.execute(stmt)
                 active_mcp_servers = set(result.scalars().all())
@@ -1512,7 +1513,8 @@ async def start_execution(
     config = get_config()
     if config.is_database_configured:
         try:
-            from ...db import ReasoningKitRepository, get_async_session as _get_session
+            from ...db import ReasoningKitRepository
+            from ...db import get_async_session as _get_session
 
             # Check private kit access
             async with _get_session() as session:
@@ -1536,8 +1538,8 @@ async def start_execution(
 
     if kit is None:
         try:
-            from ...loader import load_reasoning_kit
             from ...cli import resolve_kit_path
+            from ...loader import load_reasoning_kit
 
             kit_path = resolve_kit_path(slug, "reasoning_kits")
             kit = load_reasoning_kit(kit_path)
@@ -1593,6 +1595,7 @@ async def resume_execution(
         return {"error": "Invalid request body"}
 
     import uuid as _uuid
+
     from ...db.config import get_config
 
     config = get_config()
@@ -1602,7 +1605,8 @@ async def resume_execution(
     user_id = UUID(user["id"]) if user else None
 
     try:
-        from ...db import ExecutionRepository, get_async_session as _get_session
+        from ...db import ExecutionRepository
+        from ...db import get_async_session as _get_session
         from ...loader import load_reasoning_kit_from_db
 
         async with _get_session() as session:
@@ -1701,12 +1705,12 @@ async def execute_kit_stream(
 
     async def execution_stream():
         """Stream execution results as SSE events."""
-        from ...graph import DEFAULT_MODEL, resolve_placeholders
         from ...evaluation import (
+            complete_execution_run,
             create_execution_run,
             save_step_to_db,
-            complete_execution_run,
         )
+        from ...graph import DEFAULT_MODEL, resolve_placeholders
 
         persist = save_to_db  # local copy to allow mutation
 
@@ -1745,8 +1749,9 @@ async def execute_kit_stream(
         yield f"event: start\ndata: {json.dumps({'kit_name': kit.name, 'total_steps': len(kit.workflow), 'past_steps': past_steps})}\n\n"
 
         # Execute step by step
-        from ...llm_factory import get_llm
         from langchain_core.messages import HumanMessage, ToolMessage
+
+        from ...llm_factory import get_llm
 
         llm = await get_llm(
             user_id=user["id"] if user else None, model=DEFAULT_MODEL, temperature=0
@@ -2051,8 +2056,8 @@ async def delete_execution(
         return {"ok": False, "error": "Database not configured."}
 
     try:
-        from ...evaluation import delete_execution_run
         from ...db import ExecutionRepository, get_async_session
+        from ...evaluation import delete_execution_run
 
         async with get_async_session() as session:
             repo = ExecutionRepository(session)
@@ -2098,6 +2103,8 @@ async def list_executions(
         from ...db import (
             ExecutionRepository,
             ReasoningKitRepository,
+        )
+        from ...db import (
             get_async_session as _get_session,
         )
 
@@ -2150,7 +2157,8 @@ async def get_execution(
         return {"error": "Database not configured."}
 
     try:
-        from ...db import ExecutionRepository, get_async_session as _get_session
+        from ...db import ExecutionRepository
+        from ...db import get_async_session as _get_session
 
         async with _get_session() as session:
             repo = ExecutionRepository(session)
@@ -2232,7 +2240,8 @@ async def download_execution(
         return {"error": "Database not configured."}
 
     try:
-        from ...db import ExecutionRepository, get_async_session as _get_session
+        from ...db import ExecutionRepository
+        from ...db import get_async_session as _get_session
 
         async with _get_session() as session:
             repo = ExecutionRepository(session)
@@ -2315,7 +2324,8 @@ async def update_execution_label(
         return {"ok": False, "error": "Database not configured."}
 
     try:
-        from ...db import ExecutionRepository, get_async_session as _get_session
+        from ...db import ExecutionRepository
+        from ...db import get_async_session as _get_session
 
         async with _get_session() as session:
             repo = ExecutionRepository(session)
@@ -2894,8 +2904,8 @@ async def get_kit_detail_json(
     if not kit_data:
         # Fall back to local filesystem
         try:
-            from ...loader import load_reasoning_kit
             from ...cli import resolve_kit_path
+            from ...loader import load_reasoning_kit
 
             kit_path = resolve_kit_path(slug, "reasoning_kits")
             kit = load_reasoning_kit(kit_path)
@@ -2976,9 +2986,10 @@ async def get_mcp_configs(user: dict | None = Depends(get_optional_user)):
         return JSONResponse({"ok": False, "error": "Database not configured"}, status_code=500)
 
     try:
+        from sqlalchemy import select
+
         from ...db import get_async_session
         from ...db.models import McpServerConfig
-        from sqlalchemy import select
 
         async with get_async_session() as session:
             if not user or "id" not in user:
@@ -3019,9 +3030,10 @@ async def update_mcp_config(
         data = await request.json()
         env_vars = data.get("env_vars", {})
 
+        from sqlalchemy import select
+
         from ...db import get_async_session
         from ...db.models import McpServerConfig
-        from sqlalchemy import select
 
         async with get_async_session() as session:
             if not user or "id" not in user:
@@ -3064,9 +3076,10 @@ async def delete_mcp_config(server_name: str, user: dict | None = Depends(get_op
         return JSONResponse({"ok": False, "error": "Database not configured"}, status_code=500)
 
     try:
+        from sqlalchemy import select
+
         from ...db import get_async_session
         from ...db.models import McpServerConfig
-        from sqlalchemy import select
 
         async with get_async_session() as session:
             if not user or "id" not in user:
@@ -3103,9 +3116,10 @@ async def get_llm_configs(user: dict | None = Depends(get_optional_user)):
         return JSONResponse({"ok": False, "error": "Database not configured"}, status_code=500)
 
     try:
+        from sqlalchemy import select
+
         from ...db import get_async_session
         from ...db.models import LlmProviderConfig
-        from sqlalchemy import select
 
         async with get_async_session() as session:
             if not user or "id" not in user:
@@ -3149,9 +3163,10 @@ async def update_llm_config(
         selected_model = data.get("selected_model")
         is_active = data.get("is_active", False)
 
+        from sqlalchemy import select, update
+
         from ...db import get_async_session
         from ...db.models import LlmProviderConfig
-        from sqlalchemy import select, update
 
         async with get_async_session() as session:
             if not user or "id" not in user:
@@ -3259,8 +3274,9 @@ async def get_doc(slug: str):
 @router.get("/openapi.json")
 async def get_openapi_spec() -> dict:
     """Return the OpenAPI specification for the API."""
-    from ...web.app import create_app
     from fastapi.openapi.utils import get_openapi
+
+    from ...web.app import create_app
 
     app_instance = create_app()
     openapi_schema = get_openapi(

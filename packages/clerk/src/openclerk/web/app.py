@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 
-from openclerk.db.config import close_engines, init_engines, get_config
+from openclerk.db.config import close_engines, get_config, init_engines
 from openclerk.mcp_client import close_mcp_servers, init_mcp_servers
 
 

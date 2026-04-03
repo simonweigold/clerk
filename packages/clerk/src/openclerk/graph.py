@@ -9,9 +9,10 @@ from uuid import UUID
 
 from langchain_core.vectorstores import InMemoryVectorStore
 from langchain_openai import OpenAIEmbeddings
-from langgraph.graph import StateGraph, END
-from .llm_factory import get_llm
+from langgraph.graph import END, StateGraph
 
+from .db.config import get_async_session_factory
+from .embeddings import CachedEmbeddings
 from .evaluation import (
     complete_execution_run,
     create_execution_run,
@@ -21,11 +22,9 @@ from .evaluation import (
     save_step_to_db,
     update_step_evaluation_in_db,
 )
-from .embeddings import CachedEmbeddings
-from .db.config import get_async_session_factory
+from .llm_factory import get_llm
 from .models import Evaluation, ReasoningKit
 from .tools import get_openai_tool_schema, get_tool
-
 
 DEFAULT_MODEL = "gpt-5-mini"
 
@@ -123,16 +122,16 @@ def create_initial_state(
 
 def chunk_text(text: str, max_size: int = 2000, overlap: int = 200) -> list[str]:
     """Split text into chunks of maximum size with some overlap.
-    
+
     Tries to split by paragraphs (\\n\\n) first, then falls back to lines (\\n),
     and finally chunks by character count if necessary.
     """
     if len(text) <= max_size:
         return [text]
-        
+
     chunks = []
     paragraphs = text.split("\n\n")
-    
+
     current_chunk = ""
     for p in paragraphs:
         if len(current_chunk) + len(p) + 2 <= max_size:
@@ -162,10 +161,10 @@ def chunk_text(text: str, max_size: int = 2000, overlap: int = 200) -> list[str]
                             # Handle overlap for the last part
                             if chunks:
                                 current_chunk = chunks[-1][-overlap:] if len(chunks[-1]) > overlap else chunks[-1]
-                            
+
     if current_chunk and current_chunk.strip():
         chunks.append(current_chunk.strip())
-        
+
     return chunks
 
 
@@ -245,24 +244,24 @@ def resolve_placeholders(
 
     # Extract clean search query from prompt to use for RAG
     search_query = extract_search_query(text)
-    
+
     # We load embeddings lazily to avoid unnecessary initialization
     embeddings = None
 
     for placeholder in placeholders:
         if placeholder in resources:
             content = resources[placeholder]
-            
+
             # If resource is large, use simple RAG
             if len(content) > resource_size_threshold and search_query:
                 try:
                     if embeddings is None:
                         embeddings = OpenAIEmbeddings()
-                        
+
                     chunks = chunk_text(content)
                     vectorstore = InMemoryVectorStore.from_texts(chunks, embeddings)
                     results = vectorstore.similarity_search(search_query, k=max_chunks)
-                    
+
                     # Combine relevant chunks
                     relevant_content = "\n\n... [Context skipped] ...\n\n".join([doc.page_content for doc in results])
                     text = text.replace(f"{{{placeholder}}}", relevant_content)
@@ -272,7 +271,7 @@ def resolve_placeholders(
                     text = text.replace(f"{{{placeholder}}}", content)
             else:
                 text = text.replace(f"{{{placeholder}}}", content)
-                
+
         elif placeholder in outputs:
             text = text.replace(f"{{{placeholder}}}", outputs[placeholder])
 
@@ -294,7 +293,7 @@ async def aresolve_placeholders(
     for placeholder in placeholders:
         if placeholder in resources:
             content = resources[placeholder]
-            
+
             if len(content) > resource_size_threshold and search_query:
                 try:
                     if embeddings is None:
@@ -302,14 +301,14 @@ async def aresolve_placeholders(
                         session_factory = get_async_session_factory()
                         # Wrap the OpenAI embeddings with our database cache handler
                         embeddings = CachedEmbeddings(
-                            underlying_embeddings=base_embeddings, 
+                            underlying_embeddings=base_embeddings,
                             session_factory=session_factory
                         )
-                        
+
                     chunks = chunk_text(content)
                     vectorstore = await InMemoryVectorStore.afrom_texts(chunks, embeddings)
                     results = await vectorstore.asimilarity_search(search_query, k=max_chunks)
-                    
+
                     relevant_content = "\n\n... [Context skipped] ...\n\n".join([doc.page_content for doc in results])
                     text = text.replace(f"{{{placeholder}}}", relevant_content)
                 except Exception as e:
@@ -317,7 +316,7 @@ async def aresolve_placeholders(
                     text = text.replace(f"{{{placeholder}}}", content)
             else:
                 text = text.replace(f"{{{placeholder}}}", content)
-                
+
         elif placeholder in outputs:
             text = text.replace(f"{{{placeholder}}}", outputs[placeholder])
 
@@ -622,7 +621,7 @@ def run_reasoning_kit(
     if evaluate:
         print(f"Evaluation: enabled ({evaluation_mode} mode)")
     if save_to_db:
-        print(f"Database tracking: enabled")
+        print("Database tracking: enabled")
     print(f"{'#' * 60}\n")
 
     error_message: str | None = None

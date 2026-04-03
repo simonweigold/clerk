@@ -168,8 +168,8 @@ def upgrade() -> None:
     # Full-text search index on extracted text
     op.execute(
         """
-        CREATE INDEX idx_resources_text_search 
-        ON resources 
+        CREATE INDEX idx_resources_text_search
+        ON resources
         USING GIN (to_tsvector('english', COALESCE(extracted_text, '')))
         """
     )

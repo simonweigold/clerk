@@ -1,14 +1,13 @@
-import os
 import json
+import os
 from uuid import UUID
 
 from langchain_core.language_models.chat_models import BaseChatModel
-from langchain_core.language_models.chat_models import BaseChatModel
+from sqlalchemy import select
 
 from openclerk.db import get_async_session
-from openclerk.db.models import LlmProviderConfig
 from openclerk.db.config import get_config
-from sqlalchemy import select
+from openclerk.db.models import LlmProviderConfig
 
 # Default models per provider
 DEFAULT_MODELS = {
@@ -34,7 +33,7 @@ async def get_active_provider_config(user_id: UUID | None) -> dict[str, str] | N
         async with get_async_session() as session:
             stmt = select(LlmProviderConfig).where(
                 LlmProviderConfig.user_id == user_id,
-                LlmProviderConfig.is_active == True,
+                LlmProviderConfig.is_active,
             )
             result = await session.execute(stmt)
             provider_config = result.scalar_one_or_none()

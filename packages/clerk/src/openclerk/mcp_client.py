@@ -4,7 +4,6 @@ Connects to Model Context Protocol (MCP) servers and exposes their tools.
 Reads configuration from mcp_servers.json in the current working directory.
 """
 
-import asyncio
 import json
 import logging
 import os
@@ -13,7 +12,6 @@ from typing import Any
 
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
-from pydantic import ValidationError
 
 from openclerk.tools import ToolDefinition, register_tool
 
@@ -99,10 +97,12 @@ async def init_mcp_servers(config_path: str = "mcp_servers.json") -> None:
 
                             if get_config().is_database_configured:
                                 try:
+                                    import uuid
+
+                                    from sqlalchemy import select
+
                                     from openclerk.db import get_async_session
                                     from openclerk.db.models import McpServerConfig
-                                    from sqlalchemy import select
-                                    import uuid
 
                                     async with get_async_session() as db_session:
                                         stmt = select(McpServerConfig).where(

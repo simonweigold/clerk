@@ -811,7 +811,7 @@ async def _sync_push(kit_name: str, base_path: str, message: str | None) -> None
 
 async def _sync_pull(slug: str, base_path: str) -> None:
     """Pull a kit from database to local filesystem."""
-    from .db import StorageService, get_async_session, ReasoningKitRepository
+    from .db import ReasoningKitRepository, StorageService, get_async_session
 
     print(f"Pulling '{slug}' from database...")
 

@@ -11,7 +11,6 @@ import pgvector.sqlalchemy
 import sqlalchemy as sa
 from alembic import op
 
-
 # revision identifiers, used by Alembic.
 revision: str = '7a9829621a7c'
 down_revision: Union[str, None] = '005_add_kit_bookmarks'

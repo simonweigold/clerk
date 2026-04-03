@@ -16,7 +16,6 @@ from .models import (
     Resource,
     StepExecution,
     Tool,
-    UserKitBookmark,
     UserProfile,
     WorkflowStep,
 )

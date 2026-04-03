@@ -10,7 +10,6 @@ from typing import Sequence, Union
 import sqlalchemy as sa
 from alembic import op
 
-
 # revision identifiers, used by Alembic.
 revision: str = 'db81246b347e'
 down_revision: Union[str, None] = '665d4571ea5e'
@@ -23,7 +22,7 @@ def upgrade() -> None:
     conn = op.get_bind()
     inspector = sa.inspect(conn)
     tables = inspector.get_table_names()
-    
+
     for table in tables:
         op.execute(f"ALTER TABLE {table} ENABLE ROW LEVEL SECURITY;")
 
@@ -33,6 +32,6 @@ def downgrade() -> None:
     conn = op.get_bind()
     inspector = sa.inspect(conn)
     tables = inspector.get_table_names()
-    
+
     for table in tables:
         op.execute(f"ALTER TABLE {table} DISABLE ROW LEVEL SECURITY;")

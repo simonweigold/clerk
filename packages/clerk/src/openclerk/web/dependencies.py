@@ -1,10 +1,9 @@
 """FastAPI dependencies for database sessions and authentication."""
 
 from collections.abc import AsyncGenerator
-from uuid import UUID
 
 from fastapi import Depends, HTTPException, Request
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db.config import get_async_session, get_config

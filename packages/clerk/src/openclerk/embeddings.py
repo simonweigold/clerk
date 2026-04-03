@@ -1,7 +1,6 @@
 """Cached embeddings wrapper for LangChain."""
 
 import hashlib
-from typing import Any
 
 from langchain_core.embeddings import Embeddings
 from sqlalchemy import select
@@ -19,7 +18,7 @@ class CachedEmbeddings(Embeddings):
         session_factory: async_sessionmaker[AsyncSession],
     ):
         """Initialize the cached embeddings.
-        
+
         Args:
             underlying_embeddings: The actual embeddings implementation to use when a cache miss occurs.
             session_factory: Factory for creating async database sessions.
@@ -33,7 +32,7 @@ class CachedEmbeddings(Embeddings):
 
     def embed_documents(self, texts: list[str]) -> list[list[float]]:
         """Embed search docs (synchronous - not implemented for db cache).
-        
+
         Since our database access is async-only, we require the async version to be used.
         """
         raise NotImplementedError(
@@ -50,7 +49,7 @@ class CachedEmbeddings(Embeddings):
         """Asynchronously embed search docs, using the database cache when possible."""
         # 1. Compute hashes for all requested texts to maintain original order
         text_hashes: list[str] = [self._hash_text(t) for t in texts]
-        
+
         # 2. Check the database for existing hashes
         cached_results: dict[str, list[float]] = {}
         async with self.session_factory() as session:
@@ -81,17 +80,17 @@ class CachedEmbeddings(Embeddings):
                 for i, text in enumerate(missing_texts):
                     text_hash = text_hashes[missing_indices[i]]
                     embedding = new_embeddings[i]
-                    
+
                     # Store in our original order tracking
                     cached_results[text_hash] = embedding
-                    
+
                     # Store in DB
                     db_entry = EmbeddingCache(
                         text_hash=text_hash,
                         embedding=embedding,
                     )
                     session.add(db_entry)
-                
+
                 try:
                     await session.commit()
                 except Exception as e:

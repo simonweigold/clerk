@@ -9,8 +9,8 @@ Tools follow the OpenAI function-calling pattern:
 - The LLM decides when to invoke a tool; we handle the call loop.
 """
 
-from dataclasses import dataclass, field
-from typing import Any, Callable, Awaitable
+from dataclasses import dataclass
+from typing import Any, Awaitable, Callable
 
 
 @dataclass

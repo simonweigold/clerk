@@ -3,6 +3,7 @@
 import uuid
 from datetime import datetime
 
+from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
     Boolean,
     CheckConstraint,
@@ -13,9 +14,8 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
 )
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
-from pgvector.sqlalchemy import Vector
 
 
 class Base(DeclarativeBase):
@@ -422,7 +422,7 @@ class UserKitBookmark(Base):
 
 class EmbeddingCache(Base):
     """System-wide cache for text embeddings.
-    
+
     Stores the OpenAI embeddings for chunks of text to avoid recomputing
     them across different runs or users.
     """
@@ -473,7 +473,7 @@ class McpServerConfig(Base):
 class LlmProviderConfig(Base):
     """User-specific configuration for an LLM provider.
 
-    Stores credentials, selected model, and active status for 
+    Stores credentials, selected model, and active status for
     different LLM providers (e.g. OpenAI, Anthropic, Mistral) for a specific user.
     """
 

@@ -1,7 +1,7 @@
 import { Link, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { ToastContainer } from "../hooks/useToast";
-import { Settings, LogOut, Github } from "lucide-react";
+import { LogOut, Github } from "lucide-react";
 
 export default function Layout() {
   const { user, supabaseConfigured, loading } = useAuth();
@@ -14,10 +14,11 @@ export default function Layout() {
     (path) => location.pathname === path || location.pathname.startsWith(path),
   );
 
-  const isActive = (path: string) => {
-    if (path === "/") return location.pathname === "/";
-    return location.pathname.startsWith(path);
-  };
+  // isActive function disabled with app navigation links
+  // const isActive = (path: string) => {
+  //   if (path === "/") return location.pathname === "/";
+  //   return location.pathname.startsWith(path);
+  // };
 
   return (
     <div className="min-h-screen flex flex-col bg-white font-sans text-foreground antialiased">
@@ -79,7 +80,8 @@ export default function Layout() {
                     Home
                   </Link>
                 )}
-                {isAppRoute && user && (
+                {/* App navigation links disabled for launch */}
+                {/* {isAppRoute && user && (
                   <>
                     <Link
                       to="/home"
@@ -100,7 +102,7 @@ export default function Layout() {
                       Create
                     </Link>
                   </>
-                )}
+                )} */}
                 {loading ? (
                   <div className="flex items-center justify-center ml-2 w-8 h-8">
                     <span className="pulse-dot" />
@@ -109,13 +111,14 @@ export default function Layout() {
                   <>
                     {user ? (
                       <>
-                        <Link
+                        {/* Settings link disabled for launch */}
+                        {/* <Link
                           to="/settings"
                           className="btn btn-ghost btn-sm ml-2 px-2"
                           title="Account Settings"
                         >
                           <Settings className="w-4 h-4" />
-                        </Link>
+                        </Link> */}
                         <Link
                           to="/auth/logout"
                           className="btn btn-ghost btn-sm ml-1 px-2"

@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AuthProvider } from "./hooks/useAuth";
 import { ToastProvider } from "./hooks/useToast";
@@ -6,17 +6,10 @@ import Layout from "./components/Layout";
 import AuthGuard from "./components/AuthGuard";
 import LandingPage from "./pages/LandingPage";
 import EarlyAccessPage from "./pages/EarlyAccessPage";
-import HomePage from "./pages/HomePage";
 import LoginPage from "./pages/LoginPage";
 import SignupPage from "./pages/SignupPage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
 import LogoutPage from "./pages/LogoutPage";
-import KitDetailPage from "./pages/KitDetailPage";
-import KitCreatePage from "./pages/KitCreatePage";
-import KitRunPage from "./pages/KitRunPage";
-import KitHistoryPage from "./pages/KitHistoryPage";
-import ExecutionDetailPage from "./pages/ExecutionDetailPage";
-import SettingsPage from "./pages/SettingsPage";
 import DocsPage from "./pages/DocsPage";
 
 const queryClient = new QueryClient({
@@ -50,7 +43,7 @@ export default function App() {
                 />
                 <Route path="/auth/logout" element={<LogoutPage />} />
 
-                {/* Early Access page - requires auth */}
+                {/* Early Access page - requires auth, no backend access */}
                 <Route
                   path="/app"
                   element={
@@ -60,17 +53,14 @@ export default function App() {
                   }
                 />
 
-                {/* App routes - hidden/unlinked for launch */}
-                <Route path="/home" element={<HomePage />} />
-                <Route path="/kit/new" element={<KitCreatePage />} />
-                <Route path="/kit/:slug" element={<KitDetailPage />} />
-                <Route path="/kit/:slug/run" element={<KitRunPage />} />
-                <Route path="/kit/:slug/history" element={<KitHistoryPage />} />
-                <Route
-                  path="/kit/:slug/history/:runId"
-                  element={<ExecutionDetailPage />}
-                />
-                <Route path="/settings" element={<SettingsPage />} />
+                {/* App routes disabled for launch - redirect to early access */}
+                <Route path="/home" element={<Navigate to="/app" replace />} />
+                <Route path="/kit/new" element={<Navigate to="/app" replace />} />
+                <Route path="/kit/:slug" element={<Navigate to="/app" replace />} />
+                <Route path="/kit/:slug/run" element={<Navigate to="/app" replace />} />
+                <Route path="/kit/:slug/history" element={<Navigate to="/app" replace />} />
+                <Route path="/kit/:slug/history/:runId" element={<Navigate to="/app" replace />} />
+                <Route path="/settings" element={<Navigate to="/app" replace />} />
 
                 {/* Docs */}
                 <Route path="/docs/*" element={<DocsPage />} />

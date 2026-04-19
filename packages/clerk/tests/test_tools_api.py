@@ -15,10 +15,10 @@ Set CLERK_EMAIL and CLERK_PASSWORD env vars for auto-login,
 or the script will prompt interactively.
 """
 
+import getpass
 import json
 import os
 import sys
-import getpass
 
 import httpx
 

@@ -4,7 +4,7 @@ import { ToastContainer } from '../hooks/useToast';
 import { Settings, LogOut } from 'lucide-react';
 
 export default function Layout() {
-    const { user, supabaseConfigured, loading } = useAuth();
+    const { user, loading } = useAuth();
     const location = useLocation();
 
     const isActive = (path: string) => {
@@ -47,24 +47,20 @@ export default function Layout() {
                             <div className="flex items-center justify-center ml-2 w-8 h-8">
                                 <span className="pulse-dot" />
                             </div>
-                        ) : supabaseConfigured ? (
+                        ) : user ? (
                             <>
-                                {user ? (
-                                    <>
-                                        <Link to="/settings" className="btn btn-ghost btn-sm ml-2 px-2" title="Account Settings">
-                                            <Settings className="w-4 h-4" />
-                                        </Link>
-                                        <Link to="/auth/logout" className="btn btn-ghost btn-sm ml-1 px-2" title="Sign Out">
-                                            <LogOut className="w-4 h-4" />
-                                        </Link>
-                                    </>
-                                ) : (
-                                    <Link to="/auth/login" className="btn btn-ghost btn-sm ml-2">
-                                        Sign In
-                                    </Link>
-                                )}
+                                <Link to="/settings" className="btn btn-ghost btn-sm ml-2 px-2" title="Account Settings">
+                                    <Settings className="w-4 h-4" />
+                                </Link>
+                                <Link to="/auth/logout" className="btn btn-ghost btn-sm ml-1 px-2" title="Sign Out">
+                                    <LogOut className="w-4 h-4" />
+                                </Link>
                             </>
-                        ) : null}
+                        ) : (
+                            <Link to="/auth/login" className="btn btn-ghost btn-sm ml-2">
+                                Sign In
+                            </Link>
+                        )}
                     </nav>
                 </div>
             </header>

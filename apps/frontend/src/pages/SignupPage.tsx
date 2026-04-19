@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { supabase } from '../lib/supabase';
+import { signup } from '../lib/api';
+import { useAuth } from '../hooks/useAuth';
 import { useToast } from '../hooks/useToast';
 
 export default function SignupPage() {
@@ -8,22 +9,20 @@ export default function SignupPage() {
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
     const navigate = useNavigate();
+    const { refresh } = useAuth();
     const { addToast } = useToast();
 
     const handleSubmit = async (e: FormEvent) => {
         e.preventDefault();
         setLoading(true);
         try {
-            const { data, error } = await supabase.auth.signUp({
-                email,
-                password,
-            });
-
-            if (error) {
-                addToast('error', error.message || 'Could not create account.');
-            } else if (data.user) {
-                addToast('success', 'Account created. Please check your email for confirmation.');
-                navigate('/app');
+            const data = await signup(email, password);
+            if (data.ok) {
+                await refresh();
+                addToast('success', 'Account created.');
+                navigate('/home');
+            } else {
+                addToast('error', data.error || 'Could not create account.');
             }
         } catch (err) {
             addToast('error', err instanceof Error ? err.message : 'Sign up failed.');
@@ -38,8 +37,7 @@ export default function SignupPage() {
                 <div className="text-center mb-8">
                     <h1 className="text-3xl font-bold mb-3 tracking-tight">Create Account</h1>
                     <p className="text-muted-foreground">
-                        Create an account to join the early access list and be notified
-                        when the full app is available.
+                        Create an account to get started.
                     </p>
                 </div>
 

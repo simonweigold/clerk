@@ -1,29 +1,31 @@
 import { useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { supabase } from '../lib/supabase';
+import { signup } from '../lib/api';
+import { useAuth } from '../hooks/useAuth';
 import { useToast } from '../hooks/useToast';
 
-export default function ResetPasswordPage() {
+export default function SignupPage() {
     const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
     const navigate = useNavigate();
+    const { refresh } = useAuth();
     const { addToast } = useToast();
 
     const handleSubmit = async (e: FormEvent) => {
         e.preventDefault();
         setLoading(true);
         try {
-            const { error } = await supabase.auth.resetPasswordForEmail(email, {
-                redirectTo: `${window.location.origin}/auth/reset-password`,
-            });
-            if (error) {
-                addToast('error', error.message || 'Something went wrong.');
+            const data = await signup(email, password);
+            if (data.ok) {
+                await refresh();
+                addToast('success', 'Account created.');
+                navigate('/home');
             } else {
-                addToast('success', 'If an account with that email exists, a reset link has been sent.');
-                navigate('/auth/login');
+                addToast('error', data.error || 'Could not create account.');
             }
         } catch (err) {
-            addToast('error', err instanceof Error ? err.message : 'Reset failed.');
+            addToast('error', err instanceof Error ? err.message : 'Sign up failed.');
         } finally {
             setLoading(false);
         }
@@ -33,9 +35,9 @@ export default function ResetPasswordPage() {
         <div className="max-w-sm mx-auto fade-in">
             <div className="glass-card">
                 <div className="text-center mb-8">
-                    <h1 className="text-3xl font-bold mb-3 tracking-tight">Reset Password</h1>
+                    <h1 className="text-3xl font-bold mb-3 tracking-tight">Create Account</h1>
                     <p className="text-muted-foreground">
-                        Enter your email address and we'll send you a link to reset your password.
+                        Create an account to get started.
                     </p>
                 </div>
 
@@ -54,17 +56,33 @@ export default function ResetPasswordPage() {
                         />
                     </div>
 
+                    <div>
+                        <label htmlFor="password" className="label">Password</label>
+                        <input
+                            type="password"
+                            id="password"
+                            className="input"
+                            placeholder="Choose a password"
+                            required
+                            autoComplete="new-password"
+                            minLength={6}
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                        />
+                        <p className="text-xs text-muted-foreground mt-1.5">Minimum 6 characters.</p>
+                    </div>
+
                     <button
                         type="submit"
                         className="btn btn-primary btn-lg w-full"
                         disabled={loading}
                     >
-                        {loading ? 'Sending...' : 'Send Reset Link'}
+                        {loading ? 'Creating...' : 'Create Account'}
                     </button>
                 </form>
 
                 <p className="text-center text-sm text-muted-foreground mt-6">
-                    Remember your password?{' '}
+                    Already have an account?{' '}
                     <Link to="/auth/login" className="text-primary hover:underline font-medium">
                         Sign in
                     </Link>

@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { supabase } from '../lib/supabase';
+import { login } from '../lib/api';
 import { useAuth } from '../hooks/useAuth';
 import { useToast } from '../hooks/useToast';
 
@@ -16,17 +16,13 @@ export default function LoginPage() {
         e.preventDefault();
         setLoading(true);
         try {
-            const { data, error } = await supabase.auth.signInWithPassword({
-                email,
-                password,
-            });
-
-            if (error) {
-                addToast('error', error.message || 'Invalid credentials.');
-            } else if (data.user) {
+            const data = await login(email, password);
+            if (data.ok) {
                 await refresh();
                 addToast('success', 'Signed in.');
-                navigate('/app');
+                navigate('/home');
+            } else {
+                addToast('error', data.error || 'Invalid credentials.');
             }
         } catch (err) {
             addToast('error', err instanceof Error ? err.message : 'Sign in failed.');
@@ -41,7 +37,7 @@ export default function LoginPage() {
                 <div className="text-center mb-8">
                     <h1 className="text-3xl font-bold mb-3 tracking-tight">Sign In</h1>
                     <p className="text-muted-foreground">
-                        Sign in to access early access features.
+                        Sign in to access your kits.
                     </p>
                 </div>
 

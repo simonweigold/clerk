@@ -3,10 +3,11 @@ import sys
 
 from dotenv import load_dotenv
 
+# Load environment before importing openclerk modules
 load_dotenv()
 
-from openclerk.loader import load_reasoning_kit_from_db  # noqa: E402
 from openclerk.graph import run_reasoning_kit_async  # noqa: E402
+from openclerk.loader import load_reasoning_kit_from_db  # noqa: E402
 from openclerk.models import ReasoningKit  # noqa: E402
 
 

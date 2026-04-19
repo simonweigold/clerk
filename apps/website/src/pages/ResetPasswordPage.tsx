@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { resetPassword as apiResetPassword } from '../lib/api';
+import { supabase } from '../lib/supabase';
 import { useToast } from '../hooks/useToast';
 
 export default function ResetPasswordPage() {
@@ -13,12 +13,14 @@ export default function ResetPasswordPage() {
         e.preventDefault();
         setLoading(true);
         try {
-            const data = await apiResetPassword(email);
-            if (data.ok) {
+            const { error } = await supabase.auth.resetPasswordForEmail(email, {
+                redirectTo: `${window.location.origin}/auth/reset-password`,
+            });
+            if (error) {
+                addToast('error', error.message || 'Something went wrong.');
+            } else {
                 addToast('success', 'If an account with that email exists, a reset link has been sent.');
                 navigate('/auth/login');
-            } else {
-                addToast('error', data.error || 'Something went wrong.');
             }
         } catch (err) {
             addToast('error', err instanceof Error ? err.message : 'Reset failed.');

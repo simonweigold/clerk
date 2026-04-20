@@ -43,6 +43,14 @@ dev-backend:
 dev-frontend:
     cd apps/website && npm run dev
 
+# Sync documentation to website
+sync-docs:
+    ./scripts/sync-docs.sh
+
+# Build website for production (includes docs sync)
+build-website: sync-docs
+    cd apps/website && npm run build
+
 # Clean build artifacts
 clean:
     find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true

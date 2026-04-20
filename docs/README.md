@@ -4,9 +4,9 @@ Welcome to the OpenClerk documentation. This documentation is organized for diff
 
 ## Quick Links
 
-- **New users**: See the [User Guide](#user-guide) to get started with Clerk
-- **Developers**: See the [Integration Guide](#integration-guide) to embed Clerk in your application
-- **Contributors**: See the [Contributing Guide](#contributing-guide) to help improve Clerk
+- **New users**: See the [User Guide](user-guide/README.md) to get started with Clerk
+- **Developers**: See the [Integration Guide](integration/README.md) to embed Clerk in your application
+- **Contributors**: See the [Contributing Guide](contributing/README.md) to help improve Clerk
 
 ---
 
@@ -14,21 +14,23 @@ Welcome to the OpenClerk documentation. This documentation is organized for diff
 
 For developers who want to use Clerk as a standalone tool or self-host it.
 
-- [Getting Started](user-guide/getting-started.md) - Installation and first steps
-- [Configuration](user-guide/configuration.md) - Environment variables and settings
-- [Reasoning Kits](user-guide/reasoning-kits.md) - Creating and running workflows
+- [Getting Started](user-guide/README.md) - Installation and first steps
+- [Core Concepts](user-guide/concepts.md) - Reasoning Kits and workflows
+- [FAQ](user-guide/faq.md) - Common questions and answers
+- [Reasoning Kits](reasoning_kits.md) - Deep dive into kit structure and creation
 
 ## Integration Guide
 
 For developers who want to embed Clerk into existing applications.
 
-- [FastAPI Integration](integration/fastapi.md) - Using Clerk with FastAPI
-- [Embedding Guide](integration/embedding.md) - General embedding patterns
-- [API Reference](integration/api.md) - Auto-generated API documentation
+- [Integration Overview](integration/README.md) - Getting started with embedding
+- [API Reference](integration/api-reference.md) - Complete API documentation
+- [Examples](integration/examples.md) - Working code examples
 
 ## Contributing Guide
 
 For developers who want to contribute to Clerk.
 
+- [Contributing Overview](contributing/README.md) - Quick setup and workflow guide
 - [Setup](contributing/setup.md) - Development environment setup
-- [Guidelines](contributing/guidelines.md) - Code style and contribution process
+- [Architecture](contributing/architecture.md) - System design overview

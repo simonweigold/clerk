@@ -7,22 +7,22 @@ import { getDocsList, getDocContent, type DocItem } from '../lib/api';
 export default function DocsPage() {
     return (
         <div className="flex h-full max-w-6xl mx-auto">
-                <div className="md:hidden p-4 border-b border-border flex items-center justify-between">
-                    <span className="font-semibold text-sm">Documentation Menu</span>
-                    <button 
-                        onClick={() => {
-                            const sidebar = document.getElementById('docs-sidebar');
-                            if (sidebar) sidebar.classList.toggle('hidden');
-                        }}
-                        className="p-2 bg-muted rounded-md hover:bg-muted/80 text-foreground"
-                    >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
-                        </svg>
-                    </button>
-                </div>
-                <DocsSidebar />
-                <div className="flex-1 px-4 md:px-10 py-8 overflow-y-auto bg-white">
+            <div className="md:hidden p-4 border-b border-border flex items-center justify-between">
+                <span className="font-semibold text-sm">Documentation Menu</span>
+                <button
+                    onClick={() => {
+                        const sidebar = document.getElementById('docs-sidebar');
+                        if (sidebar) sidebar.classList.toggle('hidden');
+                    }}
+                    className="p-2 bg-muted rounded-md hover:bg-muted/80 text-foreground"
+                >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
+                    </svg>
+                </button>
+            </div>
+            <DocsSidebar />
+            <div id="docs-content" className="flex-1 px-4 md:px-10 py-8 overflow-y-auto bg-white">
                 <Routes>
                     <Route path="/" element={<DocViewer slug="README" />} />
                     <Route path="*" element={<DocViewerWrapper />} />
@@ -33,17 +33,12 @@ export default function DocsPage() {
 }
 
 function DocViewerWrapper() {
-    // We use a splat route so this works for nested stuff like ui/overview
     const [slug, setSlug] = useState<string>('');
     const location = useLocation();
 
     useEffect(() => {
-        // Remove leading "/docs/" from the pathname
         let path = location.pathname.replace(/^\/docs\/?/, '') || 'README';
-        // Strip trailing .md if present to fix 404s
-        if (path.endsWith('.md')) {
-            path = path.slice(0, -3);
-        }
+        if (path.endsWith('.md')) path = path.slice(0, -3);
         setSlug(path);
     }, [location.pathname]);
 
@@ -77,8 +72,6 @@ function CopyButton({ text }: { text: string }) {
         </button>
     );
 }
-
-
 
 function DocsSidebar() {
     const [docs, setDocs] = useState<DocItem[]>([]);
@@ -134,8 +127,7 @@ function DocsSidebar() {
         groupedDocs[dir].push(doc);
     });
 
-    // Custom order - User-centric docs first
-    const order = ['User Guide', 'Integration', 'Deployment', 'Contributing', 'General', 'CLI Commands', 'UI Features'];
+    const order = ['General', 'User Guide', 'Integration', 'Deployment', 'Contributing', 'CLI Commands', 'UI Features'];
     const groups = Object.keys(groupedDocs).sort((a, b) => {
         const indexA = order.indexOf(a);
         const indexB = order.indexOf(b);
@@ -151,29 +143,74 @@ function DocsSidebar() {
                 Documentation
             </h2>
             <nav className="space-y-6 text-sm">
-                {groups.map(dir => (
-                    <div key={dir}>
-                        <h3 className="font-semibold text-foreground mb-2 px-3">{dir}</h3>
-                        <div className="space-y-1">
-                            {groupedDocs[dir].map(doc => (
+                {groups.map(dir => {
+                    // If this section has a README, use it as the section link and hide it from items
+                    const readmeDoc = groupedDocs[dir].find(doc =>
+                        doc.slug === 'README' || doc.slug.toLowerCase().endsWith('/readme')
+                    );
+                    const visibleDocs = readmeDoc
+                        ? groupedDocs[dir].filter(doc => doc !== readmeDoc)
+                        : groupedDocs[dir];
+                    const headingTo = readmeDoc
+                        ? `/docs/${readmeDoc.slug === 'README' ? '' : readmeDoc.slug}`
+                        : null;
+
+                    return (
+                        <div key={dir}>
+                            {headingTo ? (
                                 <Link
-                                    key={doc.slug}
-                                    to={`/docs/${doc.slug === 'README' ? '' : doc.slug}`}
-                                    className={`block px-3 py-2 rounded-md transition-colors ${
-                                        isActive(doc.slug)
-                                            ? 'bg-primary/10 text-primary font-medium'
-                                            : 'text-foreground/70 hover:bg-muted hover:text-foreground'
+                                    to={headingTo}
+                                    className={`block font-semibold mb-2 px-3 transition-colors hover:text-primary ${
+                                        isActive(readmeDoc!.slug) ? 'text-primary' : 'text-foreground'
                                     }`}
                                 >
-                                    {doc.title}
+                                    {dir}
                                 </Link>
-                            ))}
+                            ) : (
+                                <h3 className="font-semibold text-foreground mb-2 px-3">{dir}</h3>
+                            )}
+                            {visibleDocs.length > 0 && (
+                                <div className="space-y-1">
+                                    {visibleDocs.map(doc => (
+                                        <Link
+                                            key={doc.slug}
+                                            to={`/docs/${doc.slug}`}
+                                            className={`block px-3 py-2 rounded-md transition-colors ${
+                                                isActive(doc.slug)
+                                                    ? 'bg-primary/10 text-primary font-medium'
+                                                    : 'text-foreground/70 hover:bg-muted hover:text-foreground'
+                                            }`}
+                                        >
+                                            {doc.title}
+                                        </Link>
+                                    ))}
+                                </div>
+                            )}
                         </div>
-                    </div>
-                ))}
+                    );
+                })}
             </nav>
         </div>
     );
+}
+
+/** Convert React children to a plain text string for generating heading IDs */
+function nodeToText(node: any): string {
+    if (typeof node === 'string') return node;
+    if (typeof node === 'number') return String(node);
+    if (Array.isArray(node)) return node.map(nodeToText).join('');
+    if (node?.props?.children) return nodeToText(node.props.children);
+    return '';
+}
+
+/** Generate a GitHub-style anchor ID from heading text */
+function toHeadingId(children: any): string {
+    return nodeToText(children)
+        .toLowerCase()
+        .replace(/[^\w\s-]/g, '')
+        .replace(/\s+/g, '-')
+        .replace(/-+/g, '-')
+        .trim();
 }
 
 function DocViewer({ slug }: { slug: string }) {
@@ -181,7 +218,9 @@ function DocViewer({ slug }: { slug: string }) {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const navigate = useNavigate();
+    const location = useLocation();
 
+    // Fetch document content
     useEffect(() => {
         setLoading(true);
         setError('');
@@ -196,6 +235,20 @@ function DocViewer({ slug }: { slug: string }) {
                 setLoading(false);
             });
     }, [slug]);
+
+    // Scroll to top on doc change, or to the anchor if there's a hash
+    useEffect(() => {
+        if (loading) return;
+        const hash = location.hash;
+        if (hash) {
+            setTimeout(() => {
+                const el = document.getElementById(hash.slice(1));
+                if (el) el.scrollIntoView({ behavior: 'smooth' });
+            }, 50);
+        } else {
+            window.scrollTo(0, 0);
+        }
+    }, [slug, loading, location.hash]);
 
     if (loading) {
         return (
@@ -224,9 +277,18 @@ function DocViewer({ slug }: { slug: string }) {
             <ReactMarkdown
                 remarkPlugins={[remarkGfm]}
                 components={{
-                    h1: ({node, ...props}) => <h1 className="!text-4xl !font-extrabold !tracking-tight text-black !mt-16 !mb-10 pb-2" {...props} />,
-                    h2: ({node, ...props}) => <h2 className="!text-3xl !font-bold tracking-tight text-black !mt-14 !mb-8" {...props} />,
-                    h3: ({node, ...props}) => <h3 className="!text-2xl !font-semibold tracking-tight text-black !mt-12 !mb-6" {...props} />,
+                    h1: ({ node, children, ...props }) => {
+                        const id = toHeadingId(children);
+                        return <h1 id={id} className="!text-4xl !font-extrabold !tracking-tight text-black !mt-16 !mb-10 pb-2" {...props}>{children}</h1>;
+                    },
+                    h2: ({ node, children, ...props }) => {
+                        const id = toHeadingId(children);
+                        return <h2 id={id} className="!text-3xl !font-bold tracking-tight text-black !mt-14 !mb-8" {...props}>{children}</h2>;
+                    },
+                    h3: ({ node, children, ...props }) => {
+                        const id = toHeadingId(children);
+                        return <h3 id={id} className="!text-2xl !font-semibold tracking-tight text-black !mt-12 !mb-6" {...props}>{children}</h3>;
+                    },
                     p: ({node, ...props}) => <p className="leading-8 text-foreground !my-6 text-lg" {...props} />,
                     ul: ({node, ...props}) => <ul className="list-disc pl-8 !my-6 space-y-3 text-lg text-foreground" {...props} />,
                     ol: ({node, ...props}) => <ol className="list-decimal pl-8 !my-6 space-y-3 text-lg text-foreground" {...props} />,
@@ -261,33 +323,46 @@ function DocViewer({ slug }: { slug: string }) {
                     },
                     code: ({ node, inline, ...props }: any) => {
                         if (inline) {
-                            return <code className="text-primary bg-primary/5 border border-primary/10 px-1.5 py-0.5 rounded-md font-mono text-sm mx-0.5" {...props} />
+                            return <code className="text-primary bg-primary/5 border border-primary/10 px-1.5 py-0.5 rounded-md font-mono text-sm mx-0.5" {...props} />;
                         }
-                        return <code className="font-mono text-sm" {...props} />
+                        return <code className="font-mono text-sm" {...props} />;
                     },
                     a: ({ node, ...props }) => {
                         const href = props.href || '';
-                        
-                        // External links normal behavior
+                        const linkClass = 'text-primary hover:text-primary/80 transition-colors underline underline-offset-4 decoration-primary/30 hover:decoration-primary';
+
+                        // External links open in new tab
                         if (href.startsWith('http') || href.startsWith('mailto:')) {
-                            return <a {...props} target="_blank" rel="noopener noreferrer" className="text-primary hover:text-primary/80 transition-colors underline underline-offset-4 decoration-primary/30 hover:decoration-primary" />;
+                            return <a {...props} target="_blank" rel="noopener noreferrer" className={linkClass} />;
                         }
 
-                        // Internal hash
+                        // Hash-only links: scroll to heading within the current page
                         if (href.startsWith('#')) {
-                            return <a {...props} className="text-primary hover:text-primary/80 transition-colors underline underline-offset-4 decoration-primary/30 hover:decoration-primary" />;
+                            return (
+                                <a
+                                    {...props}
+                                    className={`${linkClass} cursor-pointer`}
+                                    onClick={(e) => {
+                                        e.preventDefault();
+                                        const id = href.slice(1);
+                                        const el = document.getElementById(id);
+                                        if (el) el.scrollIntoView({ behavior: 'smooth' });
+                                        navigate(`${location.pathname}${href}`, { replace: true });
+                                    }}
+                                />
+                            );
                         }
 
+                        // Internal doc links: resolve relative path and navigate
                         return (
                             <a
                                 {...props}
-                                className="text-primary hover:text-primary/80 transition-colors underline underline-offset-4 decoration-primary/30 hover:decoration-primary cursor-pointer"
+                                className={`${linkClass} cursor-pointer`}
                                 onClick={(e) => {
                                     e.preventDefault();
                                     const basePath = `${window.location.origin}/docs/${slug === 'README' ? 'README' : slug}`;
                                     const url = new URL(href, basePath);
                                     let navPath = url.pathname.replace(/^\/docs\/?/, '');
-                                    // if resolving up dir created double slashes remove them
                                     navPath = navPath.replace(/\/{2,}/g, '/');
                                     navigate(`/docs/${navPath}${url.search}${url.hash}`);
                                 }}

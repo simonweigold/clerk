@@ -93,17 +93,6 @@ export default function DocsPage() {
     return current === filePath;
   };
 
-  if (error) {
-    return (
-      <div className="p-4 bg-red-50 text-red-600 rounded-md border border-red-100 flex items-center gap-2 mt-8 max-w-6xl mx-auto">
-        <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-        </svg>
-        {error}
-      </div>
-    );
-  }
-
   const linkClass = 'text-primary hover:text-primary/80 transition-colors underline underline-offset-4 decoration-primary/30 hover:decoration-primary';
 
   return (
@@ -185,6 +174,12 @@ export default function DocsPage() {
             <div className="h-4 bg-muted rounded w-full"></div>
             <div className="h-4 bg-muted rounded w-5/6"></div>
             <div className="h-4 bg-muted rounded w-4/5"></div>
+          </div>
+        ) : error ? (
+          <div className="mt-16 text-center">
+            <p className="text-5xl mb-6">404</p>
+            <h2 className="text-xl font-semibold text-foreground mb-2">Page not found</h2>
+            <p className="text-muted-foreground">This documentation page doesn't exist.</p>
           </div>
         ) : currentDoc ? (
           <>

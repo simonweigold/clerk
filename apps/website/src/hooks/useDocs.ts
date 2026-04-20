@@ -86,14 +86,18 @@ export function useDocs() {
   // Load a specific doc file — path should be WITHOUT .md extension
   const loadDoc = useCallback(async (path: string) => {
     setLoading(true);
+    setError(null); // clear any stale error from a previous failed load
     // Normalize: strip any .md suffix before fetching so we don't double it
     const normalizedPath = path.replace(/\.md$/i, '');
     try {
       const response = await fetch(`/docs/${normalizedPath}.md`);
-      if (!response.ok) {
-        throw new Error(`Failed to load document: ${path}`);
-      }
       const content = await response.text();
+      // Vite and SPA hosts return the index.html fallback (status 200) when a
+      // static file doesn't exist. Check the actual content, not headers, because
+      // some hosts serve .md files with text/html content-type.
+      if (!response.ok || content.trimStart().toLowerCase().startsWith('<!doctype html')) {
+        throw new Error(`Document not found: ${normalizedPath}`);
+      }
       const title = extractTitle(content) || formatTitle(normalizedPath.split('/').pop() || normalizedPath);
 
       setCurrentDoc({ path: normalizedPath, content, title });

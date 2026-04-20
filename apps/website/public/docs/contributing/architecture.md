@@ -127,27 +127,32 @@ Input → Resource Loading → Step 1 → Step 2 → ... → Final Output
 
 ---
 
-## Frontend
+## Frontend Applications
 
-Location: `apps/website/`
+Clerk has two separate frontend applications in the `apps/` directory:
 
-### Tech Stack
+### App Frontend (`apps/frontend/`)
 
+The main OpenClerk application - a full-featured React app for creating, editing, and executing reasoning kits.
+
+**Tech Stack:**
 - **Framework:** React 19 + TypeScript
 - **Build:** Vite
 - **Styling:** Tailwind CSS
 - **Routing:** React Router
 - **UI Components:** Custom + shadcn/ui patterns
 
-### Project Structure
+**Project Structure:**
 
 ```
-apps/website/src/
+apps/frontend/src/
 ├── pages/              # Route components
-│   ├── HomePage.tsx    # Landing page
+│   ├── HomePage.tsx    # Dashboard/home
 │   ├── DocsPage.tsx    # Documentation viewer
-│   ├── KitsPage.tsx    # Kit browser
-│   └── KitEditorPage.tsx  # Kit creation/editing
+│   ├── KitDetailPage.tsx   # Kit browser/detail
+│   ├── KitEditorPage.tsx   # Kit creation/editing
+│   ├── KitRunPage.tsx      # Kit execution
+│   └── ...
 ├── components/         # Reusable UI
 │   ├── ui/            # Base components
 │   └── kit-editor/    # Kit-specific components
@@ -160,14 +165,21 @@ apps/website/src/
 └── App.tsx            # Router setup
 ```
 
-### Key Pages
+**Key Pages:**
 
 | Page       | Route              | Purpose                         |
 | ---------- | ------------------ | ------------------------------- |
-| Home       | `/`                | Landing, feature overview       |
+| Home       | `/`                | Dashboard, kit overview         |
 | Docs       | `/docs/*`          | Documentation viewer (markdown) |
 | Kits       | `/kits`            | Browse public kits              |
 | Kit Editor | `/kits/:slug/edit` | Create/edit kits                |
+| Kit Run    | `/kits/:slug/run`  | Execute kits                    |
+
+### Website (`apps/website/`)
+
+The public-facing marketing website hosted on Vercel. Provides landing page, documentation, and sign-up flows.
+
+**Key Difference:** The website is a lightweight, static-focused frontend for user acquisition and documentation, while `apps/frontend` is the full application for authenticated users to work with reasoning kits.
 
 ---
 
@@ -178,7 +190,10 @@ apps/website/src/
 ```
 clerk/
 ├── apps/
-│   └── website/           # Deployable web app
+│   ├── frontend/          # Main OpenClerk application
+│   │   ├── package.json   # npm dependencies
+│   │   └── src/           # React source
+│   └── website/           # Marketing website (Vercel)
 │       ├── package.json   # npm dependencies
 │       └── src/           # React source
 ├── packages/
@@ -199,12 +214,19 @@ clerk/
 
    Creates: `dist/clerk_framework-*.whl`
 
-2. **Frontend:**
+2. **App Frontend:**
+   ```bash
+   cd apps/frontend
+   npm run build
+   ```
+   Creates: `dist/` with static assets
+
+3. **Website:**
    ```bash
    cd apps/website
    npm run build
    ```
-   Creates: `dist/` with static assets
+   Creates: `dist/` with static assets for Vercel deployment
 
 ---
 
@@ -296,6 +318,14 @@ async def my_endpoint(request: Request):
 
 ### Adding Frontend Pages
 
+For the main application (`apps/frontend`):
+
+1. Create page in `apps/frontend/src/pages/`
+2. Add route in `apps/frontend/src/App.tsx`
+3. Add link in navigation if needed
+
+For the marketing website (`apps/website`):
+
 1. Create page in `apps/website/src/pages/`
 2. Add route in `apps/website/src/App.tsx`
 3. Add link in navigation if needed
@@ -306,4 +336,5 @@ async def my_endpoint(request: Request):
 
 - **[Contributing Guide](./README.md)** — How to contribute
 - **[Backend Code](../../packages/clerk/src/openclerk/)** — Explore the source
-- **[Frontend Code](../../apps/website/src/)** — Explore the UI
+- **[App Frontend Code](../../apps/frontend/src/)** — Explore the main application UI
+- **[Website Code](../../apps/website/src/)** — Explore the marketing website UI

@@ -117,13 +117,13 @@ if __name__ == "__main__":
 
 ## 6. Utilizing the React UI (Optional)
 
-If you would like to run CLERK's workflow builder and monitoring UI within your platform, you can compile the React frontend (`npm run build` inside `frontend/`) and serve the resulting static assets using FastAPI:
+If you would like to run CLERK's workflow builder and monitoring UI within your platform, you can compile the React frontend (`npm run build` inside `apps/frontend/`) and serve the resulting static assets using FastAPI:
 
 ```python
 from fastapi.staticfiles import StaticFiles
 
-# Serve the static UI files under /clerk-frontend
-app.mount("/clerk", StaticFiles(directory="path/to/clerk/frontend/dist", html=True), name="clerk_ui")
+# Serve the static UI files under /clerk
+app.mount("/clerk", StaticFiles(directory="path/to/clerk/apps/frontend/dist", html=True), name="clerk_ui")
 ```
 
 Alternatively, you can deploy the React app externally on services like Vercel or Netlify, configured to point to your new FastAPI backend integration.

@@ -1,15 +1,17 @@
-# OpenClerk Website
+# OpenClerk Marketing Website
 
-The official website for OpenClerk - built with React, TypeScript, and Vite.
+The public-facing marketing website for OpenClerk - built with React, TypeScript, and Vite.
 
 ## Overview
 
-This is the website application for openclerk.dev, providing:
+This is the landing page and documentation site hosted on Vercel at openclerk.dev, providing:
 
-- Documentation and guides (static, no backend required)
-- Interactive reasoning kit browser
-- Kit execution interface
-- User authentication and settings
+- **Landing page** - Product overview and features
+- **Documentation** - User guides and API reference (static, no backend required)
+- **Sign up/Login** - User authentication flows (redirects to main app)
+- **Early access** - Waitlist and registration
+
+**Note:** This is distinct from `apps/frontend/`, which is the main OpenClerk application where users create and execute reasoning kits.
 
 ## Tech Stack
 
@@ -126,10 +128,13 @@ VITE_API_URL=http://localhost:8000
 
 ## Deployment
 
-The website is deployed to openclerk.dev via [deployment platform].
+The website is deployed to openclerk.dev via **Vercel**.
+
+See `vercel.json` for deployment configuration.
 
 ## Links
 
 - [Live Site](https://openclerk.dev)
 - [Main Repository](../../README.md)
 - [Python Package](../../packages/clerk/README.md)
+- [Main Application](../frontend/README.md) - The full OpenClerk app

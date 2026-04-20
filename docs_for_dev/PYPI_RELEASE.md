@@ -4,7 +4,7 @@
 
 Use this checklist to track progress toward the first PyPI release.
 
-- [ ] **P0**: Verify URLs in pyproject.toml (`packages/clerk/pyproject.toml`)
+- [x] **P0**: Verify URLs in pyproject.toml (`packages/clerk/pyproject.toml`)
 - [ ] **P0**: Create release workflow (`.github/workflows/release.yml`)
 - [ ] **P0**: Ensure LICENSE is packaged (verify or add to package)
 - [ ] **P1**: Add release commands to Justfile (`Justfile`)
@@ -16,29 +16,31 @@ Use this checklist to track progress toward the first PyPI release.
 
 ## Current State Summary
 
-| Component | Status |
-|-----------|--------|
-| Package name | `openclerk` |
-| Version | `0.1.0` |
-| Location | `packages/clerk/` |
-| Build system | Hatchling (via UV) |
-| Source layout | `src/openclerk/` |
-| Python support | 3.13+ |
-| CI/CD | Basic (lint, test) |
-| Entry points | `clerk`, `openclerk` |
+| Component      | Status               |
+| -------------- | -------------------- |
+| Package name   | `openclerk`          |
+| Version        | `0.1.0`              |
+| Location       | `packages/clerk/`    |
+| Build system   | Hatchling (via UV)   |
+| Source layout  | `src/openclerk/`     |
+| Python support | 3.13+                |
+| CI/CD          | Basic (lint, test)   |
+| Entry points   | `clerk`, `openclerk` |
 
 ---
 
 ## Pre-Release Checklist
 
 ### 1. Package Metadata Verification
+
 - [ ] **Verify classifiers** are accurate (currently "Development Status :: 3 - Alpha")
-- [ ] **Update project URLs** in `pyproject.toml` (currently placeholder GitHub URLs)
+- [x] **Update project URLs** in `pyproject.toml` (currently placeholder GitHub URLs)
 - [ ] **Confirm license file** is included in package distribution
 - [ ] **Review keywords** for PyPI searchability
 - [ ] **Add CHANGELOG.md** reference to pyproject.toml if desired
 
 ### 2. Build Verification
+
 ```bash
 # Test the build locally
 cd packages/clerk
@@ -47,12 +49,14 @@ uv build
 ```
 
 ### 3. TestPyCI Testing
+
 - [ ] Create TestPyPI account (if not exists)
 - [ ] Upload to TestPyPI: `uv publish --index testpypi`
 - [ ] Verify installation: `pip install --index-url https://test.pypi.org/simple/ openclerk`
 - [ ] Test CLI: `clerk --version`
 
 ### 4. Long Description Verification
+
 - [ ] Ensure `README.md` renders correctly on PyPI
 - [ ] Check relative links work (or use absolute URLs)
 
@@ -77,20 +81,20 @@ jobs:
     runs-on: ubuntu-latest
     environment: release
     permissions:
-      id-token: write  # For trusted publishing
-    
+      id-token: write # For trusted publishing
+
     steps:
       - uses: actions/checkout@v4
-      
-      - uses: astral-sh/setup-uv@v3
+
+      - uses: astral-sh/setup-uv@v4
         with:
           version: "0.4.x"
-      
+
       - name: Build package
         run: |
           cd packages/clerk
           uv build
-      
+
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
@@ -122,6 +126,7 @@ version NEW_VERSION:
 ### 3. Version Management
 
 Options:
+
 - **Option A**: Manual version bumping in `pyproject.toml` and `__init__.py`
 - **Option B**: Use `bump-my-version` or `hatch-vcs` for automated versioning
 - **Option C**: Use git tags with `hatch-vcs` (recommended)
@@ -139,12 +144,14 @@ Options:
 2. **Update CHANGELOG.md** with release notes
 
 3. **Run full test suite**:
+
    ```bash
    just test
    just lint
    ```
 
 4. **Build and verify**:
+
    ```bash
    just build
    ```
@@ -157,6 +164,7 @@ Options:
 ### Phase 2: Release
 
 1. **Create git tag**:
+
    ```bash
    git tag v0.1.0
    git push origin v0.1.0
@@ -189,7 +197,6 @@ Before proceeding, clarify the following:
 2. **Versioning Strategy**:
    - Option A: Manual version bumps (simple, explicit)
    - Option B: Automated via git tags with `hatch-vcs` (recommended for CI/CD)
-   
 3. **Trusted Publishing**: Would you like to set up PyPI trusted publishing (OIDC) for the GitHub workflow, or use API tokens?
 
 4. **TestPyPI**: Should we automate TestPyPI uploads on every merge to main, or only on demand?
@@ -203,6 +210,7 @@ Before proceeding, clarify the following:
 ## Reference Commands
 
 ### Local Build & Test
+
 ```bash
 # Build package
 cd packages/clerk
@@ -216,6 +224,7 @@ tar -tzf dist/openclerk-*.tar.gz
 ```
 
 ### Manual PyPI Upload (if not using GitHub Actions)
+
 ```bash
 # Configure PyPI credentials
 uv publish --username __token__ --password $PYPI_TOKEN
@@ -226,4 +235,4 @@ just publish
 
 ---
 
-*Last updated: 2026-04-20*
+_Last updated: 2026-04-20_

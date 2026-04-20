@@ -7,7 +7,7 @@ requires-python = ">=3.13"
 license = "MIT"
 license-files = ["LICENSE"]
 authors = [
-    {name = "OpenClerk Contributors"}
+    {name = "Simon Weigold"}
 ]
 keywords = ["llm", "ai", "workflow", "reasoning", "langchain", "langgraph"]
 classifiers = [
@@ -59,8 +59,8 @@ clerk = "openclerk.cli:main"
 openclerk = "openclerk.cli:main"
 
 [project.urls]
-Homepage = "https://openclerk.dev"
-Documentation = "https://openclerk.dev/docs"
+Homepage = "https://openclerk.ch"
+Documentation = "https://openclerk.dev/ch"
 Repository = "https://github.com/simonweigold/clerk"
 Issues = "https://github.com/simonweigold/clerk/issues"
 

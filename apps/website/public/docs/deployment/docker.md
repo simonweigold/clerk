@@ -69,7 +69,7 @@ Clerk uses a multi-container architecture with three main services:
 |---------|------------|---------|------|
 | **db** | PostgreSQL 16 | Persistent data storage | 5432 (internal) |
 | **backend** | Python 3.13 + FastAPI | API server, LLM workflows | 8000 |
-| **frontend** | React + nginx | Static UI, reverse proxy | 80 (configurable) |
+| **frontend** | React + nginx | Main OpenClerk app UI (`apps/frontend/`) | 80 (configurable) |
 
 ### Data Flow
 

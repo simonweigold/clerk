@@ -96,7 +96,8 @@ Look for issues labeled `good first issue` on GitHub. These are:
 ```
 clerk/
 ├── apps/
-│   └── website/        # React frontend
+│   ├── frontend/       # Main OpenClerk application (React)
+│   └── website/        # Marketing website (React, Vercel-hosted)
 ├── packages/
 │   └── clerk/          # Python package
 │       └── src/openclerk/
@@ -109,6 +110,8 @@ clerk/
 ├── reasoning_kits/     # Example kits
 └── tests/              # Test suite
 ```
+
+**Note:** `apps/frontend/` is the main application for creating and executing reasoning kits. `apps/website/` is the public-facing marketing site with documentation and landing pages.
 
 ---
 

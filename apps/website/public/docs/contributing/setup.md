@@ -101,6 +101,11 @@ brew install uv
 ### Node modules not found
 If frontend dependencies fail to install, try:
 ```bash
+cd apps/frontend && npm install
+```
+
+For the marketing website:
+```bash
 cd apps/website && npm install
 ```
 

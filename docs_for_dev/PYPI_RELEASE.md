@@ -5,7 +5,7 @@
 Use this checklist to track progress toward the first PyPI release.
 
 - [x] **P0**: Verify URLs in pyproject.toml (`packages/clerk/pyproject.toml`)
-- [ ] **P0**: Create release workflow (`.github/workflows/release.yml`)
+- [x] **P0**: Create release workflow (`.github/workflows/release.yml`)
 - [ ] **P0**: Ensure LICENSE is packaged (verify or add to package)
 - [ ] **P1**: Add release commands to Justfile (`Justfile`)
 - [ ] **P1**: Test build locally (run `uv build`)

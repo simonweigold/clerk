@@ -60,7 +60,7 @@ openclerk = "openclerk.cli:main"
 
 [project.urls]
 Homepage = "https://openclerk.ch"
-Documentation = "https://openclerk.dev/ch"
+Documentation = "https://openclerk.ch/docs"
 Repository = "https://github.com/simonweigold/clerk"
 Issues = "https://github.com/simonweigold/clerk/issues"
 

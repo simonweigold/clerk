@@ -6,7 +6,7 @@ Use this checklist to track progress toward the first PyPI release.
 
 - [x] **P0**: Verify URLs in pyproject.toml (`packages/clerk/pyproject.toml`)
 - [x] **P0**: Create release workflow (`.github/workflows/release.yml`)
-- [ ] **P0**: Ensure LICENSE is packaged (verify or add to package)
+- [x] **P0**: Ensure LICENSE is packaged (copied to `packages/clerk/LICENSE`)
 - [ ] **P1**: Add release commands to Justfile (`Justfile`)
 - [ ] **P1**: Test build locally (run `uv build`)
 - [ ] **P2**: Set up TestPyPI upload (test workflow)
@@ -35,7 +35,7 @@ Use this checklist to track progress toward the first PyPI release.
 
 - [ ] **Verify classifiers** are accurate (currently "Development Status :: 3 - Alpha")
 - [x] **Update project URLs** in `pyproject.toml` (currently placeholder GitHub URLs)
-- [ ] **Confirm license file** is included in package distribution
+- [x] **Confirm license file** is included in package distribution (verified in wheel + sdist)
 - [ ] **Review keywords** for PyPI searchability
 - [ ] **Add CHANGELOG.md** reference to pyproject.toml if desired
 
@@ -203,7 +203,7 @@ Before proceeding, clarify the following:
 
 5. **Homepage URL**: The README shows `openclerk.dev` - is this the correct domain for `project.urls.Homepage`?
 
-6. **License**: The LICENSE file is at root level. Should it be copied to `packages/clerk/` or is hatchling configured to find it at workspace root?
+6. ~~**License**: The LICENSE file is at root level. Should it be copied to `packages/clerk/` or is hatchling configured to find it at workspace root?~~ **Resolved**: Copied to `packages/clerk/LICENSE` and verified in wheel/sdist.
 
 ---
 

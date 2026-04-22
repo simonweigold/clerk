@@ -51,6 +51,22 @@ sync-docs:
 build-website: sync-docs
     cd apps/website && npm run build
 
+# Build package for distribution
+build:
+    cd packages/clerk && uv build
+
+# Publish to TestPyPI
+publish-test: build
+    cd packages/clerk && uv publish --index testpypi
+
+# Publish to PyPI (requires credentials)
+publish: build
+    cd packages/clerk && uv publish
+
+# Bump package version (e.g., just version patch)
+version BUMP:
+    cd packages/clerk && uvx bump-my-version bump {{BUMP}}
+
 # Clean build artifacts
 clean:
     find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true

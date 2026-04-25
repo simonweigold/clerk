@@ -2,6 +2,7 @@
 
 import argparse
 import asyncio
+import json
 import re
 import sys
 from pathlib import Path
@@ -77,6 +78,24 @@ def main() -> None:
         default="transparent",
         help="Evaluation mode: 'transparent' stores full text, 'anonymous' stores char counts",
     )
+    run_parser.add_argument(
+        "--dynamic-resource",
+        action="append",
+        default=[],
+        help='Inline dynamic resource (e.g., --dynamic-resource resource_1="text")',
+    )
+    run_parser.add_argument(
+        "--dynamic-resource-file",
+        action="append",
+        default=[],
+        help="Dynamic resource from file (e.g., --dynamic-resource-file resource_1=./file.txt)",
+    )
+    run_parser.add_argument(
+        "--stdin",
+        action="append",
+        default=[],
+        help="Read dynamic resource from stdin (e.g., --stdin resource_1)",
+    )
 
     # =========================================================================
     # INFO COMMAND
@@ -93,6 +112,27 @@ def main() -> None:
         help="Load from local filesystem instead of database",
     )
     info_parser.add_argument(
+        "--base-path",
+        type=str,
+        default="reasoning_kits",
+        help="Base path for local reasoning kits",
+    )
+
+    # =========================================================================
+    # VALIDATE COMMAND
+    # =========================================================================
+    validate_parser = subparsers.add_parser("validate", help="Validate a reasoning kit")
+    validate_parser.add_argument(
+        "kit",
+        type=str,
+        help="Name/slug of the reasoning kit to validate",
+    )
+    validate_parser.add_argument(
+        "--local",
+        action="store_true",
+        help="Validate a local kit instead of database",
+    )
+    validate_parser.add_argument(
         "--base-path",
         type=str,
         default="reasoning_kits",
@@ -371,6 +411,8 @@ def main() -> None:
         _cmd_run(args)
     elif args.command == "info":
         _cmd_info(args)
+    elif args.command == "validate":
+        _cmd_validate(args)
     elif args.command == "db":
         _cmd_db(args)
     elif args.command == "sync":
@@ -441,14 +483,20 @@ def _cmd_run(args: argparse.Namespace) -> None:
     """Handle the run command."""
     from uuid import UUID
 
+    from .mcp_client import close_mcp_servers, init_mcp_servers
+
     try:
         kit = None
         db_version_id: UUID | None = None
         save_to_db = False
 
+        # Resolve local path early for MCP config detection
+        kit_path = resolve_kit_path(args.kit, args.base_path)
+        local_mcp = kit_path / "mcp_servers.json"
+        kit_config = str(local_mcp) if local_mcp.exists() else None
+
         if args.local:
             # Load from local filesystem
-            kit_path = resolve_kit_path(args.kit, args.base_path)
             kit = load_reasoning_kit(kit_path)
         else:
             # Try database first
@@ -462,20 +510,52 @@ def _cmd_run(args: argparse.Namespace) -> None:
                 except FileNotFoundError:
                     # Fall back to local
                     print(f"Kit '{args.kit}' not found in database, trying local...")
-                    kit_path = resolve_kit_path(args.kit, args.base_path)
                     kit = load_reasoning_kit(kit_path)
             else:
                 # No database configured, use local
-                kit_path = resolve_kit_path(args.kit, args.base_path)
                 kit = load_reasoning_kit(kit_path)
 
-        # Prompt for dynamic resources
+        # Parse dynamic resource inputs from CLI flags
+        dynamic_inputs: dict[str, str] = {}
+
+        # --stdin resource_id
+        for stdin_spec in args.stdin:
+            dynamic_inputs[stdin_spec] = sys.stdin.read()
+
+        # --dynamic-resource-file resource_id=./file.txt
+        for file_spec in args.dynamic_resource_file:
+            if "=" not in file_spec:
+                print(f"Error: Invalid --dynamic-resource-file format: {file_spec}")
+                sys.exit(1)
+            res_id, file_path = file_spec.split("=", 1)
+            path = Path(file_path)
+            if not path.exists():
+                print(f"Error: File not found for dynamic resource: {path}")
+                sys.exit(1)
+            dynamic_inputs[res_id] = path.read_text()
+
+        # --dynamic-resource resource_id=text
+        for inline_spec in args.dynamic_resource:
+            if "=" not in inline_spec:
+                print(f"Error: Invalid --dynamic-resource format: {inline_spec}")
+                sys.exit(1)
+            res_id, text = inline_spec.split("=", 1)
+            dynamic_inputs[res_id] = text
+
+        # Apply provided dynamic resources and prompt for remaining ones
         dynamic_resources = [r for r in kit.resources.values() if r.is_dynamic]
-        if dynamic_resources:
+        unresolved = []
+        for resource in dynamic_resources:
+            if resource.resource_id in dynamic_inputs:
+                resource.content = dynamic_inputs[resource.resource_id]
+            else:
+                unresolved.append(resource)
+
+        if unresolved:
             print(
                 f"\nThis kit has {len(dynamic_resources)} dynamic resource(s) that require user input.\n"
             )
-            for resource in dynamic_resources:
+            for resource in unresolved:
                 while True:
                     file_path = input(
                         f"  Enter file path for {resource.resource_id} ({resource.file}): "
@@ -495,13 +575,18 @@ def _cmd_run(args: argparse.Namespace) -> None:
                         print(f"    Error reading file: {e}. Please try again.")
             print()
 
-        run_reasoning_kit(
-            kit,
-            evaluate=args.evaluate,
-            evaluation_mode=args.mode,
-            save_to_db=save_to_db,
-            db_version_id=db_version_id,
-        )
+        # Initialize MCP servers (global + optional kit-local override)
+        asyncio.run(init_mcp_servers(config_path="mcp_servers.json", kit_config_path=kit_config))
+        try:
+            run_reasoning_kit(
+                kit,
+                evaluate=args.evaluate,
+                evaluation_mode=args.mode,
+                save_to_db=save_to_db,
+                db_version_id=db_version_id,
+            )
+        finally:
+            asyncio.run(close_mcp_servers())
         sys.exit(0)
     except FileNotFoundError as e:
         print(f"Error: {e}")
@@ -523,14 +608,7 @@ def _cmd_info(args: argparse.Namespace) -> None:
             # Load from local filesystem
             kit_path = resolve_kit_path(args.kit, args.base_path)
             kit = load_reasoning_kit(kit_path)
-            print(f"\nReasoning Kit: {kit.name}")
-            print(f"Path: {kit.path}")
-            print(f"\nResources ({len(kit.resources)}):")
-            for key, resource in kit.resources.items():
-                print(f"  {key}. {resource.resource_id} ({resource.file})")
-            print(f"\nWorkflow Steps ({len(kit.workflow)}):")
-            for key, step in kit.workflow.items():
-                print(f"  {key}. {step.output_id} ({step.file})")
+            _print_local_kit_info(kit)
         else:
             # Try database first
             config = get_config()
@@ -544,18 +622,28 @@ def _cmd_info(args: argparse.Namespace) -> None:
 
             kit_path = resolve_kit_path(args.kit, args.base_path)
             kit = load_reasoning_kit(kit_path)
-            print(f"\nReasoning Kit: {kit.name}")
-            print(f"Path: {kit.path}")
-            print(f"\nResources ({len(kit.resources)}):")
-            for key, resource in kit.resources.items():
-                print(f"  {key}. {resource.resource_id} ({resource.file})")
-            print(f"\nWorkflow Steps ({len(kit.workflow)}):")
-            for key, step in kit.workflow.items():
-                print(f"  {key}. {step.output_id} ({step.file})")
+            _print_local_kit_info(kit)
 
     except FileNotFoundError as e:
         print(f"Error: {e}")
         sys.exit(1)
+
+
+def _print_local_kit_info(kit) -> None:
+    """Print formatted local kit info."""
+    print(f"\nReasoning Kit: {kit.name}")
+    print(f"Path: {kit.path}")
+    print(f"\nResources ({len(kit.resources)}):")
+    for key, resource in kit.resources.items():
+        print(f"  {key}. {resource.resource_id} ({resource.file})")
+    print(f"\nWorkflow Steps ({len(kit.workflow)}):")
+    for key, step in kit.workflow.items():
+        print(f"  {key}. {step.output_id} ({step.file})")
+    if kit.tools:
+        print(f"\nTools ({len(kit.tools)}):")
+        for key, tool in kit.tools.items():
+            display = f" ({tool.display_name})" if tool.display_name else ""
+            print(f"  {key}. {tool.tool_name}{display}")
 
 
 def _print_db_kit_info(info: dict) -> None:
@@ -591,6 +679,110 @@ def _print_db_kit_info(info: dict) -> None:
                 print(f"  {t['number']}. {t['tool_name']}{display}")
     else:
         print("\nNo published version available")
+
+
+# =============================================================================
+# VALIDATE COMMAND
+# =============================================================================
+
+
+def _cmd_validate(args: argparse.Namespace) -> None:
+    """Handle the validate command."""
+    from .tools import get_tool
+
+    errors: list[str] = []
+    warnings: list[str] = []
+
+    try:
+        kit_path = resolve_kit_path(args.kit, args.base_path)
+        kit = load_reasoning_kit(kit_path)
+    except FileNotFoundError as e:
+        print(f"Error: {e}")
+        sys.exit(1)
+
+    # 1. Sequential instruction numbering
+    step_nums = sorted(int(k) for k in kit.workflow.keys())
+    expected_steps = list(range(1, len(step_nums) + 1))
+    if step_nums != expected_steps:
+        errors.append(
+            f"Instructions are not numbered sequentially. Found: {step_nums}, expected: {expected_steps}"
+        )
+
+    # 2. All {resource_N} placeholders have matching resources
+    resource_ids = {r.resource_id for r in kit.resources.values()}
+    for step_num, step in kit.workflow.items():
+        placeholders = re.findall(r"\{(resource_\d+)\}", step.prompt)
+        for ph in placeholders:
+            if ph not in resource_ids:
+                errors.append(f"Step {step_num} references missing resource {{{ph}}}")
+
+    # 3. All {tool_N} placeholders have matching tool definitions
+    tool_ids = {t.tool_id for t in kit.tools.values()}
+    for step_num, step in kit.workflow.items():
+        placeholders = re.findall(r"\{(tool_\d+)\}", step.prompt)
+        for ph in placeholders:
+            if ph not in tool_ids:
+                errors.append(f"Step {step_num} references missing tool {{{ph}}}")
+            else:
+                # Also verify the tool exists in the global registry
+                tool_num = ph.replace("tool_", "")
+                tool = kit.tools[tool_num]
+                tool_name = tool.tool_name
+                if tool_name and get_tool(tool_name) is None:
+                    warnings.append(
+                        f"Step {step_num} references tool '{tool_name}' which is not available in the global registry"
+                    )
+
+    # 4. All {workflow_N} placeholders refer to earlier steps
+    for step_num, step in kit.workflow.items():
+        placeholders = re.findall(r"\{(workflow_(\d+))\}", step.prompt)
+        for full_ph, ref_num_str in placeholders:
+            if int(ref_num_str) >= int(step_num):
+                errors.append(
+                    f"Step {step_num} references {{{full_ph}}} which is not an earlier step"
+                )
+
+    # 5. Dynamic resources are present but empty (or placeholder text)
+    for resource in kit.resources.values():
+        if resource.is_dynamic and resource.content:
+            warnings.append(
+                f"Dynamic resource {resource.resource_id} has pre-filled content: '{resource.content[:50]}...'"
+            )
+
+    # 6. Approximate prompt size per step (rough char count heuristic: ~4 chars/token)
+    max_chars = 128_000 * 4  # ~128k tokens for gpt-5-mini context
+    for step_num, step in kit.workflow.items():
+        resolved = step.prompt
+        for r in kit.resources.values():
+            resolved = resolved.replace(f"{{{r.resource_id}}}", r.content)
+        for s_num, s in kit.workflow.items():
+            if int(s_num) < int(step_num):
+                resolved = resolved.replace(f"{{{s.output_id}}}", s.prompt)
+        if len(resolved) > max_chars:
+            warnings.append(
+                f"Step {step_num} resolved prompt is ~{len(resolved) // 4} tokens (approx), which may exceed context limits"
+            )
+
+    # Report
+    print(f"\nValidation Results for '{kit.name}':")
+    print("=" * 50)
+
+    if errors:
+        print(f"\nErrors ({len(errors)}):")
+        for err in errors:
+            print(f"  ❌ {err}")
+
+    if warnings:
+        print(f"\nWarnings ({len(warnings)}):")
+        for warn in warnings:
+            print(f"  ⚠️  {warn}")
+
+    if not errors and not warnings:
+        print("\n✅ Kit is valid!")
+
+    print()
+    if errors:
+        sys.exit(1)
 
 
 # =============================================================================
@@ -807,6 +999,20 @@ async def _sync_push(kit_name: str, base_path: str, message: str | None) -> None
             )
             print(f"  - Added step {num}")
 
+        # Add tools
+        if local_kit.tools:
+            print("Adding tools...")
+            for num, tool in local_kit.tools.items():
+                await version_repo.add_tool(
+                    version_id=version.id,
+                    tool_number=int(num),
+                    tool_name=tool.tool_name,
+                    display_name=tool.display_name,
+                    configuration=tool.configuration,
+                )
+                display = f" ({tool.display_name})" if tool.display_name else ""
+                print(f"  - Added tool {num}: {tool.tool_name}{display}")
+
     print(f"\nSuccessfully pushed '{local_kit.name}' as version {version.version_number}")
 
 
@@ -850,6 +1056,22 @@ async def _sync_pull(slug: str, base_path: str) -> None:
             instruction_file = kit_dir / f"instruction_{step.step_number}.txt"
             instruction_file.write_text(step.prompt_template)
             print(f"  - Created instruction_{step.step_number}.txt")
+
+        # Write tool files
+        if version.tools:
+            print("Writing tool files...")
+            for tool in version.tools:
+                tool_file = kit_dir / f"tool_{tool.tool_number}.json"
+                data = {"tool_name": tool.tool_name}
+                if tool.display_name:
+                    data["display_name"] = tool.display_name
+                if tool.configuration:
+                    try:
+                        data["configuration"] = json.loads(tool.configuration)
+                    except Exception:
+                        data["configuration"] = tool.configuration
+                tool_file.write_text(json.dumps(data, indent=2), encoding="utf-8")
+                print(f"  - Created tool_{tool.tool_number}.json")
 
     print(f"\nSuccessfully pulled '{slug}' to {kit_dir}")
 

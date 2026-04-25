@@ -5,6 +5,7 @@ Handles kit CRUD operations, resource/step management, execution streaming, and 
 
 import asyncio
 import json
+import logging
 import re
 import time
 from pathlib import Path
@@ -17,6 +18,7 @@ from starlette.datastructures import UploadFile as StarletteUploadFile
 
 from ..dependencies import get_optional_user
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
@@ -1816,6 +1818,9 @@ async def execute_kit_stream(
             try:
                 if openai_tools:
                     # Tool-aware execution: bind tools and handle call loop
+                    tool_names = [t["function"]["name"] for t in openai_tools]
+                    logger.info("Step %s - Tools enabled: %s", step_num, ", ".join(tool_names))
+
                     llm_with_tools = llm.bind_tools([t["function"] for t in openai_tools])
                     messages: list[Any] = [HumanMessage(content=clean_prompt)]
                     response = await llm_with_tools.ainvoke(messages)
@@ -1840,6 +1845,17 @@ async def execute_kit_stream(
                                     tool_result = f"Error executing tool: {te}"
                             else:
                                 tool_result = f"Unknown tool: {tool_call['name']}"
+
+                            args_str = ", ".join(
+                                f"{k}={repr(v)}" for k, v in tool_call["args"].items()
+                            )
+                            logger.info("Tool call: %s(%s)", tool_call["name"], args_str)
+                            preview = (
+                                tool_result[:200].replace("\n", " ")
+                                if len(tool_result) > 200
+                                else tool_result
+                            )
+                            logger.info("Tool result: %s", preview)
 
                             messages.append(
                                 ToolMessage(

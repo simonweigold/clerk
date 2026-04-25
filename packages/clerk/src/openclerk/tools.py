@@ -46,6 +46,13 @@ def list_tools() -> list[ToolDefinition]:
     return list(TOOL_REGISTRY.values())
 
 
+def clear_mcp_tools() -> None:
+    """Remove all non-builtin tools from the global registry."""
+    mcp_names = [n for n, t in TOOL_REGISTRY.items() if t.source != "builtin"]
+    for n in mcp_names:
+        del TOOL_REGISTRY[n]
+
+
 def get_openai_tool_schema(name: str) -> dict[str, Any] | None:
     """Return the OpenAI-compatible tool schema for a registered tool.
 

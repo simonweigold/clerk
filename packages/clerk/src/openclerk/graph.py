@@ -1,6 +1,7 @@
 """LangGraph workflow execution for reasoning kits."""
 
 import asyncio
+import logging
 import re
 import time
 from pathlib import Path
@@ -26,7 +27,30 @@ from .llm_factory import get_llm
 from .models import Evaluation, ReasoningKit
 from .tools import get_openai_tool_schema, get_tool
 
+logger = logging.getLogger(__name__)
+
 DEFAULT_MODEL = "gpt-5-mini"
+
+
+def _format_tool_call(tool_name: str, args: dict[str, Any]) -> str:
+    """Format a tool call for human-readable logging."""
+    args_str = ", ".join(f"{k}={repr(v)}" for k, v in args.items())
+    return f"{tool_name}({args_str})"
+
+
+def _log_tool_execution(
+    step: int | str,
+    tool_names: list[str],
+    tool_calls: list[dict[str, Any]],
+    tool_results: list[str],
+) -> None:
+    """Log tool execution details for a step."""
+    if tool_names:
+        logger.info("Step %s - Tools enabled: %s", step, ", ".join(tool_names))
+    for call, result in zip(tool_calls, tool_results):
+        logger.info("Tool call: %s", _format_tool_call(call["name"], call["args"]))
+        preview = result[:200].replace("\n", " ") if len(result) > 200 else result
+        logger.info("Tool result: %s", preview)
 
 
 class State(TypedDict):
@@ -281,12 +305,18 @@ def resolve_placeholders(
                         [doc.page_content for doc in results]
                     )
                     text = text.replace(f"{{{placeholder}}}", relevant_content)
-                    print(
-                        f"RAG triggered for {placeholder}: chunked {len(content)} chars into {len(chunks)} parts, retrieved {len(results)} chunks."
+                    logger.debug(
+                        "RAG triggered for %s: chunked %d chars into %d parts, retrieved %d chunks.",
+                        placeholder,
+                        len(content),
+                        len(chunks),
+                        len(results),
                     )
                 except Exception as e:
-                    print(
-                        f"Warning: RAG failed for {placeholder}, falling back to full text. Error: {e}"
+                    logger.debug(
+                        "RAG failed for %s, falling back to full text. Error: %s",
+                        placeholder,
+                        e,
                     )
                     text = text.replace(f"{{{placeholder}}}", content)
             else:
@@ -336,8 +366,10 @@ async def aresolve_placeholders(
                     )
                     text = text.replace(f"{{{placeholder}}}", relevant_content)
                 except Exception as e:
-                    print(
-                        f"Warning: async RAG failed for {placeholder}, falling back to full text. Error: {e}"
+                    logger.debug(
+                        "Async RAG failed for %s, falling back to full text. Error: %s",
+                        placeholder,
+                        e,
                     )
                     text = text.replace(f"{{{placeholder}}}", content)
             else:
@@ -388,6 +420,9 @@ def execute_step(state: State) -> dict[str, Any]:
         # Tool-aware execution
         from langchain_core.messages import HumanMessage, ToolMessage
 
+        tool_names = [t["function"]["name"] for t in openai_tools]
+        logger.info("Step %s - Tools enabled: %s", current_step, ", ".join(tool_names))
+
         llm_with_tools = llm.bind_tools([t["function"] for t in openai_tools])
         messages: list[Any] = [HumanMessage(content=clean_prompt)]
         response = llm_with_tools.invoke(messages)
@@ -413,6 +448,15 @@ def execute_step(state: State) -> dict[str, Any]:
                         tool_result = f"Error executing tool: {te}"
                 else:
                     tool_result = f"Unknown tool: {tool_call['name']}"
+
+                logger.info(
+                    "Tool call: %s",
+                    _format_tool_call(tool_call["name"], tool_call["args"]),
+                )
+                preview = (
+                    tool_result[:200].replace("\n", " ") if len(tool_result) > 200 else tool_result
+                )
+                logger.info("Tool result: %s", preview)
 
                 messages.append(
                     ToolMessage(
@@ -780,6 +824,9 @@ async def run_reasoning_kit_async(
                 # Tool-aware execution
                 from langchain_core.messages import HumanMessage, ToolMessage
 
+                tool_names = [t["function"]["name"] for t in openai_tools]
+                logger.info("Step %s - Tools enabled: %s", step_num, ", ".join(tool_names))
+
                 llm_with_tools = llm.bind_tools([t["function"] for t in openai_tools])
                 messages: list[Any] = [HumanMessage(content=clean_prompt)]
                 response = await llm_with_tools.ainvoke(messages)
@@ -802,6 +849,17 @@ async def run_reasoning_kit_async(
                                 tool_result = f"Error executing tool: {te}"
                         else:
                             tool_result = f"Unknown tool: {tool_call['name']}"
+
+                        logger.info(
+                            "Tool call: %s",
+                            _format_tool_call(tool_call["name"], tool_call["args"]),
+                        )
+                        preview = (
+                            tool_result[:200].replace("\n", " ")
+                            if len(tool_result) > 200
+                            else tool_result
+                        )
+                        logger.info("Tool result: %s", preview)
 
                         messages.append(
                             ToolMessage(

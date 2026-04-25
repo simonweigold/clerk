@@ -1,3 +1,40 @@
+## Installation (TestPyPI)
+
+**1. Install the package**
+
+```bash
+pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ openclerk
+```
+
+**2. Set your OpenAI API key**
+
+```bash
+export OPENAI_API_KEY=sk-...
+```
+
+Or create a `.env` file:
+
+```
+OPENAI_API_KEY=sk-...
+```
+
+**3. Verify the installation**
+
+```bash
+clerk --help
+```
+
+**4. Run a reasoning kit**
+
+```bash
+clerk list
+clerk run <kit-name>
+```
+
+> **Python 3.13+ required.** With `uv`: `uv pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ openclerk`
+
+---
+
 # OpenClerk Package — Agent Skill Reference
 
 This document gives an AI agent the exact knowledge needed to use, create, update, and execute reasoning kits with the `openclerk` Python package.
@@ -6,15 +43,16 @@ This document gives an AI agent the exact knowledge needed to use, create, updat
 
 ## Package Identity
 
-| Item | Value |
-|------|-------|
-| Package name | `openclerk` |
-| CLI commands | `clerk` / `openclerk` |
-| Entry point | `openclerk.cli:main` |
-| Python requirement | `>=3.13` |
-| Version | `0.1.1` |
+| Item               | Value                 |
+| ------------------ | --------------------- |
+| Package name       | `openclerk`           |
+| CLI commands       | `clerk` / `openclerk` |
+| Entry point        | `openclerk.cli:main`  |
+| Python requirement | `>=3.13`              |
+| Version            | `0.1.1`               |
 
 Install from source:
+
 ```bash
 just setup          # preferred
 # or
@@ -29,13 +67,13 @@ A **reasoning kit** is a directory of plain text files that define a multi-step 
 
 ### File naming rules
 
-| File pattern | Role | Notes |
-|---|---|---|
-| `instruction_N.txt` | Workflow step N | N starts at 1; steps run in ascending order |
-| `resource_N.EXT` | Static resource N | Read at load time; any extension supported |
-| `dynamic_resource_N.EXT` | Dynamic resource N | Content is empty at load time; user provides it at runtime |
-| `tool_N.json` | Tool reference N | References a tool from the global registry (built-in or MCP) |
-| `mcp_servers.json` | MCP server config (optional) | Kit-local override; merges with project-root `mcp_servers.json` |
+| File pattern             | Role                         | Notes                                                           |
+| ------------------------ | ---------------------------- | --------------------------------------------------------------- |
+| `instruction_N.txt`      | Workflow step N              | N starts at 1; steps run in ascending order                     |
+| `resource_N.EXT`         | Static resource N            | Read at load time; any extension supported                      |
+| `dynamic_resource_N.EXT` | Dynamic resource N           | Content is empty at load time; user provides it at runtime      |
+| `tool_N.json`            | Tool reference N             | References a tool from the global registry (built-in or MCP)    |
+| `mcp_servers.json`       | MCP server config (optional) | Kit-local override; merges with project-root `mcp_servers.json` |
 
 Directories named `evaluations/` inside a kit are created automatically and hold evaluation JSON files — do not create them manually.
 
@@ -43,13 +81,13 @@ Directories named `evaluations/` inside a kit are created automatically and hold
 
 Instructions use `{placeholder}` to reference content:
 
-| Placeholder | Resolves to |
-|---|---|
-| `{resource_1}` | Content of `resource_1.*` |
-| `{resource_2}` | Content of `resource_2.*` |
-| `{workflow_1}` | Output of step 1 (available from step 2 onward) |
-| `{workflow_N}` | Output of step N |
-| `{tool_1}` | Result of calling tool 1 (LLM decides when to invoke) |
+| Placeholder    | Resolves to                                           |
+| -------------- | ----------------------------------------------------- |
+| `{resource_1}` | Content of `resource_1.*`                             |
+| `{resource_2}` | Content of `resource_2.*`                             |
+| `{workflow_1}` | Output of step 1 (available from step 2 onward)       |
+| `{workflow_N}` | Output of step N                                      |
+| `{tool_1}`     | Result of calling tool 1 (LLM decides when to invoke) |
 
 For resources exceeding 4 000 characters, the loader automatically uses RAG (chunking + embeddings) to retrieve only the most relevant chunks. RAG status is logged at `DEBUG` level only — no console warnings.
 
@@ -213,6 +251,7 @@ outputs = await run_reasoning_kit_async(
 ```
 
 **Evaluation modes:**
+
 - `transparent` — stores full prompt + output text in DB
 - `anonymous` — stores only character counts (privacy-preserving)
 
@@ -232,6 +271,7 @@ llm = await get_llm(
 ```
 
 Supported providers (configured via env vars or DB per-user):
+
 - `OpenAI` (`OPENAI_API_KEY`)
 - `Anthropic` (`ANTHROPIC_API_KEY`)
 - `Mistral`
@@ -245,9 +285,9 @@ Supported providers (configured via env vars or DB per-user):
 
 ### Built-in tools (always available)
 
-| Tool name | Description |
-|---|---|
-| `read_url` | Fetches a URL and extracts readable text via BeautifulSoup |
+| Tool name     | Description                                                           |
+| ------------- | --------------------------------------------------------------------- |
+| `read_url`    | Fetches a URL and extracts readable text via BeautifulSoup            |
 | `jina_reader` | Fetches a URL via `https://r.jina.ai/{url}` — bypasses bot protection |
 
 ### Register a custom tool
@@ -318,11 +358,11 @@ MCP servers can be configured at the project root or inside a kit directory. Kit
 
 ### Supported transports
 
-| Transport | Required fields | Notes |
-|---|---|---|
-| `stdio` (default) | `command`, `args?`, `env?` | Spawns a subprocess |
-| `sse` | `url` | Server-Sent Events over HTTP |
-| `http` | `url` | Streamable HTTP |
+| Transport         | Required fields            | Notes                        |
+| ----------------- | -------------------------- | ---------------------------- |
+| `stdio` (default) | `command`, `args?`, `env?` | Spawns a subprocess          |
+| `sse`             | `url`                      | Server-Sent Events over HTTP |
+| `http`            | `url`                      | Streamable HTTP              |
 
 ### Project-root `mcp_servers.json`
 
@@ -416,6 +456,7 @@ echo "piped text" | clerk run demo --stdin resource_1
 ```
 
 **Dynamic resource flags:**
+
 - `--dynamic-resource resource_N="text"` — Provide content inline
 - `--dynamic-resource-file resource_N=./file.txt` — Read content from a file
 - `--stdin resource_N` — Read content from standard input (useful for piping)
@@ -429,6 +470,7 @@ clerk validate my-kit --local
 ```
 
 Checks for:
+
 - Sequential instruction numbering
 - All `{resource_N}` placeholders have matching resource files
 - All `{tool_N}` placeholders have matching tool definitions (from `tool_*.json`, DB, or global registry)
@@ -564,15 +606,15 @@ CORS_ORIGINS=http://localhost:3000,https://example.com
 
 ## Database Schema Quick Reference
 
-| Table | Key columns |
-|---|---|
-| `user_profiles` | `id`, `display_name`, `is_premium` |
-| `reasoning_kits` | `id`, `slug` (unique), `name`, `owner_id`, `is_public`, `current_version_id` |
-| `kit_versions` | `id`, `kit_id`, `version_number`, `commit_message`, `is_draft` |
-| `resources` | `id`, `version_id`, `resource_number`, `resource_id`, `filename`, `storage_path`, `extracted_text`, `is_dynamic` |
-| `workflow_steps` | `id`, `version_id`, `step_number`, `output_id`, `prompt_template` |
-| `tools` | `id`, `version_id`, `tool_number`, `tool_name`, `configuration` |
-| `execution_runs` | `id`, `version_id`, `user_id`, `status`, `storage_mode`, `started_at`, `completed_at` |
+| Table             | Key columns                                                                                                               |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `user_profiles`   | `id`, `display_name`, `is_premium`                                                                                        |
+| `reasoning_kits`  | `id`, `slug` (unique), `name`, `owner_id`, `is_public`, `current_version_id`                                              |
+| `kit_versions`    | `id`, `kit_id`, `version_number`, `commit_message`, `is_draft`                                                            |
+| `resources`       | `id`, `version_id`, `resource_number`, `resource_id`, `filename`, `storage_path`, `extracted_text`, `is_dynamic`          |
+| `workflow_steps`  | `id`, `version_id`, `step_number`, `output_id`, `prompt_template`                                                         |
+| `tools`           | `id`, `version_id`, `tool_number`, `tool_name`, `configuration`                                                           |
+| `execution_runs`  | `id`, `version_id`, `user_id`, `status`, `storage_mode`, `started_at`, `completed_at`                                     |
 | `step_executions` | `id`, `run_id`, `step_number`, `input_text`, `output_text`, `evaluation_score`, `model_used`, `tokens_used`, `latency_ms` |
 
 `resource_id` on the `resources` table matches the placeholder used in prompts (e.g., `resource_1`).
@@ -661,17 +703,17 @@ outputs = await run_reasoning_kit_async(
 
 ## Key Source Files
 
-| File | Purpose |
-|---|---|
-| `packages/clerk/src/openclerk/models.py` | Pydantic data models |
-| `packages/clerk/src/openclerk/loader.py` | Kit loading (filesystem + DB) |
-| `packages/clerk/src/openclerk/graph.py` | LangGraph execution engine |
-| `packages/clerk/src/openclerk/tools.py` | Tool registry + built-in tools |
-| `packages/clerk/src/openclerk/llm_factory.py` | Multi-provider LLM factory |
-| `packages/clerk/src/openclerk/cli.py` | CLI commands |
-| `packages/clerk/src/openclerk/web/routes/api.py` | REST API endpoints |
-| `packages/clerk/src/openclerk/db/models.py` | SQLAlchemy ORM models |
-| `packages/clerk/src/openclerk/db/repository.py` | Database access layer |
-| `packages/clerk/src/openclerk/mcp_client.py` | MCP server integration |
-| `packages/clerk/src/openclerk/evaluation.py` | Evaluation scoring |
-| `reasoning_kits/demo/` | Reference kit (2 steps, 2 resources) |
+| File                                             | Purpose                              |
+| ------------------------------------------------ | ------------------------------------ |
+| `packages/clerk/src/openclerk/models.py`         | Pydantic data models                 |
+| `packages/clerk/src/openclerk/loader.py`         | Kit loading (filesystem + DB)        |
+| `packages/clerk/src/openclerk/graph.py`          | LangGraph execution engine           |
+| `packages/clerk/src/openclerk/tools.py`          | Tool registry + built-in tools       |
+| `packages/clerk/src/openclerk/llm_factory.py`    | Multi-provider LLM factory           |
+| `packages/clerk/src/openclerk/cli.py`            | CLI commands                         |
+| `packages/clerk/src/openclerk/web/routes/api.py` | REST API endpoints                   |
+| `packages/clerk/src/openclerk/db/models.py`      | SQLAlchemy ORM models                |
+| `packages/clerk/src/openclerk/db/repository.py`  | Database access layer                |
+| `packages/clerk/src/openclerk/mcp_client.py`     | MCP server integration               |
+| `packages/clerk/src/openclerk/evaluation.py`     | Evaluation scoring                   |
+| `reasoning_kits/demo/`                           | Reference kit (2 steps, 2 resources) |

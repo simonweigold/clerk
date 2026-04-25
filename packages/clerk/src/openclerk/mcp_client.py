@@ -259,6 +259,10 @@ async def init_mcp_servers(
 async def close_mcp_servers() -> None:
     """Close all MCP server connections and reset state for re-initialization."""
     global _exit_stack, _sessions
-    await _exit_stack.aclose()
-    _sessions.clear()
-    _exit_stack = AsyncExitStack()
+    try:
+        await _exit_stack.aclose()
+    except Exception as e:
+        logger.warning(f"Error during MCP server cleanup: {e}")
+    finally:
+        _sessions.clear()
+        _exit_stack = AsyncExitStack()

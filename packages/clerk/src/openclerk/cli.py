@@ -10,7 +10,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 from .db.config import get_config
-from .graph import run_reasoning_kit
+from .graph import run_reasoning_kit_async
 from .loader import (
     get_kit_info_from_db,
     list_reasoning_kits,
@@ -575,18 +575,25 @@ def _cmd_run(args: argparse.Namespace) -> None:
                         print(f"    Error reading file: {e}. Please try again.")
             print()
 
-        # Initialize MCP servers (global + optional kit-local override)
-        asyncio.run(init_mcp_servers(config_path="mcp_servers.json", kit_config_path=kit_config))
-        try:
-            run_reasoning_kit(
-                kit,
-                evaluate=args.evaluate,
-                evaluation_mode=args.mode,
-                save_to_db=save_to_db,
-                db_version_id=db_version_id,
+        async def _run_with_mcp() -> None:
+            """Initialize MCP, run kit async, and clean up in one event loop."""
+            await init_mcp_servers(
+                config_path="mcp_servers.json",
+                kit_config_path=kit_config,
             )
-        finally:
-            asyncio.run(close_mcp_servers())
+            try:
+                await run_reasoning_kit_async(
+                    kit,
+                    evaluate=args.evaluate,
+                    evaluation_mode=args.mode,
+                    save_to_db=save_to_db,
+                    db_version_id=db_version_id,
+                    verbose=True,
+                )
+            finally:
+                await close_mcp_servers()
+
+        asyncio.run(_run_with_mcp())
         sys.exit(0)
     except FileNotFoundError as e:
         print(f"Error: {e}")

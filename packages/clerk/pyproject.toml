@@ -1,6 +1,6 @@
 [project]
 name = "openclerk"
-version = "0.1.0"
+version = "0.1.2"
 description = "Community Library of Executable Reasoning Kits"
 readme = "README.md"
 requires-python = ">=3.13"

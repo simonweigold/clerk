@@ -5,7 +5,7 @@ import logging
 import re
 import time
 from pathlib import Path
-from typing import Annotated, Any, Coroutine, TypedDict, cast
+from typing import Annotated, Any, Coroutine, TypedDict, TypeVar, cast
 from uuid import UUID
 
 from langchain_core.vectorstores import InMemoryVectorStore
@@ -24,7 +24,7 @@ from .evaluation import (
     update_step_evaluation_in_db,
 )
 from .llm_factory import get_llm
-from .models import Evaluation, ReasoningKit
+from .models import Evaluation, ReasoningKit, StepEvaluation
 from .tools import get_openai_tool_schema, get_tool
 
 logger = logging.getLogger(__name__)
@@ -381,6 +381,24 @@ async def aresolve_placeholders(
     return text
 
 
+T = TypeVar("T")
+
+
+def _run_coro_sync(coro: Coroutine[Any, Any, T]) -> T:
+    """Run an async coroutine from a synchronous context.
+
+    Tries to use the current event loop if it exists and is not running.
+    Otherwise falls back to creating a new loop via asyncio.run().
+    """
+    try:
+        loop = asyncio.get_event_loop()
+        if loop.is_closed() or loop.is_running():
+            raise RuntimeError("Event loop not available for run_until_complete")
+        return loop.run_until_complete(coro)
+    except RuntimeError:
+        return asyncio.run(coro)
+
+
 def execute_step(state: State) -> dict[str, Any]:
     """Execute the current workflow step."""
     current_step = str(state["current_step"])
@@ -406,15 +424,9 @@ def execute_step(state: State) -> dict[str, Any]:
     start_time = time.time()
 
     # Execute with LLM (using the factory and waiting for the async result)
-    try:
-        loop = asyncio.get_event_loop()
-        llm = loop.run_until_complete(
-            get_llm(user_id=state.get("user_id"), model=state["model_used"], temperature=0)
-        )
-    except RuntimeError:
-        llm = asyncio.run(
-            get_llm(user_id=state.get("user_id"), model=state["model_used"], temperature=0)
-        )
+    llm = _run_coro_sync(
+        get_llm(user_id=state.get("user_id"), model=state["model_used"], temperature=0)
+    )
 
     if openai_tools:
         # Tool-aware execution
@@ -438,7 +450,7 @@ def execute_step(state: State) -> dict[str, Any]:
                 tool_def = get_tool(tool_call["name"])
                 if tool_def:
                     try:
-                        tool_result: str = asyncio.run(
+                        tool_result: str = _run_coro_sync(
                             cast(
                                 Coroutine[Any, Any, str],
                                 tool_def.execute(tool_call["args"], user_id=state.get("user_id")),
@@ -501,33 +513,18 @@ def execute_step(state: State) -> dict[str, Any]:
 
     # Save to database if enabled (run in event loop)
     if state["save_to_db"] and state["db_run_id"]:
-        try:
-            asyncio.get_event_loop().run_until_complete(
-                save_step_to_db(
-                    run_id=UUID(state["db_run_id"]),
-                    step_number=int(current_step),
-                    prompt=clean_prompt,
-                    output=result,
-                    mode=state["evaluation_mode"],
-                    model_used=state["model_used"],
-                    tokens_used=tokens_used,
-                    latency_ms=latency_ms,
-                )
+        _run_coro_sync(
+            save_step_to_db(
+                run_id=UUID(state["db_run_id"]),
+                step_number=int(current_step),
+                prompt=clean_prompt,
+                output=result,
+                mode=state["evaluation_mode"],
+                model_used=state["model_used"],
+                tokens_used=tokens_used,
+                latency_ms=latency_ms,
             )
-        except RuntimeError:
-            # No event loop running, create a new one
-            asyncio.run(
-                save_step_to_db(
-                    run_id=UUID(state["db_run_id"]),
-                    step_number=int(current_step),
-                    prompt=clean_prompt,
-                    output=result,
-                    mode=state["evaluation_mode"],
-                    model_used=state["model_used"],
-                    tokens_used=tokens_used,
-                    latency_ms=latency_ms,
-                )
-            )
+        )
 
     return {
         "outputs": new_outputs,
@@ -759,6 +756,7 @@ async def run_reasoning_kit_async(
     db_version_id: UUID | None = None,
     model: str = DEFAULT_MODEL,
     user_id: str | None = None,
+    verbose: bool = False,
 ) -> dict[str, str]:
     """Async version of run_reasoning_kit for use in async contexts.
 
@@ -773,6 +771,7 @@ async def run_reasoning_kit_async(
         db_version_id: Database kit version UUID (required if save_to_db=True)
         model: LLM model to use
         user_id: ID of the user executing the kit
+        verbose: Whether to print execution details to stdout
 
     Returns:
         Dict of all outputs from the workflow
@@ -788,11 +787,16 @@ async def run_reasoning_kit_async(
                     version_id=db_version_id,
                     storage_mode=evaluation_mode,
                 )
-            except Exception:
+                if verbose:
+                    print(f"Created execution run: {db_run_id}")
+            except Exception as e:
+                if verbose:
+                    print(f"Warning: Could not create execution run: {e}")
                 save_to_db = False
 
     resources = {r.resource_id: r.content for r in kit.resources.values()}
     outputs: dict[str, str] = {}
+    evaluations: dict[str, dict] = {}
     llm = await get_llm(user_id=user_id, model=model, temperature=0)
     error_message: str | None = None
 
@@ -806,6 +810,19 @@ async def run_reasoning_kit_async(
         }
         for k, v in kit.tools.items()
     }
+
+    if verbose:
+        print(f"\n{'#' * 60}")
+        print(f"Running Reasoning Kit: {kit.name}")
+        print(f"{'#' * 60}")
+        print(f"Resources: {list(resources.keys())}")
+        print(f"Workflow Steps: {len(kit.workflow)}")
+        print(f"Model: {model}")
+        if evaluate:
+            print(f"Evaluation: enabled ({evaluation_mode} mode)")
+        if save_to_db:
+            print("Database tracking: enabled")
+        print(f"{'#' * 60}\n")
 
     for step_key in sorted(kit.workflow.keys(), key=int):
         step = kit.workflow[step_key]
@@ -887,6 +904,18 @@ async def run_reasoning_kit_async(
 
             outputs[step.output_id] = result
 
+            if verbose:
+                print(f"\n{'=' * 60}")
+                print(f"Step {step_num} - Output ID: {step.output_id}")
+                print(f"{'=' * 60}")
+                print(
+                    f"Prompt:\n{clean_prompt[:200]}..."
+                    if len(clean_prompt) > 200
+                    else f"Prompt:\n{clean_prompt}"
+                )
+                print(f"\nResult:\n{result}")
+                print(f"{'=' * 60}\n")
+
             # Save step to database
             if save_to_db and db_run_id:
                 try:
@@ -903,16 +932,65 @@ async def run_reasoning_kit_async(
                 except Exception:
                     pass
 
+            # Evaluation
+            if evaluate:
+                score = await asyncio.to_thread(prompt_for_evaluation, step_num, step.output_id)
+                step_eval = create_step_evaluation(
+                    prompt=clean_prompt,
+                    output=result,
+                    score=score,
+                    mode=evaluation_mode,
+                )
+                evaluations[str(step_num)] = step_eval.model_dump()
+
+                if save_to_db and db_run_id:
+                    try:
+                        await update_step_evaluation_in_db(
+                            run_id=db_run_id,
+                            step_number=step_num,
+                            score=score,
+                        )
+                    except Exception:
+                        pass
+
         except Exception as e:
             error_message = str(e)
+            if verbose:
+                print(f"\nError during execution: {e}")
             break
+
+    if verbose:
+        print(f"\n{'#' * 60}")
+        print("Workflow Completed!" if not error_message else "Workflow Failed!")
+        print(f"{'#' * 60}")
+        if not error_message:
+            print("Final Outputs:")
+            for output_id, result in outputs.items():
+                print(f"\n{output_id}:")
+                print(result)
+        print(f"{'#' * 60}\n")
+
+    # Save evaluation if enabled (to local file)
+    if evaluate and evaluations and not kit.path.startswith("db://"):
+        steps_eval = {
+            str(k): StepEvaluation(**v) if isinstance(v, dict) else v
+            for k, v in evaluations.items()
+        }
+        evaluation = Evaluation(mode=evaluation_mode, steps=steps_eval)
+        eval_file = save_evaluation(Path(kit.path), evaluation)
+        if verbose:
+            print(f"Evaluation saved to: {eval_file}\n")
 
     # Complete database execution run
     if save_to_db and db_run_id:
         try:
             await complete_execution_run(db_run_id, error=error_message)
-        except Exception:
-            pass
+            if verbose:
+                status = "failed" if error_message else "completed"
+                print(f"Execution run {status}: {db_run_id}\n")
+        except Exception as e:
+            if verbose:
+                print(f"Warning: Could not complete execution run: {e}")
 
     if error_message:
         raise RuntimeError(error_message)

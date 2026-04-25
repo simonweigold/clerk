@@ -12,7 +12,7 @@ This document gives an AI agent the exact knowledge needed to use, create, updat
 | CLI commands | `clerk` / `openclerk` |
 | Entry point | `openclerk.cli:main` |
 | Python requirement | `>=3.13` |
-| Version | `0.1.0` |
+| Version | `0.1.1` |
 
 Install from source:
 ```bash
@@ -34,6 +34,8 @@ A **reasoning kit** is a directory of plain text files that define a multi-step 
 | `instruction_N.txt` | Workflow step N | N starts at 1; steps run in ascending order |
 | `resource_N.EXT` | Static resource N | Read at load time; any extension supported |
 | `dynamic_resource_N.EXT` | Dynamic resource N | Content is empty at load time; user provides it at runtime |
+| `tool_N.json` | Tool reference N | References a tool from the global registry (built-in or MCP) |
+| `mcp_servers.json` | MCP server config (optional) | Kit-local override; merges with project-root `mcp_servers.json` |
 
 Directories named `evaluations/` inside a kit are created automatically and hold evaluation JSON files — do not create them manually.
 
@@ -49,7 +51,23 @@ Instructions use `{placeholder}` to reference content:
 | `{workflow_N}` | Output of step N |
 | `{tool_1}` | Result of calling tool 1 (LLM decides when to invoke) |
 
-For resources exceeding 4 000 characters, the loader automatically uses RAG (chunking + embeddings) to retrieve only the most relevant chunks.
+For resources exceeding 4 000 characters, the loader automatically uses RAG (chunking + embeddings) to retrieve only the most relevant chunks. RAG status is logged at `DEBUG` level only — no console warnings.
+
+### Tool reference file (`tool_N.json`)
+
+A `tool_N.json` file references a tool from the global registry by name. The tool can be built-in or provided by an MCP server.
+
+```json
+{
+  "tool_name": "read_url",
+  "display_name": "Web Fetcher",
+  "configuration": null
+}
+```
+
+Only `tool_name` is required. `display_name` is optional (used in prompts). `configuration` is optional JSON that overrides the tool's default behavior.
+
+The placeholder `{tool_1}` in an instruction resolves to the tool's display name and makes the tool available to the LLM for that step.
 
 ### Minimal kit example
 
@@ -59,6 +77,15 @@ my-kit/
 ├── instruction_2.txt     # "Given this summary:\n{workflow_1}\n\nRate it 1-5 using {resource_2}."
 ├── resource_1.txt        # Source document
 └── resource_2.csv        # Rating criteria
+```
+
+### Tool-enabled kit example
+
+```
+my-kit/
+├── instruction_1.txt       # "Use {tool_1} to read https://example.com and summarise."
+├── tool_1.json             # {"tool_name": "read_url", "display_name": "Web Fetcher"}
+└── mcp_servers.json        # Optional: kit-local MCP server override
 ```
 
 ### Dynamic resource example (user provides input at runtime)
@@ -181,6 +208,7 @@ outputs = await run_reasoning_kit_async(
     db_version_id=None,              # UUID — required when save_to_db=True
     model="gpt-4o-mini",            # LLM model string
     user_id=None,                    # UUID string — loads user's LLM provider config
+    verbose=False,                   # Print step prompts and results to stdout
 )
 ```
 
@@ -270,11 +298,33 @@ kit.tools["1"] = Tool(tool_name="read_url", tool_id="tool_1")
 
 The LLM decides when to invoke the tool; results flow back automatically.
 
+### Tool execution logging
+
+When tools are invoked, structured logs are emitted at `INFO` level:
+
+```
+Step 1 - Tools enabled: read_url
+Tool call: read_url(url='https://example.com')
+Tool result: Example Domain...
+```
+
+These appear in the terminal during `clerk run` and in the server logs during web execution. Set `LOGLEVEL=DEBUG` to see RAG chunking details as well.
+
 ---
 
 ## MCP Integration
 
-Configure external MCP servers in `mcp_servers.json` (project root):
+MCP servers can be configured at the project root or inside a kit directory. Kit-local configs override global configs by server name.
+
+### Supported transports
+
+| Transport | Required fields | Notes |
+|---|---|---|
+| `stdio` (default) | `command`, `args?`, `env?` | Spawns a subprocess |
+| `sse` | `url` | Server-Sent Events over HTTP |
+| `http` | `url` | Streamable HTTP |
+
+### Project-root `mcp_servers.json`
 
 ```json
 {
@@ -290,7 +340,53 @@ Configure external MCP servers in `mcp_servers.json` (project root):
 }
 ```
 
-MCP tools are auto-registered into the global tool registry on startup and can be referenced in kits as `{tool_N}` exactly like built-in tools.
+### Kit-local `mcp_servers.json`
+
+Place an `mcp_servers.json` inside a kit directory to add or override servers for that kit only. It merges with the project-root config (kit-local wins by server name).
+
+```json
+{
+  "mcpServers": {
+    "opencaselaw": {
+      "transport": "sse",
+      "url": "https://mcp.opencaselaw.ch"
+    }
+  }
+}
+```
+
+MCP tools are auto-registered into the global tool registry when the kit runs (CLI or web) and can be referenced in kits as `{tool_N}` exactly like built-in tools.
+
+### Using MCP tools programmatically
+
+MCP client sessions are bound to the event loop they are created in. When calling kits with MCP tools from Python code, **initialize MCP, run the kit, and clean up all within the same event loop**:
+
+```python
+import asyncio
+from openclerk.loader import load_reasoning_kit
+from openclerk.graph import run_reasoning_kit_async
+from openclerk.mcp_client import init_mcp_servers, close_mcp_servers
+from openclerk.tools import clear_mcp_tools
+
+kit = load_reasoning_kit("reasoning_kits/my-kit")
+
+clear_mcp_tools()
+
+async def run():
+    await init_mcp_servers(
+        config_path="mcp_servers.json",
+        kit_config_path=f"{kit.path}/mcp_servers.json",
+    )
+    try:
+        outputs = await run_reasoning_kit_async(kit, verbose=True)
+        print(outputs["workflow_1"])
+    finally:
+        await close_mcp_servers()
+
+asyncio.run(run())
+```
+
+**Do not** call `run_reasoning_kit()` (the sync LangGraph path) after initializing MCP in a different `asyncio.run()` — the tool sessions will fail with `ClosedResourceError`. Use `run_reasoning_kit_async()` instead, or manage a single persistent event loop manually.
 
 ---
 
@@ -312,7 +408,33 @@ clerk run demo --local              # From filesystem (looks in reasoning_kits/)
 clerk run demo --evaluate           # Enable step-by-step evaluation
 clerk run demo --mode anonymous     # Privacy-preserving evaluation
 clerk run demo --model gpt-4o       # Override model
+
+# Dynamic resources (skip interactive prompts)
+clerk run demo --dynamic-resource resource_1="inline text"
+clerk run demo --dynamic-resource-file resource_1=./my-input.txt
+echo "piped text" | clerk run demo --stdin resource_1
 ```
+
+**Dynamic resource flags:**
+- `--dynamic-resource resource_N="text"` — Provide content inline
+- `--dynamic-resource-file resource_N=./file.txt` — Read content from a file
+- `--stdin resource_N` — Read content from standard input (useful for piping)
+
+If all dynamic resources are satisfied via flags, the interactive prompt is skipped entirely.
+
+### Validating a kit
+
+```bash
+clerk validate my-kit --local
+```
+
+Checks for:
+- Sequential instruction numbering
+- All `{resource_N}` placeholders have matching resource files
+- All `{tool_N}` placeholders have matching tool definitions (from `tool_*.json`, DB, or global registry)
+- All `{workflow_N}` placeholders refer to earlier steps
+- Dynamic resources are present but empty
+- Approximate prompt size per step is within model context limits
 
 ### Creating and managing kits
 
@@ -493,7 +615,26 @@ outputs = run_reasoning_kit(kit, model="gpt-4o-mini")
 print(outputs["workflow_2"])
 ```
 
-### Add a web-fetch tool to a kit
+### Add a tool to a kit via filesystem
+
+Create `tool_1.json` inside the kit directory:
+
+```json
+{
+  "tool_name": "read_url",
+  "display_name": "Web Fetcher"
+}
+```
+
+Then reference it in `instruction_1.txt`:
+
+```
+Fetch {tool_1} and summarise the content.
+```
+
+No Python code required — the loader auto-discovers `tool_*.json` files.
+
+### Add a tool to a kit programmatically
 
 ```python
 from openclerk.models import Tool

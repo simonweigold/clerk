@@ -9,7 +9,7 @@ Use this checklist to track progress toward the first PyPI release.
 - [x] **P0**: Ensure LICENSE is packaged (copied to `packages/clerk/LICENSE`)
 - [x] **P1**: Add release commands to Justfile (`Justfile`)
 - [x] **P1**: Test build locally (`uv build` succeeds, LICENSE verified in wheel/sdist)
-- [ ] **P2**: Set up TestPyPI upload (test workflow)
+- [x] **P2**: Set up TestPyPI upload (index configured, `just publish-test` ready)
 - [ ] **P2**: Configure trusted publishing (PyPI + GitHub settings)
 
 ---
@@ -48,10 +48,11 @@ uv build
 # Verify wheel and sdist are created in dist/
 ```
 
-### 3. TestPyCI Testing
+### 3. TestPyPI Testing
 
-- [ ] Create TestPyPI account (if not exists)
-- [ ] Upload to TestPyPI: `uv publish --index testpypi`
+- [x] Configure TestPyPI index in workspace `pyproject.toml`
+- [ ] Create TestPyPI account and API token (manual step)
+- [ ] Upload to TestPyPI: `just publish-test` (or `uv publish --index testpypi --username __token__ --password $TESTPYPI_TOKEN dist/openclerk-*`)
 - [ ] Verify installation: `pip install --index-url https://test.pypi.org/simple/ openclerk`
 - [ ] Test CLI: `clerk --version`
 
@@ -91,14 +92,12 @@ jobs:
           version: "0.4.x"
 
       - name: Build package
-        run: |
-          cd packages/clerk
-          uv build
+        run: uv build packages/clerk
 
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
-          packages-dir: packages/clerk/dist/
+          packages-dir: dist/
 ```
 
 ### 2. Justfile Release Commands
@@ -108,19 +107,19 @@ Add to `Justfile`:
 ```just
 # Build package for distribution
 build:
-    cd packages/clerk && uv build
+    uv build packages/clerk
 
 # Publish to TestPyPI
 publish-test: build
-    cd packages/clerk && uv publish --index testpypi
+    uv publish --index testpypi dist/openclerk-*
 
 # Publish to PyPI (requires credentials)
 publish: build
-    cd packages/clerk && uv publish
+    uv publish dist/openclerk-*
 
 # Create a new version tag
-version NEW_VERSION:
-    cd packages/clerk && uvx bump-my-version bump {{NEW_VERSION}}
+version BUMP:
+    cd packages/clerk && uvx bump-my-version bump {{BUMP}}
 ```
 
 ### 3. Version Management
@@ -199,7 +198,7 @@ Before proceeding, clarify the following:
    - Option B: Automated via git tags with `hatch-vcs` (recommended for CI/CD)
 3. **Trusted Publishing**: Would you like to set up PyPI trusted publishing (OIDC) for the GitHub workflow, or use API tokens?
 
-4. **TestPyPI**: Should we automate TestPyPI uploads on every merge to main, or only on demand?
+4. ~~**TestPyPI**: Should we automate TestPyPI uploads on every merge to main, or only on demand?~~ **Configured**: Index added to workspace `pyproject.toml`; use `just publish-test` on demand.
 
 5. **Homepage URL**: The README shows `openclerk.dev` - is this the correct domain for `project.urls.Homepage`?
 
@@ -212,9 +211,8 @@ Before proceeding, clarify the following:
 ### Local Build & Test
 
 ```bash
-# Build package
-cd packages/clerk
-uv build
+# Build package (outputs to workspace root dist/)
+uv build packages/clerk
 
 # Check what's in the wheel
 unzip -l dist/openclerk-*.whl
@@ -226,9 +224,13 @@ tar -tzf dist/openclerk-*.tar.gz
 ### Manual PyPI Upload (if not using GitHub Actions)
 
 ```bash
-# Configure PyPI credentials
-uv publish --username __token__ --password $PYPI_TOKEN
+# Publish to TestPyPI (requires --index testpypi!)
+uv publish --index testpypi --username __token__ --password $TESTPYPI_TOKEN dist/openclerk-*
+# Or use the Justfile command (includes --index testpypi automatically)
+just publish-test
 
+# Publish to PyPI (production)
+uv publish --username __token__ --password $PYPI_TOKEN dist/openclerk-*
 # Or use the Justfile command
 just publish
 ```

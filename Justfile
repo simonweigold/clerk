@@ -53,15 +53,15 @@ build-website: sync-docs
 
 # Build package for distribution
 build:
-    cd packages/clerk && uv build
+    uv build packages/clerk
 
 # Publish to TestPyPI
 publish-test: build
-    cd packages/clerk && uv publish --index testpypi
+    uv publish --index testpypi dist/openclerk-*
 
 # Publish to PyPI (requires credentials)
 publish: build
-    cd packages/clerk && uv publish
+    uv publish dist/openclerk-*
 
 # Bump package version (e.g., just version patch)
 version BUMP:

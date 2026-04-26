@@ -12,12 +12,12 @@ from openclerk.db.models import LlmProviderConfig
 
 # Default models per provider
 DEFAULT_MODELS = {
-    "openai": "gpt-5-mini",
+    "openai": "gpt-5.4-nano",
     "anthropic": "claude-3-5-sonnet-latest",
     "mistral": "mistral-large-latest",
     "gemini": "gemini-1.5-pro",
     "vertex": "gemini-1.5-pro",
-    "openrouter": "openai/gpt-5-mini",
+    "openrouter": "openai/gpt-5.4-nano",
 }
 
 
@@ -44,7 +44,7 @@ async def get_active_provider_config(user_id: UUID | None) -> dict[str, Any] | N
                     "provider": provider_config.provider_name,
                     "env_vars": provider_config.env_vars,
                     "model": provider_config.selected_model
-                    or DEFAULT_MODELS.get(provider_config.provider_name, "gpt-4o-mini"),
+                    or DEFAULT_MODELS.get(provider_config.provider_name, "gpt-5.4-nano"),
                 }
     except Exception as e:
         print(f"Error fetching active provider config: {e}")

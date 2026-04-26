@@ -29,7 +29,7 @@ from .tools import get_openai_tool_schema, get_tool
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_MODEL = "gpt-5-mini"
+DEFAULT_MODEL = "gpt-5.4-nano"
 
 
 def _format_tool_call(tool_name: str, args: dict[str, Any]) -> str:
@@ -272,7 +272,7 @@ def resolve_placeholders(
     text: str,
     resources: dict[str, str],
     outputs: dict[str, str],
-    resource_size_threshold: int = 4000,
+    resource_size_threshold: int = 400000,
     max_chunks: int = 4,
 ) -> str:
     """Resolve {placeholder} references in text, using RAG for large resources.

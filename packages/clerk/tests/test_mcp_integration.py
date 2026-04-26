@@ -156,7 +156,7 @@ def test_run_swiss_legal_kit_sync():
                 kit_config_path=str(kit_mcp),
             )
         )
-        outputs = run_reasoning_kit(kit, evaluate=False, save_to_db=False, model="gpt-5-mini")
+        outputs = run_reasoning_kit(kit, evaluate=False, save_to_db=False, model="gpt-5.4-nano")
 
         assert (
             "workflow_1" in outputs

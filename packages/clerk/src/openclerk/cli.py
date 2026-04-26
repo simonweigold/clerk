@@ -96,6 +96,12 @@ def main() -> None:
         default=[],
         help="Read dynamic resource from stdin (e.g., --stdin resource_1)",
     )
+    run_parser.add_argument(
+        "--verbose",
+        "-v",
+        action="store_true",
+        help="Enable verbose output (tool calls, LLM responses, etc.)",
+    )
 
     # =========================================================================
     # INFO COMMAND
@@ -588,7 +594,7 @@ def _cmd_run(args: argparse.Namespace) -> None:
                     evaluation_mode=args.mode,
                     save_to_db=save_to_db,
                     db_version_id=db_version_id,
-                    verbose=True,
+                    verbose=args.verbose,
                 )
             finally:
                 await close_mcp_servers()

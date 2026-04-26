@@ -1,40 +1,3 @@
-## Installation (TestPyPI)
-
-**1. Install the package**
-
-```bash
-pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ openclerk
-```
-
-**2. Set your OpenAI API key**
-
-```bash
-export OPENAI_API_KEY=sk-...
-```
-
-Or create a `.env` file:
-
-```
-OPENAI_API_KEY=sk-...
-```
-
-**3. Verify the installation**
-
-```bash
-clerk --help
-```
-
-**4. Run a reasoning kit**
-
-```bash
-clerk list
-clerk run <kit-name>
-```
-
-> **Python 3.13+ required.** With `uv`: `uv pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ openclerk`
-
----
-
 # OpenClerk Package — Agent Skill Reference
 
 This document gives an AI agent the exact knowledge needed to use, create, update, and execute reasoning kits with the `openclerk` Python package.
@@ -49,7 +12,7 @@ This document gives an AI agent the exact knowledge needed to use, create, updat
 | CLI commands       | `clerk` / `openclerk` |
 | Entry point        | `openclerk.cli:main`  |
 | Python requirement | `>=3.13`              |
-| Version            | `0.1.1`               |
+| Version            | `0.1.2`               |
 
 Install from source:
 
@@ -63,7 +26,7 @@ uv sync --all-groups
 
 ## Core Concept: Reasoning Kits
 
-A **reasoning kit** is a directory of plain text files that define a multi-step LLM workflow. No Python code is needed to define a kit — only files with strict naming conventions.
+A **reasoning kit** is a directory of plain text files that define a multi-step LLM workflow. No Python code is needed to define or run a kit — only files with strict naming conventions. **Always use the CLI (`openclerk run`) to execute kits.** Do not write custom Python scripts for running kits; the CLI already handles MCP tool discovery, dynamic resource injection, and workflow execution.
 
 ### File naming rules
 
@@ -216,38 +179,56 @@ kits = await list_reasoning_kits_from_db()
 
 ## Executing a Kit
 
-### Programmatic API
+### CLI (recommended — always use this)
+
+```bash
+# Run a local kit
+openclerk run my-kit --local --base-path reasoning_kits
+
+# With dynamic resource inline
+openclerk run my-kit --local --base-path reasoning_kits \
+  --dynamic-resource resource_1="Art. 41 OR"
+
+# With dynamic resource from stdin
+echo "Art. 41 OR" | openclerk run my-kit --local --base-path reasoning_kits \
+  --stdin resource_1
+
+# With dynamic resource from file
+openclerk run my-kit --local --base-path reasoning_kits \
+  --dynamic-resource-file resource_1=./input.txt
+```
+
+The CLI automatically:
+
+- Discovers and loads the kit from the filesystem
+- Detects `mcp_servers.json` in the kit directory and connects to MCP servers
+- Discovers MCP tools and registers them in the global tool registry
+- Injects dynamic resources
+- Runs the full workflow step by step
+- Cleans up MCP connections
+
+### Programmatic API (advanced use only)
+
+Only use the Python API when embedding openclerk inside another application. For standalone kit execution, always use the CLI.
 
 ```python
 from openclerk.loader import load_reasoning_kit
-from openclerk.graph import run_reasoning_kit, run_reasoning_kit_async
+from openclerk.graph import run_reasoning_kit_async
 
 kit = load_reasoning_kit("reasoning_kits/demo")
-
-# Sync
-outputs = run_reasoning_kit(kit, model="gpt-4o-mini")
-
-# Async (preferred)
-outputs = await run_reasoning_kit_async(kit, model="gpt-4o-mini")
-
-# outputs is dict[str, str]:
-# {"workflow_1": "...", "workflow_2": "..."}
-print(outputs["workflow_1"])
+outputs = await run_reasoning_kit_async(kit)
 ```
 
-### Full parameter reference
+When using the programmatic API with MCP tools, you must manually initialize MCP servers:
 
 ```python
-outputs = await run_reasoning_kit_async(
-    kit=kit,
-    evaluate=False,                  # Prompt user to score each step 0-100
-    evaluation_mode="transparent",   # "transparent" | "anonymous"
-    save_to_db=False,                # Persist run + step results to DB
-    db_version_id=None,              # UUID — required when save_to_db=True
-    model="gpt-4o-mini",            # LLM model string
-    user_id=None,                    # UUID string — loads user's LLM provider config
-    verbose=False,                   # Print step prompts and results to stdout
-)
+from openclerk.mcp_client import init_mcp_servers, close_mcp_servers
+
+await init_mcp_servers(config_path="mcp_servers.json")
+try:
+    outputs = await run_reasoning_kit_async(kit)
+finally:
+    await close_mcp_servers()
 ```
 
 **Evaluation modes:**
@@ -395,64 +376,34 @@ Place an `mcp_servers.json` inside a kit directory to add or override servers fo
 }
 ```
 
-MCP tools are auto-registered into the global tool registry when the kit runs (CLI or web) and can be referenced in kits as `{tool_N}` exactly like built-in tools.
-
-### Using MCP tools programmatically
-
-MCP client sessions are bound to the event loop they are created in. When calling kits with MCP tools from Python code, **initialize MCP, run the kit, and clean up all within the same event loop**:
-
-```python
-import asyncio
-from openclerk.loader import load_reasoning_kit
-from openclerk.graph import run_reasoning_kit_async
-from openclerk.mcp_client import init_mcp_servers, close_mcp_servers
-from openclerk.tools import clear_mcp_tools
-
-kit = load_reasoning_kit("reasoning_kits/my-kit")
-
-clear_mcp_tools()
-
-async def run():
-    await init_mcp_servers(
-        config_path="mcp_servers.json",
-        kit_config_path=f"{kit.path}/mcp_servers.json",
-    )
-    try:
-        outputs = await run_reasoning_kit_async(kit, verbose=True)
-        print(outputs["workflow_1"])
-    finally:
-        await close_mcp_servers()
-
-asyncio.run(run())
-```
-
-**Do not** call `run_reasoning_kit()` (the sync LangGraph path) after initializing MCP in a different `asyncio.run()` — the tool sessions will fail with `ClosedResourceError`. Use `run_reasoning_kit_async()` instead, or manage a single persistent event loop manually.
+**MCP tools are auto-registered into the global tool registry when the kit runs via CLI or web.** No custom Python code is needed to discover or register MCP tools. Place `mcp_servers.json` in the kit directory (or project root) and run the kit with `openclerk run` — everything is handled automatically.
 
 ---
 
 ## CLI Reference
 
+**The CLI is the primary and recommended interface for all kit operations.** Do not write custom Python scripts to run kits — the CLI handles kit loading, MCP server connection, tool discovery, dynamic resource injection, and workflow execution automatically.
+
 ### Kit discovery
 
 ```bash
-clerk list                          # List kits from database
-clerk list --local --path reasoning_kits   # List local kits
-clerk info <slug>                   # Show kit details
+openclerk list                          # List kits from database
+openclerk list --local --base-path reasoning_kits   # List local kits
+openclerk info <slug>                   # Show kit details
 ```
 
 ### Running a kit
 
 ```bash
-clerk run demo                      # From database
-clerk run demo --local              # From filesystem (looks in reasoning_kits/)
-clerk run demo --evaluate           # Enable step-by-step evaluation
-clerk run demo --mode anonymous     # Privacy-preserving evaluation
-clerk run demo --model gpt-4o       # Override model
+openclerk run demo                      # From database
+openclerk run demo --local              # From filesystem (looks in reasoning_kits/)
+openclerk run demo --evaluate           # Enable step-by-step evaluation
+openclerk run demo --mode anonymous     # Privacy-preserving evaluation
 
 # Dynamic resources (skip interactive prompts)
-clerk run demo --dynamic-resource resource_1="inline text"
-clerk run demo --dynamic-resource-file resource_1=./my-input.txt
-echo "piped text" | clerk run demo --stdin resource_1
+openclerk run demo --dynamic-resource resource_1="inline text"
+openclerk run demo --dynamic-resource-file resource_1=./my-input.txt
+echo "piped text" | openclerk run demo --stdin resource_1
 ```
 
 **Dynamic resource flags:**
@@ -466,7 +417,7 @@ If all dynamic resources are satisfied via flags, the interactive prompt is skip
 ### Validating a kit
 
 ```bash
-clerk validate my-kit --local
+openclerk validate my-kit --local
 ```
 
 Checks for:
@@ -481,31 +432,31 @@ Checks for:
 ### Creating and managing kits
 
 ```bash
-clerk kit create <name> --description "What this kit does"
-clerk kit delete <slug> --force
+openclerk kit create <name> --description "What this kit does"
+openclerk kit delete <slug> --force
 ```
 
 ### Syncing local ↔ database
 
 ```bash
-clerk sync push <name> -m "Commit message"   # Upload local kit to DB
-clerk sync pull <slug>                        # Download DB kit to filesystem
-clerk sync list                               # Compare local vs. DB
+openclerk sync push <name> -m "Commit message"   # Upload local kit to DB
+openclerk sync pull <slug>                        # Download DB kit to filesystem
+openclerk sync list                               # Compare local vs. DB
 ```
 
 ### Database management
 
 ```bash
-clerk db setup      # Initialize database and storage bucket
-clerk db migrate    # Run pending Alembic migrations
-clerk db status     # Check migration status
+openclerk db setup      # Initialize database and storage bucket
+openclerk db migrate    # Run pending Alembic migrations
+openclerk db status     # Check migration status
 ```
 
 ### Web server
 
 ```bash
-clerk web                    # Start API + React UI on port 8000
-clerk web --port 3001        # Custom port
+openclerk web                    # Start API + React UI on port 8000
+openclerk web --port 3001        # Custom port
 ```
 
 ---
@@ -623,15 +574,37 @@ CORS_ORIGINS=http://localhost:3000,https://example.com
 
 ## Common Patterns
 
-### Create a kit programmatically and run it
+### Create and run a kit via CLI
+
+**Create the kit directory and files:**
+
+```bash
+mkdir -p reasoning_kits/my-kit
+cat > reasoning_kits/my-kit/instruction_1.txt << 'EOF'
+Summarise in one sentence: {resource_1}
+EOF
+cat > reasoning_kits/my-kit/resource_1.txt << 'EOF'
+The sun is a star at the center of the Solar System.
+EOF
+```
+
+**Run it:**
+
+```bash
+openclerk run my-kit --local --base-path reasoning_kits
+```
+
+### Create a kit programmatically (advanced only)
+
+Only use the Python API when embedding openclerk inside another application. For normal kit creation, write files to disk and use the CLI.
 
 ```python
 from openclerk.models import ReasoningKit, Resource, WorkflowStep
-from openclerk.graph import run_reasoning_kit
+from openclerk.graph import run_reasoning_kit_async
 
 kit = ReasoningKit(
     name="my-kit",
-    path="reasoning_kits/my-kit",   # can be any string when constructing manually
+    path="reasoning_kits/my-kit",
     resources={
         "1": Resource(
             file="resource_1.txt",
@@ -645,16 +618,11 @@ kit = ReasoningKit(
             output_id="workflow_1",
             prompt="Summarise in one sentence: {resource_1}",
         ),
-        "2": WorkflowStep(
-            file="instruction_2.txt",
-            output_id="workflow_2",
-            prompt="Expand this summary into a paragraph: {workflow_1}",
-        ),
     },
 )
 
-outputs = run_reasoning_kit(kit, model="gpt-4o-mini")
-print(outputs["workflow_2"])
+outputs = await run_reasoning_kit_async(kit)
+print(outputs["workflow_1"])
 ```
 
 ### Add a tool to a kit via filesystem

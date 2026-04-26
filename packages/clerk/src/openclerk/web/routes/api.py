@@ -1850,12 +1850,6 @@ async def execute_kit_stream(
                                 f"{k}={repr(v)}" for k, v in tool_call["args"].items()
                             )
                             logger.info("Tool call: %s(%s)", tool_call["name"], args_str)
-                            preview = (
-                                tool_result[:200].replace("\n", " ")
-                                if len(tool_result) > 200
-                                else tool_result
-                            )
-                            logger.info("Tool result: %s", preview)
 
                             messages.append(
                                 ToolMessage(

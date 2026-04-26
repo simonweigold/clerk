@@ -38,6 +38,18 @@ def _format_tool_call(tool_name: str, args: dict[str, Any]) -> str:
     return f"{tool_name}({args_str})"
 
 
+def _preview(text: str, max_len: int = 120) -> str:
+    """Return a one-line preview of text for concise tool result display."""
+    if not text:
+        return "<empty>"
+    if text.startswith("Error"):
+        return text[:max_len]
+    single = text.replace("\n", " ")
+    if len(single) > max_len:
+        return single[: max_len - 3] + "..."
+    return single
+
+
 def _log_tool_execution(
     step: int | str,
     tool_names: list[str],
@@ -49,8 +61,7 @@ def _log_tool_execution(
         logger.info("Step %s - Tools enabled: %s", step, ", ".join(tool_names))
     for call, result in zip(tool_calls, tool_results):
         logger.info("Tool call: %s", _format_tool_call(call["name"], call["args"]))
-        preview = result[:200].replace("\n", " ") if len(result) > 200 else result
-        logger.info("Tool result: %s", preview)
+        logger.info("Tool result (%s chars): %s", len(result), _preview(result))
 
 
 class State(TypedDict):
@@ -450,25 +461,22 @@ def execute_step(state: State) -> dict[str, Any]:
                 tool_def = get_tool(tool_call["name"])
                 if tool_def:
                     try:
+                        print(f"[Tool] {tool_call['name']} -> {tool_call['args']}")
                         tool_result: str = _run_coro_sync(
                             cast(
                                 Coroutine[Any, Any, str],
                                 tool_def.execute(tool_call["args"], user_id=state.get("user_id")),
                             )
                         )
+                        print(
+                            f"[Tool] {tool_call['name']} <- ({len(tool_result)} chars) {_preview(tool_result)}"
+                        )
                     except Exception as te:
                         tool_result = f"Error executing tool: {te}"
+                        print(f"[Tool] {tool_call['name']} <- Error: {te}")
                 else:
                     tool_result = f"Unknown tool: {tool_call['name']}"
-
-                logger.info(
-                    "Tool call: %s",
-                    _format_tool_call(tool_call["name"], tool_call["args"]),
-                )
-                preview = (
-                    tool_result[:200].replace("\n", " ") if len(tool_result) > 200 else tool_result
-                )
-                logger.info("Tool result: %s", preview)
+                    print(f"[Tool] {tool_call['name']} <- Unknown tool")
 
                 messages.append(
                     ToolMessage(
@@ -859,24 +867,23 @@ async def run_reasoning_kit_async(
                         tool_def = get_tool(tool_call["name"])
                         if tool_def:
                             try:
+                                if verbose:
+                                    print(f"[Tool] {tool_call['name']} -> {tool_call['args']}")
                                 tool_result = await tool_def.execute(
                                     tool_call["args"], user_id=user_id
                                 )
+                                if verbose:
+                                    print(
+                                        f"[Tool] {tool_call['name']} <- ({len(tool_result)} chars) {_preview(tool_result)}"
+                                    )
                             except Exception as te:
                                 tool_result = f"Error executing tool: {te}"
+                                if verbose:
+                                    print(f"[Tool] {tool_call['name']} <- Error: {te}")
                         else:
                             tool_result = f"Unknown tool: {tool_call['name']}"
-
-                        logger.info(
-                            "Tool call: %s",
-                            _format_tool_call(tool_call["name"], tool_call["args"]),
-                        )
-                        preview = (
-                            tool_result[:200].replace("\n", " ")
-                            if len(tool_result) > 200
-                            else tool_result
-                        )
-                        logger.info("Tool result: %s", preview)
+                            if verbose:
+                                print(f"[Tool] {tool_call['name']} <- Unknown tool")
 
                         messages.append(
                             ToolMessage(

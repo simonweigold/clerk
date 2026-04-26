@@ -1,6 +1,6 @@
 """Data models for reasoning kits."""
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 class Resource(BaseModel):
@@ -65,5 +65,4 @@ class GraphState(BaseModel):
     completed: bool = False
     error: str | None = None
 
-    class Config:
-        arbitrary_types_allowed = True
+    model_config = ConfigDict(arbitrary_types_allowed=True)

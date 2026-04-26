@@ -102,6 +102,17 @@ def main() -> None:
         action="store_true",
         help="Enable verbose output (tool calls, LLM responses, etc.)",
     )
+    run_parser.add_argument(
+        "--output-dir",
+        type=str,
+        default="outputs",
+        help="Base directory for saved run outputs (default: outputs/)",
+    )
+    run_parser.add_argument(
+        "--no-save",
+        action="store_true",
+        help="Do not save run outputs to disk",
+    )
 
     # =========================================================================
     # INFO COMMAND
@@ -485,6 +496,51 @@ def _cmd_list(args: argparse.Namespace) -> None:
 # =============================================================================
 
 
+def _save_run_outputs(kit, outputs: dict[str, str], prompts: dict[str, str], base_dir: str) -> None:
+    """Save run outputs to a versioned folder under base_dir/kit-name/timestamp/."""
+    import json
+    from datetime import datetime
+
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    run_dir = Path(base_dir) / kit.name / timestamp
+    run_dir.mkdir(parents=True, exist_ok=True)
+
+    # Write one output + prompt file per step
+    step_meta = []
+    for step_key in sorted(kit.workflow.keys(), key=int):
+        step = kit.workflow[step_key]
+        step_num = int(step_key)
+        base = f"step_{step_num}_{step.output_id}"
+
+        output = outputs.get(step.output_id, "")
+        output_file = f"{base}.md"
+        (run_dir / output_file).write_text(output, encoding="utf-8")
+
+        prompt = prompts.get(step.output_id, "")
+        prompt_file = f"{base}_prompt.md"
+        (run_dir / prompt_file).write_text(prompt, encoding="utf-8")
+
+        step_meta.append(
+            {
+                "step": step_num,
+                "output_id": step.output_id,
+                "display_name": step.display_name,
+                "output_file": output_file,
+                "prompt_file": prompt_file,
+            }
+        )
+
+    # Write run metadata
+    run_info = {
+        "kit": kit.name,
+        "timestamp": timestamp,
+        "steps": step_meta,
+    }
+    (run_dir / "run.json").write_text(json.dumps(run_info, indent=2), encoding="utf-8")
+
+    print(f"\nOutputs saved to: {run_dir}")
+
+
 def _cmd_run(args: argparse.Namespace) -> None:
     """Handle the run command."""
     from uuid import UUID
@@ -581,25 +637,31 @@ def _cmd_run(args: argparse.Namespace) -> None:
                         print(f"    Error reading file: {e}. Please try again.")
             print()
 
-        async def _run_with_mcp() -> None:
+        collected_prompts: dict[str, str] = {}
+
+        async def _run_with_mcp() -> dict[str, str]:
             """Initialize MCP, run kit async, and clean up in one event loop."""
             await init_mcp_servers(
                 config_path="mcp_servers.json",
                 kit_config_path=kit_config,
             )
             try:
-                await run_reasoning_kit_async(
+                return await run_reasoning_kit_async(
                     kit,
                     evaluate=args.evaluate,
                     evaluation_mode=args.mode,
                     save_to_db=save_to_db,
                     db_version_id=db_version_id,
                     verbose=args.verbose,
+                    collected_prompts=collected_prompts,
                 )
             finally:
                 await close_mcp_servers()
 
-        asyncio.run(_run_with_mcp())
+        outputs = asyncio.run(_run_with_mcp())
+
+        if not args.no_save:
+            _save_run_outputs(kit, outputs, collected_prompts, args.output_dir)
         sys.exit(0)
     except FileNotFoundError as e:
         print(f"Error: {e}")

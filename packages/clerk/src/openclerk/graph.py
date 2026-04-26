@@ -345,7 +345,7 @@ async def aresolve_placeholders(
     text: str,
     resources: dict[str, str],
     outputs: dict[str, str],
-    resource_size_threshold: int = 4000,
+    resource_size_threshold: int = 400000,
     max_chunks: int = 4,
 ) -> str:
     """Async version of resolve_placeholders for non-blocking execution."""
@@ -783,6 +783,7 @@ async def run_reasoning_kit_async(
     model: str = DEFAULT_MODEL,
     user_id: str | None = None,
     verbose: bool = False,
+    collected_prompts: dict[str, str] | None = None,
 ) -> dict[str, str]:
     """Async version of run_reasoning_kit for use in async contexts.
 
@@ -860,6 +861,9 @@ async def run_reasoning_kit_async(
         openai_tools = extract_tool_refs(step.prompt, kit_tools)
         clean_prompt = remove_tool_placeholders(prompt, kit_tools)
 
+        if collected_prompts is not None:
+            collected_prompts[step.output_id] = clean_prompt
+
         start_time = time.time()
 
         try:
@@ -870,6 +874,12 @@ async def run_reasoning_kit_async(
                 tool_names = [t["function"]["name"] for t in openai_tools]
                 logger.info("Step %s - Tools enabled: %s", step_num, ", ".join(tool_names))
 
+                if verbose:
+                    print(f"\n{'=' * 60}")
+                    print(f"Step {step_num} — Tools: {', '.join(tool_names)}")
+                    print(f"{'=' * 60}")
+                    print(f"[Prompt]\n{clean_prompt}\n")
+
                 llm_with_tools = llm.bind_tools([t["function"] for t in openai_tools])
                 messages: list[Any] = [HumanMessage(content=clean_prompt)]
                 response = await llm_with_tools.ainvoke(messages)
@@ -877,31 +887,37 @@ async def run_reasoning_kit_async(
 
                 # Tool-call loop
                 max_rounds = 5
+                round_num = 0
                 for _ in range(max_rounds):
                     if not response.tool_calls:
                         break
+
+                    round_num += 1
+                    if verbose:
+                        print(f"[Round {round_num}]")
 
                     for tool_call in response.tool_calls:
                         tool_def = get_tool(tool_call["name"])
                         if tool_def:
                             try:
                                 if verbose:
-                                    print(f"[Tool] {tool_call['name']} -> {tool_call['args']}")
+                                    args_str = ", ".join(
+                                        f"{k}={repr(v)}" for k, v in tool_call["args"].items()
+                                    )
+                                    print(f"  → {tool_call['name']}({args_str})")
                                 tool_result = await tool_def.execute(
                                     tool_call["args"], user_id=user_id
                                 )
                                 if verbose:
-                                    print(
-                                        f"[Tool] {tool_call['name']} <- ({len(tool_result)} chars) {_preview(tool_result)}"
-                                    )
+                                    print(f"  ← ({len(tool_result)} chars) {_preview(tool_result)}")
                             except Exception as te:
                                 tool_result = f"Error executing tool: {te}"
                                 if verbose:
-                                    print(f"[Tool] {tool_call['name']} <- Error: {te}")
+                                    print(f"  ← Error: {te}")
                         else:
                             tool_result = f"Unknown tool: {tool_call['name']}"
                             if verbose:
-                                print(f"[Tool] {tool_call['name']} <- Unknown tool")
+                                print(f"  ← Unknown tool: {tool_call['name']}")
 
                         messages.append(
                             ToolMessage(
@@ -930,10 +946,22 @@ async def run_reasoning_kit_async(
                     response = await llm_final.ainvoke(messages)
                     messages.append(response)
                     result = str(response.content)
+
+                if verbose:
+                    print(f"\n[Final Response]\n{result}")
+                    print(f"{'=' * 60}\n")
             else:
                 # Standard execution without tools
                 response = await llm.ainvoke(clean_prompt)
                 result = str(response.content)
+
+                if verbose:
+                    print(f"\n{'=' * 60}")
+                    print(f"Step {step_num} — {step.output_id}")
+                    print(f"{'=' * 60}")
+                    print(f"[Prompt]\n{clean_prompt}\n")
+                    print(f"[Response]\n{result}")
+                    print(f"{'=' * 60}\n")
 
             latency_ms = int((time.time() - start_time) * 1000)
 
@@ -944,18 +972,6 @@ async def run_reasoning_kit_async(
                     tokens_used = metadata["token_usage"].get("total_tokens")
 
             outputs[step.output_id] = result
-
-            if verbose:
-                print(f"\n{'=' * 60}")
-                print(f"Step {step_num} - Output ID: {step.output_id}")
-                print(f"{'=' * 60}")
-                print(
-                    f"Prompt:\n{clean_prompt[:200]}..."
-                    if len(clean_prompt) > 200
-                    else f"Prompt:\n{clean_prompt}"
-                )
-                print(f"\nResult:\n{result}")
-                print(f"{'=' * 60}\n")
 
             # Save step to database
             if save_to_db and db_run_id:

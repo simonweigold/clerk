@@ -45,9 +45,9 @@ class TestMcpInitialization:
             assert get_tool("search_decisions") is not None, "search_decisions tool not registered"
 
             law_tool = get_tool("get_law")
-            assert (
-                law_tool.source == "opencaselaw"
-            ), f"Expected source 'opencaselaw', got {law_tool.source}"
+            # SSE/HTTP transport tools are registered as "builtin" so they are
+            # visible to all users without requiring DB activation.
+            assert law_tool.source == "builtin", f"Expected source 'builtin', got {law_tool.source}"
         finally:
             await close_mcp_servers()
 

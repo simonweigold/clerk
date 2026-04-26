@@ -300,6 +300,8 @@ def resolve_placeholders(
     for placeholder in placeholders:
         if placeholder in resources:
             content = resources[placeholder]
+            if not isinstance(content, str):
+                content = str(content) if content else ""
 
             # If resource is large, use simple RAG
             if len(content) > resource_size_threshold and search_query:
@@ -357,6 +359,8 @@ async def aresolve_placeholders(
     for placeholder in placeholders:
         if placeholder in resources:
             content = resources[placeholder]
+            if not isinstance(content, str):
+                content = str(content) if content else ""
 
             if len(content) > resource_size_threshold and search_query:
                 try:
@@ -489,6 +493,20 @@ def execute_step(state: State) -> dict[str, Any]:
             messages.append(response)
 
         result = str(response.content)
+        # If the model never returned text (kept calling tools), force final response
+        if not response.content:
+            logger.info(
+                "Step %s - Forcing final text response after %s tool rounds",
+                current_step,
+                max_rounds,
+            )
+            # Remove the last assistant message with unresolved tool_calls to avoid 400 error
+            if messages and hasattr(messages[-1], "tool_calls") and messages[-1].tool_calls:
+                messages.pop()
+            llm_final = llm.bind_tools([t["function"] for t in openai_tools], tool_choice="none")
+            response = llm_final.invoke(messages)
+            messages.append(response)
+            result = str(response.content)
     else:
         # Standard execution without tools
         response = llm.invoke(clean_prompt)
@@ -896,6 +914,22 @@ async def run_reasoning_kit_async(
                     messages.append(response)
 
                 result = str(response.content)
+                # If the model never returned text (kept calling tools), force final response
+                if not response.content:
+                    logger.info(
+                        "Step %s - Forcing final text response after %s tool rounds",
+                        step_num,
+                        max_rounds,
+                    )
+                    # Remove the last assistant message with unresolved tool_calls to avoid 400 error
+                    if messages and hasattr(messages[-1], "tool_calls") and messages[-1].tool_calls:
+                        messages.pop()
+                    llm_final = llm.bind_tools(
+                        [t["function"] for t in openai_tools], tool_choice="none"
+                    )
+                    response = await llm_final.ainvoke(messages)
+                    messages.append(response)
+                    result = str(response.content)
             else:
                 # Standard execution without tools
                 response = await llm.ainvoke(clean_prompt)

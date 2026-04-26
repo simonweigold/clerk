@@ -94,8 +94,16 @@ async def _create_transport(
 async def init_mcp_servers(
     config_path: str = "mcp_servers.json",
     kit_config_path: str | None = None,
+    extra_kit_config_paths: list[str] | None = None,
 ) -> None:
-    """Initialize MCP servers from configuration file(s) and register their tools."""
+    """Initialize MCP servers from configuration file(s) and register their tools.
+
+    Args:
+        config_path: Path to the global mcp_servers.json.
+        kit_config_path: Optional single kit-local config to merge (CLI usage).
+        extra_kit_config_paths: Optional list of additional kit-local configs to
+            merge (web startup usage — scanned from all kit directories).
+    """
     global _exit_stack, _sessions
 
     # Close any previous sessions to allow re-initialization
@@ -116,18 +124,27 @@ async def init_mcp_servers(
             logger.error(f"Failed to load MCP config {config_path}: {e}")
             return
 
-    # Load and merge kit-local config (kit-local servers override global by name)
-    if kit_config_path and os.path.exists(kit_config_path):
+    # Collect all kit-local config paths to merge
+    kit_paths: list[str] = []
+    if kit_config_path:
+        kit_paths.append(kit_config_path)
+    if extra_kit_config_paths:
+        kit_paths.extend(extra_kit_config_paths)
+
+    # Merge all kit-local configs (later entries override earlier ones by name)
+    for kpath in kit_paths:
+        if not os.path.exists(kpath):
+            continue
         try:
-            with open(kit_config_path, "r", encoding="utf-8") as f:
+            with open(kpath, "r", encoding="utf-8") as f:
                 kit_config = json.load(f)
             if "mcpServers" in kit_config:
                 global_servers = config.get("mcpServers", {})
                 global_servers.update(kit_config["mcpServers"])
                 config["mcpServers"] = global_servers
-                logger.info(f"Merged kit-local MCP config from {kit_config_path}")
+                logger.info(f"Merged kit-local MCP config from {kpath}")
         except Exception as e:
-            logger.warning(f"Failed to load kit-local MCP config {kit_config_path}: {e}")
+            logger.warning(f"Failed to load kit-local MCP config {kpath}: {e}")
 
     servers = config.get("mcpServers", {})
     if not servers:
@@ -242,13 +259,19 @@ async def init_mcp_servers(
 
                     return execute_tool
 
+                # HTTP/SSE servers are public (no user credentials needed).
+                # Mark them as "builtin" so they appear for all users in
+                # tools/available without requiring DB activation.
+                transport = server_cfg.get("transport", "stdio")
+                tool_source = "builtin" if transport in ("sse", "http") else name
+
                 register_tool(
                     ToolDefinition(
                         name=tool.name,
                         description=tool.description or f"MCP tool: {tool.name}",
                         parameters=tool.inputSchema,
                         execute=make_execute(name, server_cfg, session, tool.name),
-                        source=name,
+                        source=tool_source,
                     )
                 )
 

@@ -701,7 +701,7 @@ async def add_step(
     except Exception:
         return JSONResponse({"ok": False, "error": "Invalid JSON body"}, status_code=400)
 
-    prompt = body.get("prompt", "")
+    prompt = body.get("prompt_template", "") or body.get("prompt", "")
     display_name = body.get("display_name", "")
 
     if not prompt:
@@ -846,7 +846,7 @@ async def update_step(
     else:
         try:
             body = await request.json()
-            prompt = body.get("prompt", "")
+            prompt = body.get("prompt_template", "") or body.get("prompt", "")
             display_name = body.get("display_name", "")
         except Exception:
             return JSONResponse({"ok": False, "error": "Invalid request body"}, status_code=400)
@@ -2958,6 +2958,21 @@ async def get_kit_detail_json(
                         "output_id": local_s.output_id,
                         "prompt_template": local_s.prompt,
                         "display_name": getattr(local_s, "display_name", None),
+                    }
+                )
+            from ...tools import get_tool
+
+            for key in sorted(kit.tools.keys(), key=int):
+                local_t = kit.tools[key]
+                tool_def = get_tool(local_t.tool_name)
+                tools.append(
+                    {
+                        "number": int(key),
+                        "tool_name": local_t.tool_name,
+                        "tool_id": local_t.tool_id,
+                        "display_name": local_t.display_name,
+                        "configuration": local_t.configuration,
+                        "source": getattr(tool_def, "source", "builtin") if tool_def else "unknown",
                     }
                 )
         except Exception:

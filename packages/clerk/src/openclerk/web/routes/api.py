@@ -260,6 +260,13 @@ async def add_resource(
                 file_content = await file.read()
                 filename = file.filename
                 mime_type = detect_mime_type_from_filename(filename)
+            elif is_dynamic:
+                # Dynamic resources have no pre-loaded content — the user
+                # supplies it at execution time.
+                file_content = b""
+                safe_name = (display_name.strip() or "resource").replace(" ", "_")
+                filename = f"{safe_name}.txt"
+                mime_type = "text/plain"
             else:
                 return JSONResponse(
                     {
@@ -388,6 +395,9 @@ async def add_resource(
             elif file and file.filename:
                 ext = Path(file.filename).suffix or ".txt"
                 content = await file.read()
+            elif is_dynamic:
+                ext = ".txt"
+                content = b""
             else:
                 return JSONResponse(
                     {

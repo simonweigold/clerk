@@ -192,10 +192,12 @@ async def get_llm(
 
     elif inferred_provider == "openrouter" and os.environ.get("OPENROUTER_API_KEY"):
         from langchain_openai import ChatOpenAI
+        from pydantic import SecretStr
 
         return ChatOpenAI(
             model=target_model,
             temperature=temperature,
+            api_key=SecretStr(os.environ["OPENROUTER_API_KEY"]),
             base_url="https://openrouter.ai/api/v1",
         )
 

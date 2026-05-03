@@ -19,6 +19,7 @@ EXTENSION_TO_MIME: dict[str, str] = {
     ".pdf": "application/pdf",
     ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     ".xls": "application/vnd.ms-excel",
+    ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
 }
 
 
@@ -75,6 +76,10 @@ def extract_text(file_path: Path, mime_type: str | None = None) -> str | None:
     ):
         return _extract_xlsx_text(file_path)
 
+    # Word documents
+    if mime_type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+        return _extract_docx_text(file_path)
+
     # JSON files (treat as text)
     if mime_type == "application/json":
         return _extract_text_file(file_path)
@@ -121,6 +126,10 @@ def extract_text_from_bytes(
         "application/vnd.ms-excel",
     ):
         return _extract_xlsx_text_from_bytes(content)
+
+    # Word documents
+    if mime_type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+        return _extract_docx_text_from_bytes(content)
 
     # Unknown type - try reading as text
     try:
@@ -254,6 +263,38 @@ def _extract_xlsx_text_from_bytes(content: bytes) -> str:
 
     wb.close()
     return "\n".join(text_parts)
+
+
+def _extract_docx_text(file_path: Path) -> str:
+    """Extract text from a Word document (.docx) file.
+
+    Args:
+        file_path: Path to the .docx file
+
+    Returns:
+        Extracted text with paragraphs joined by newlines
+    """
+    from docx import Document
+
+    doc = Document(str(file_path))
+    return "\n".join(para.text for para in doc.paragraphs if para.text)
+
+
+def _extract_docx_text_from_bytes(content: bytes) -> str:
+    """Extract text from a Word document (.docx) in memory.
+
+    Args:
+        content: .docx file content as bytes
+
+    Returns:
+        Extracted text with paragraphs joined by newlines
+    """
+    import io
+
+    from docx import Document
+
+    doc = Document(io.BytesIO(content))
+    return "\n".join(para.text for para in doc.paragraphs if para.text)
 
 
 def get_file_size(file_path: Path) -> int:

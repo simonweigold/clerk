@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+import os
 import re
 import time
 from pathlib import Path
@@ -29,7 +30,7 @@ from .tools import get_openai_tool_schema, get_tool
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_MODEL = "gpt-5.4-nano"
+DEFAULT_MODEL = os.environ.get("CLERK_DEFAULT_MODEL", "gpt-5.4-nano")
 
 
 def _format_tool_call(tool_name: str, args: dict[str, Any]) -> str:
@@ -899,21 +900,43 @@ async def run_reasoning_kit_async(
                     for tool_call in response.tool_calls:
                         tool_def = get_tool(tool_call["name"])
                         if tool_def:
-                            try:
-                                if verbose:
-                                    args_str = ", ".join(
-                                        f"{k}={repr(v)}" for k, v in tool_call["args"].items()
-                                    )
-                                    print(f"  → {tool_call['name']}({args_str})")
-                                tool_result = await tool_def.execute(
-                                    tool_call["args"], user_id=user_id
+                            if verbose:
+                                args_str = ", ".join(
+                                    f"{k}={repr(v)}" for k, v in tool_call["args"].items()
                                 )
-                                if verbose:
-                                    print(f"  ← ({len(tool_result)} chars) {_preview(tool_result)}")
-                            except Exception as te:
-                                tool_result = f"Error executing tool: {te}"
-                                if verbose:
-                                    print(f"  ← Error: {te}")
+                                print(f"  → {tool_call['name']}({args_str})")
+                            tool_result = None
+                            max_tool_retries = 5
+                            for attempt in range(1, max_tool_retries + 1):
+                                try:
+                                    tool_result = await tool_def.execute(
+                                        tool_call["args"], user_id=user_id
+                                    )
+                                    break
+                                except Exception as te:
+                                    if attempt < max_tool_retries:
+                                        wait = attempt * 2  # 2s, 4s, 6s, 8s
+                                        logger.warning(
+                                            "Tool %s failed (attempt %d/%d): %s — retrying in %ds",
+                                            tool_call["name"],
+                                            attempt,
+                                            max_tool_retries,
+                                            te,
+                                            wait,
+                                        )
+                                        if verbose:
+                                            print(
+                                                f"  ← Error (attempt {attempt}/{max_tool_retries}), retrying in {wait}s: {te}"
+                                            )
+                                        await asyncio.sleep(wait)
+                                    else:
+                                        tool_result = f"Error executing tool: {te}"
+                                        if verbose:
+                                            print(
+                                                f"  ← Error after {max_tool_retries} attempts: {te}"
+                                            )
+                            if verbose and tool_result and not tool_result.startswith("Error"):
+                                print(f"  ← ({len(tool_result)} chars) {_preview(tool_result)}")
                         else:
                             tool_result = f"Unknown tool: {tool_call['name']}"
                             if verbose:

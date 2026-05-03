@@ -221,3 +221,7 @@ tmp_mcp_030/
 
 # Apple
 .DS_Store
+
+outputs/
+*.docx
+*.doc

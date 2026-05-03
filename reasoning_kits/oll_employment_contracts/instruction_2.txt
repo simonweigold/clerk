@@ -1,0 +1,45 @@
+You are conducting Swiss employment law research using OpenCaseLaw. Based on the contract and the initial contract analysis below, you must research Swiss employment law in the provided sources.
+
+CONTRACT:
+{resource_1}
+
+INITIAL CONTRACT ANALYSIS:
+{workflow_1}
+
+AVAILABLE TOOLS:
+You have access to the following Swiss legal research tools from OpenCaseLaw. You MUST invoke them by calling the tool function with the exact parameters. Do not merely describe what you would do — actually call the tools. Do not invent stuff and leave nothing out.
+
+- {tool_1}: search_decisions — Search Swiss court decisions using full-text search. Supports keywords, phrases, canton filters, court filters, date ranges, and result limits. Parameters: query (string, required), canton (string, optional, e.g. "ZH", "BE", "GE"), court (string, optional), date_from (string, optional, YYYY-MM-DD), date_to (string, optional, YYYY-MM-DD), limit (integer, optional, default 10, max 50).
+- {tool_2}: get_law — Look up the current authoritative text of any Swiss law article — federal or cantonal. Parameters: abbreviation (string, required, e.g. "OR", "ZGB", "StGB", "MRG"), article (string, required, e.g. "319", "320", "334"), language (string, optional, "de", "fr", "it", default "de").
+- {tool_3}: find_leading_cases — Find the most-cited decisions for a topic or statute. Authority ranking based on citation count. Parameters: law_code (string, optional, e.g. "OR"), article (string, optional, e.g. "319"), topic (string, optional), limit (integer, optional, default 5).
+- {tool_4}: get_doctrine — Get statute text + leading cases + doctrinal timeline + Federal Council Botschaft for a Swiss law article. Parameters: abbreviation (string, required), article (string, required), language (string, optional, default "de").
+- {tool_5}: search_laws — Full-text search across Swiss statute articles. Parameters: query (string, required), limit (integer, optional, default 10).
+- {tool_6}: get_case_brief — Get a structured case brief for a Swiss court decision. Parameters: decision_id (string, required, e.g. "bger_4a_2023_123") OR reference (string, e.g. "BGE 143 III 123").
+
+RESEARCH TASK:
+Find everything about Swiss employment law relevant to the analyzed contract from the tools above.
+
+Use the available legal research tools to:
+1. Look up the mandatory requirements for employment contracts under Swiss law
+2. Find relevant articles using the research tools
+3. Search for relevant Swiss court decisions on employment contract validity
+4. Search for relevant doctrine
+5. Identify any mandatory provisions that cannot be contractually waived
+
+Research strategy:
+1. Start by looking up the most relevant statute articles with {tool_2} or {tool_4}.
+2. Use {tool_3} to identify landmark decisions on those articles.
+3. Use {tool_1} with your key terms to find recent and relevant case law.
+4. Call tools iteratively — use findings from one search to refine the next.
+
+For each tool call, include in your output:
+- Which tool you called and with what parameters
+- A summary of the actual results returned by the tool
+- Your analysis of how the result advances the research
+
+Output a list of sources relevant for the contract to be analyzed and a brief description of why the source is relevant in this format:
+{
+   "source": "description",
+   "source": "description",
+   ...
+}

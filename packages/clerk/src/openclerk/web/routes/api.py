@@ -5,6 +5,7 @@ Handles kit CRUD operations, resource/step management, execution streaming, and 
 
 import asyncio
 import json
+import logging
 import re
 import time
 from pathlib import Path
@@ -17,6 +18,7 @@ from starlette.datastructures import UploadFile as StarletteUploadFile
 
 from ..dependencies import get_optional_user
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
@@ -258,6 +260,13 @@ async def add_resource(
                 file_content = await file.read()
                 filename = file.filename
                 mime_type = detect_mime_type_from_filename(filename)
+            elif is_dynamic:
+                # Dynamic resources have no pre-loaded content — the user
+                # supplies it at execution time.
+                file_content = b""
+                safe_name = (display_name.strip() or "resource").replace(" ", "_")
+                filename = f"{safe_name}.txt"
+                mime_type = "text/plain"
             else:
                 return JSONResponse(
                     {
@@ -386,6 +395,9 @@ async def add_resource(
             elif file and file.filename:
                 ext = Path(file.filename).suffix or ".txt"
                 content = await file.read()
+            elif is_dynamic:
+                ext = ".txt"
+                content = b""
             else:
                 return JSONResponse(
                     {
@@ -699,7 +711,7 @@ async def add_step(
     except Exception:
         return JSONResponse({"ok": False, "error": "Invalid JSON body"}, status_code=400)
 
-    prompt = body.get("prompt", "")
+    prompt = body.get("prompt_template", "") or body.get("prompt", "")
     display_name = body.get("display_name", "")
 
     if not prompt:
@@ -844,7 +856,7 @@ async def update_step(
     else:
         try:
             body = await request.json()
-            prompt = body.get("prompt", "")
+            prompt = body.get("prompt_template", "") or body.get("prompt", "")
             display_name = body.get("display_name", "")
         except Exception:
             return JSONResponse({"ok": False, "error": "Invalid request body"}, status_code=400)
@@ -1816,6 +1828,9 @@ async def execute_kit_stream(
             try:
                 if openai_tools:
                     # Tool-aware execution: bind tools and handle call loop
+                    tool_names = [t["function"]["name"] for t in openai_tools]
+                    logger.info("Step %s - Tools enabled: %s", step_num, ", ".join(tool_names))
+
                     llm_with_tools = llm.bind_tools([t["function"] for t in openai_tools])
                     messages: list[Any] = [HumanMessage(content=clean_prompt)]
                     response = await llm_with_tools.ainvoke(messages)
@@ -1840,6 +1855,11 @@ async def execute_kit_stream(
                                     tool_result = f"Error executing tool: {te}"
                             else:
                                 tool_result = f"Unknown tool: {tool_call['name']}"
+
+                            args_str = ", ".join(
+                                f"{k}={repr(v)}" for k, v in tool_call["args"].items()
+                            )
+                            logger.info("Tool call: %s(%s)", tool_call["name"], args_str)
 
                             messages.append(
                                 ToolMessage(
@@ -2948,6 +2968,21 @@ async def get_kit_detail_json(
                         "output_id": local_s.output_id,
                         "prompt_template": local_s.prompt,
                         "display_name": getattr(local_s, "display_name", None),
+                    }
+                )
+            from ...tools import get_tool
+
+            for key in sorted(kit.tools.keys(), key=int):
+                local_t = kit.tools[key]
+                tool_def = get_tool(local_t.tool_name)
+                tools.append(
+                    {
+                        "number": int(key),
+                        "tool_name": local_t.tool_name,
+                        "tool_id": local_t.tool_id,
+                        "display_name": local_t.display_name,
+                        "configuration": local_t.configuration,
+                        "source": getattr(tool_def, "source", "builtin") if tool_def else "unknown",
                     }
                 )
         except Exception:

@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "opencaselaw": {
+      "transport": "sse",
+      "url": "https://mcp.opencaselaw.ch"
+    }
+  }
+}

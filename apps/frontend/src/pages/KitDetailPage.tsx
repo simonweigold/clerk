@@ -113,7 +113,11 @@ function ResourceCard({ resource, slug, isOwner, onRefresh }: {
 
                     {(editMode === 'text' || editMode === 'dynamic') && (
                         <div>
-                            <label className="label text-xs">{editMode === 'dynamic' ? 'Dynamic Value (JS Expression)' : 'Text Content'}</label>
+                            <label className="label text-xs">
+                                {editMode === 'dynamic' ? (
+                                    <>Default Content <span className="text-muted-foreground font-normal">(optional)</span></>
+                                ) : 'Text Content'}
+                            </label>
                             <textarea className="input text-sm font-mono" rows={4} value={editText} onChange={(e) => setEditText(e.target.value)} />
                         </div>
                     )}
@@ -613,12 +617,16 @@ function AddResourceForm({ slug, onRefresh }: { slug: string; onRefresh: () => v
 
             {(mode === 'text' || mode === 'dynamic') && (
                 <div>
-                    <label className="label">{mode === 'dynamic' ? 'Dynamic Value (JS Expression)' : 'Text Content'}</label>
-                    <textarea className="input font-mono" rows={6} value={text} onChange={(e) => setText(e.target.value)} required />
+                    <label className="label">
+                        {mode === 'dynamic' ? (
+                            <>Default Content <span className="text-muted-foreground font-normal">(optional — user provides this at run time)</span></>
+                        ) : 'Text Content'}
+                    </label>
+                    <textarea className="input font-mono" rows={6} value={text} onChange={(e) => setText(e.target.value)} required={mode === 'text'} />
                 </div>
             )}
 
-            <button type="submit" className="btn btn-primary" disabled={loading || (mode === 'file' && !file) || ((mode === 'text' || mode === 'dynamic') && !text.trim())}>
+            <button type="submit" className="btn btn-primary" disabled={loading || (mode === 'file' && !file) || (mode === 'text' && !text.trim())}>
                 {loading ? 'Adding...' : 'Add Resource'}
             </button>
         </form>

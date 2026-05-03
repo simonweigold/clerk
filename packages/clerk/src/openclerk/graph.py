@@ -1,10 +1,12 @@
 """LangGraph workflow execution for reasoning kits."""
 
 import asyncio
+import logging
+import os
 import re
 import time
 from pathlib import Path
-from typing import Annotated, Any, Coroutine, TypedDict, cast
+from typing import Annotated, Any, Coroutine, TypedDict, TypeVar, cast
 from uuid import UUID
 
 from langchain_core.vectorstores import InMemoryVectorStore
@@ -23,10 +25,44 @@ from .evaluation import (
     update_step_evaluation_in_db,
 )
 from .llm_factory import get_llm
-from .models import Evaluation, ReasoningKit
+from .models import Evaluation, ReasoningKit, StepEvaluation
 from .tools import get_openai_tool_schema, get_tool
 
-DEFAULT_MODEL = "gpt-5-mini"
+logger = logging.getLogger(__name__)
+
+DEFAULT_MODEL = os.environ.get("CLERK_DEFAULT_MODEL", "gpt-5.4-nano")
+
+
+def _format_tool_call(tool_name: str, args: dict[str, Any]) -> str:
+    """Format a tool call for human-readable logging."""
+    args_str = ", ".join(f"{k}={repr(v)}" for k, v in args.items())
+    return f"{tool_name}({args_str})"
+
+
+def _preview(text: str, max_len: int = 120) -> str:
+    """Return a one-line preview of text for concise tool result display."""
+    if not text:
+        return "<empty>"
+    if text.startswith("Error"):
+        return text[:max_len]
+    single = text.replace("\n", " ")
+    if len(single) > max_len:
+        return single[: max_len - 3] + "..."
+    return single
+
+
+def _log_tool_execution(
+    step: int | str,
+    tool_names: list[str],
+    tool_calls: list[dict[str, Any]],
+    tool_results: list[str],
+) -> None:
+    """Log tool execution details for a step."""
+    if tool_names:
+        logger.info("Step %s - Tools enabled: %s", step, ", ".join(tool_names))
+    for call, result in zip(tool_calls, tool_results):
+        logger.info("Tool call: %s", _format_tool_call(call["name"], call["args"]))
+        logger.info("Tool result (%s chars): %s", len(result), _preview(result))
 
 
 class State(TypedDict):
@@ -237,7 +273,7 @@ def resolve_placeholders(
     text: str,
     resources: dict[str, str],
     outputs: dict[str, str],
-    resource_size_threshold: int = 4000,
+    resource_size_threshold: int = 400000,
     max_chunks: int = 4,
 ) -> str:
     """Resolve {placeholder} references in text, using RAG for large resources.
@@ -265,6 +301,8 @@ def resolve_placeholders(
     for placeholder in placeholders:
         if placeholder in resources:
             content = resources[placeholder]
+            if not isinstance(content, str):
+                content = str(content) if content else ""
 
             # If resource is large, use simple RAG
             if len(content) > resource_size_threshold and search_query:
@@ -281,12 +319,18 @@ def resolve_placeholders(
                         [doc.page_content for doc in results]
                     )
                     text = text.replace(f"{{{placeholder}}}", relevant_content)
-                    print(
-                        f"RAG triggered for {placeholder}: chunked {len(content)} chars into {len(chunks)} parts, retrieved {len(results)} chunks."
+                    logger.debug(
+                        "RAG triggered for %s: chunked %d chars into %d parts, retrieved %d chunks.",
+                        placeholder,
+                        len(content),
+                        len(chunks),
+                        len(results),
                     )
                 except Exception as e:
-                    print(
-                        f"Warning: RAG failed for {placeholder}, falling back to full text. Error: {e}"
+                    logger.debug(
+                        "RAG failed for %s, falling back to full text. Error: %s",
+                        placeholder,
+                        e,
                     )
                     text = text.replace(f"{{{placeholder}}}", content)
             else:
@@ -302,7 +346,7 @@ async def aresolve_placeholders(
     text: str,
     resources: dict[str, str],
     outputs: dict[str, str],
-    resource_size_threshold: int = 4000,
+    resource_size_threshold: int = 400000,
     max_chunks: int = 4,
 ) -> str:
     """Async version of resolve_placeholders for non-blocking execution."""
@@ -316,6 +360,8 @@ async def aresolve_placeholders(
     for placeholder in placeholders:
         if placeholder in resources:
             content = resources[placeholder]
+            if not isinstance(content, str):
+                content = str(content) if content else ""
 
             if len(content) > resource_size_threshold and search_query:
                 try:
@@ -336,8 +382,10 @@ async def aresolve_placeholders(
                     )
                     text = text.replace(f"{{{placeholder}}}", relevant_content)
                 except Exception as e:
-                    print(
-                        f"Warning: async RAG failed for {placeholder}, falling back to full text. Error: {e}"
+                    logger.debug(
+                        "Async RAG failed for %s, falling back to full text. Error: %s",
+                        placeholder,
+                        e,
                     )
                     text = text.replace(f"{{{placeholder}}}", content)
             else:
@@ -347,6 +395,24 @@ async def aresolve_placeholders(
             text = text.replace(f"{{{placeholder}}}", outputs[placeholder])
 
     return text
+
+
+T = TypeVar("T")
+
+
+def _run_coro_sync(coro: Coroutine[Any, Any, T]) -> T:
+    """Run an async coroutine from a synchronous context.
+
+    Tries to use the current event loop if it exists and is not running.
+    Otherwise falls back to creating a new loop via asyncio.run().
+    """
+    try:
+        loop = asyncio.get_event_loop()
+        if loop.is_closed() or loop.is_running():
+            raise RuntimeError("Event loop not available for run_until_complete")
+        return loop.run_until_complete(coro)
+    except RuntimeError:
+        return asyncio.run(coro)
 
 
 def execute_step(state: State) -> dict[str, Any]:
@@ -374,19 +440,16 @@ def execute_step(state: State) -> dict[str, Any]:
     start_time = time.time()
 
     # Execute with LLM (using the factory and waiting for the async result)
-    try:
-        loop = asyncio.get_event_loop()
-        llm = loop.run_until_complete(
-            get_llm(user_id=state.get("user_id"), model=state["model_used"], temperature=0)
-        )
-    except RuntimeError:
-        llm = asyncio.run(
-            get_llm(user_id=state.get("user_id"), model=state["model_used"], temperature=0)
-        )
+    llm = _run_coro_sync(
+        get_llm(user_id=state.get("user_id"), model=state["model_used"], temperature=0)
+    )
 
     if openai_tools:
         # Tool-aware execution
         from langchain_core.messages import HumanMessage, ToolMessage
+
+        tool_names = [t["function"]["name"] for t in openai_tools]
+        logger.info("Step %s - Tools enabled: %s", current_step, ", ".join(tool_names))
 
         llm_with_tools = llm.bind_tools([t["function"] for t in openai_tools])
         messages: list[Any] = [HumanMessage(content=clean_prompt)]
@@ -403,16 +466,22 @@ def execute_step(state: State) -> dict[str, Any]:
                 tool_def = get_tool(tool_call["name"])
                 if tool_def:
                     try:
-                        tool_result: str = asyncio.run(
+                        print(f"[Tool] {tool_call['name']} -> {tool_call['args']}")
+                        tool_result: str = _run_coro_sync(
                             cast(
                                 Coroutine[Any, Any, str],
                                 tool_def.execute(tool_call["args"], user_id=state.get("user_id")),
                             )
                         )
+                        print(
+                            f"[Tool] {tool_call['name']} <- ({len(tool_result)} chars) {_preview(tool_result)}"
+                        )
                     except Exception as te:
                         tool_result = f"Error executing tool: {te}"
+                        print(f"[Tool] {tool_call['name']} <- Error: {te}")
                 else:
                     tool_result = f"Unknown tool: {tool_call['name']}"
+                    print(f"[Tool] {tool_call['name']} <- Unknown tool")
 
                 messages.append(
                     ToolMessage(
@@ -425,6 +494,20 @@ def execute_step(state: State) -> dict[str, Any]:
             messages.append(response)
 
         result = str(response.content)
+        # If the model never returned text (kept calling tools), force final response
+        if not response.content:
+            logger.info(
+                "Step %s - Forcing final text response after %s tool rounds",
+                current_step,
+                max_rounds,
+            )
+            # Remove the last assistant message with unresolved tool_calls to avoid 400 error
+            if messages and hasattr(messages[-1], "tool_calls") and messages[-1].tool_calls:
+                messages.pop()
+            llm_final = llm.bind_tools([t["function"] for t in openai_tools], tool_choice="none")
+            response = llm_final.invoke(messages)
+            messages.append(response)
+            result = str(response.content)
     else:
         # Standard execution without tools
         response = llm.invoke(clean_prompt)
@@ -457,33 +540,18 @@ def execute_step(state: State) -> dict[str, Any]:
 
     # Save to database if enabled (run in event loop)
     if state["save_to_db"] and state["db_run_id"]:
-        try:
-            asyncio.get_event_loop().run_until_complete(
-                save_step_to_db(
-                    run_id=UUID(state["db_run_id"]),
-                    step_number=int(current_step),
-                    prompt=clean_prompt,
-                    output=result,
-                    mode=state["evaluation_mode"],
-                    model_used=state["model_used"],
-                    tokens_used=tokens_used,
-                    latency_ms=latency_ms,
-                )
+        _run_coro_sync(
+            save_step_to_db(
+                run_id=UUID(state["db_run_id"]),
+                step_number=int(current_step),
+                prompt=clean_prompt,
+                output=result,
+                mode=state["evaluation_mode"],
+                model_used=state["model_used"],
+                tokens_used=tokens_used,
+                latency_ms=latency_ms,
             )
-        except RuntimeError:
-            # No event loop running, create a new one
-            asyncio.run(
-                save_step_to_db(
-                    run_id=UUID(state["db_run_id"]),
-                    step_number=int(current_step),
-                    prompt=clean_prompt,
-                    output=result,
-                    mode=state["evaluation_mode"],
-                    model_used=state["model_used"],
-                    tokens_used=tokens_used,
-                    latency_ms=latency_ms,
-                )
-            )
+        )
 
     return {
         "outputs": new_outputs,
@@ -715,6 +783,8 @@ async def run_reasoning_kit_async(
     db_version_id: UUID | None = None,
     model: str = DEFAULT_MODEL,
     user_id: str | None = None,
+    verbose: bool = False,
+    collected_prompts: dict[str, str] | None = None,
 ) -> dict[str, str]:
     """Async version of run_reasoning_kit for use in async contexts.
 
@@ -729,6 +799,7 @@ async def run_reasoning_kit_async(
         db_version_id: Database kit version UUID (required if save_to_db=True)
         model: LLM model to use
         user_id: ID of the user executing the kit
+        verbose: Whether to print execution details to stdout
 
     Returns:
         Dict of all outputs from the workflow
@@ -744,11 +815,16 @@ async def run_reasoning_kit_async(
                     version_id=db_version_id,
                     storage_mode=evaluation_mode,
                 )
-            except Exception:
+                if verbose:
+                    print(f"Created execution run: {db_run_id}")
+            except Exception as e:
+                if verbose:
+                    print(f"Warning: Could not create execution run: {e}")
                 save_to_db = False
 
     resources = {r.resource_id: r.content for r in kit.resources.values()}
     outputs: dict[str, str] = {}
+    evaluations: dict[str, dict] = {}
     llm = await get_llm(user_id=user_id, model=model, temperature=0)
     error_message: str | None = None
 
@@ -763,6 +839,19 @@ async def run_reasoning_kit_async(
         for k, v in kit.tools.items()
     }
 
+    if verbose:
+        print(f"\n{'#' * 60}")
+        print(f"Running Reasoning Kit: {kit.name}")
+        print(f"{'#' * 60}")
+        print(f"Resources: {list(resources.keys())}")
+        print(f"Workflow Steps: {len(kit.workflow)}")
+        print(f"Model: {model}")
+        if evaluate:
+            print(f"Evaluation: enabled ({evaluation_mode} mode)")
+        if save_to_db:
+            print("Database tracking: enabled")
+        print(f"{'#' * 60}\n")
+
     for step_key in sorted(kit.workflow.keys(), key=int):
         step = kit.workflow[step_key]
         step_num = int(step_key)
@@ -773,12 +862,24 @@ async def run_reasoning_kit_async(
         openai_tools = extract_tool_refs(step.prompt, kit_tools)
         clean_prompt = remove_tool_placeholders(prompt, kit_tools)
 
+        if collected_prompts is not None:
+            collected_prompts[step.output_id] = clean_prompt
+
         start_time = time.time()
 
         try:
             if openai_tools:
                 # Tool-aware execution
                 from langchain_core.messages import HumanMessage, ToolMessage
+
+                tool_names = [t["function"]["name"] for t in openai_tools]
+                logger.info("Step %s - Tools enabled: %s", step_num, ", ".join(tool_names))
+
+                if verbose:
+                    print(f"\n{'=' * 60}")
+                    print(f"Step {step_num} — Tools: {', '.join(tool_names)}")
+                    print(f"{'=' * 60}")
+                    print(f"[Prompt]\n{clean_prompt}\n")
 
                 llm_with_tools = llm.bind_tools([t["function"] for t in openai_tools])
                 messages: list[Any] = [HumanMessage(content=clean_prompt)]
@@ -787,21 +888,59 @@ async def run_reasoning_kit_async(
 
                 # Tool-call loop
                 max_rounds = 5
+                round_num = 0
                 for _ in range(max_rounds):
                     if not response.tool_calls:
                         break
 
+                    round_num += 1
+                    if verbose:
+                        print(f"[Round {round_num}]")
+
                     for tool_call in response.tool_calls:
                         tool_def = get_tool(tool_call["name"])
                         if tool_def:
-                            try:
-                                tool_result = await tool_def.execute(
-                                    tool_call["args"], user_id=user_id
+                            if verbose:
+                                args_str = ", ".join(
+                                    f"{k}={repr(v)}" for k, v in tool_call["args"].items()
                                 )
-                            except Exception as te:
-                                tool_result = f"Error executing tool: {te}"
+                                print(f"  → {tool_call['name']}({args_str})")
+                            tool_result = None
+                            max_tool_retries = 5
+                            for attempt in range(1, max_tool_retries + 1):
+                                try:
+                                    tool_result = await tool_def.execute(
+                                        tool_call["args"], user_id=user_id
+                                    )
+                                    break
+                                except Exception as te:
+                                    if attempt < max_tool_retries:
+                                        wait = attempt * 2  # 2s, 4s, 6s, 8s
+                                        logger.warning(
+                                            "Tool %s failed (attempt %d/%d): %s — retrying in %ds",
+                                            tool_call["name"],
+                                            attempt,
+                                            max_tool_retries,
+                                            te,
+                                            wait,
+                                        )
+                                        if verbose:
+                                            print(
+                                                f"  ← Error (attempt {attempt}/{max_tool_retries}), retrying in {wait}s: {te}"
+                                            )
+                                        await asyncio.sleep(wait)
+                                    else:
+                                        tool_result = f"Error executing tool: {te}"
+                                        if verbose:
+                                            print(
+                                                f"  ← Error after {max_tool_retries} attempts: {te}"
+                                            )
+                            if verbose and tool_result and not tool_result.startswith("Error"):
+                                print(f"  ← ({len(tool_result)} chars) {_preview(tool_result)}")
                         else:
                             tool_result = f"Unknown tool: {tool_call['name']}"
+                            if verbose:
+                                print(f"  ← Unknown tool: {tool_call['name']}")
 
                         messages.append(
                             ToolMessage(
@@ -814,10 +953,38 @@ async def run_reasoning_kit_async(
                     messages.append(response)
 
                 result = str(response.content)
+                # If the model never returned text (kept calling tools), force final response
+                if not response.content:
+                    logger.info(
+                        "Step %s - Forcing final text response after %s tool rounds",
+                        step_num,
+                        max_rounds,
+                    )
+                    # Remove the last assistant message with unresolved tool_calls to avoid 400 error
+                    if messages and hasattr(messages[-1], "tool_calls") and messages[-1].tool_calls:
+                        messages.pop()
+                    llm_final = llm.bind_tools(
+                        [t["function"] for t in openai_tools], tool_choice="none"
+                    )
+                    response = await llm_final.ainvoke(messages)
+                    messages.append(response)
+                    result = str(response.content)
+
+                if verbose:
+                    print(f"\n[Final Response]\n{result}")
+                    print(f"{'=' * 60}\n")
             else:
                 # Standard execution without tools
                 response = await llm.ainvoke(clean_prompt)
                 result = str(response.content)
+
+                if verbose:
+                    print(f"\n{'=' * 60}")
+                    print(f"Step {step_num} — {step.output_id}")
+                    print(f"{'=' * 60}")
+                    print(f"[Prompt]\n{clean_prompt}\n")
+                    print(f"[Response]\n{result}")
+                    print(f"{'=' * 60}\n")
 
             latency_ms = int((time.time() - start_time) * 1000)
 
@@ -845,16 +1012,65 @@ async def run_reasoning_kit_async(
                 except Exception:
                     pass
 
+            # Evaluation
+            if evaluate:
+                score = await asyncio.to_thread(prompt_for_evaluation, step_num, step.output_id)
+                step_eval = create_step_evaluation(
+                    prompt=clean_prompt,
+                    output=result,
+                    score=score,
+                    mode=evaluation_mode,
+                )
+                evaluations[str(step_num)] = step_eval.model_dump()
+
+                if save_to_db and db_run_id:
+                    try:
+                        await update_step_evaluation_in_db(
+                            run_id=db_run_id,
+                            step_number=step_num,
+                            score=score,
+                        )
+                    except Exception:
+                        pass
+
         except Exception as e:
             error_message = str(e)
+            if verbose:
+                print(f"\nError during execution: {e}")
             break
+
+    if verbose:
+        print(f"\n{'#' * 60}")
+        print("Workflow Completed!" if not error_message else "Workflow Failed!")
+        print(f"{'#' * 60}")
+        if not error_message:
+            print("Final Outputs:")
+            for output_id, result in outputs.items():
+                print(f"\n{output_id}:")
+                print(result)
+        print(f"{'#' * 60}\n")
+
+    # Save evaluation if enabled (to local file)
+    if evaluate and evaluations and not kit.path.startswith("db://"):
+        steps_eval = {
+            str(k): StepEvaluation(**v) if isinstance(v, dict) else v
+            for k, v in evaluations.items()
+        }
+        evaluation = Evaluation(mode=evaluation_mode, steps=steps_eval)
+        eval_file = save_evaluation(Path(kit.path), evaluation)
+        if verbose:
+            print(f"Evaluation saved to: {eval_file}\n")
 
     # Complete database execution run
     if save_to_db and db_run_id:
         try:
             await complete_execution_run(db_run_id, error=error_message)
-        except Exception:
-            pass
+            if verbose:
+                status = "failed" if error_message else "completed"
+                print(f"Execution run {status}: {db_run_id}\n")
+        except Exception as e:
+            if verbose:
+                print(f"Warning: Could not complete execution run: {e}")
 
     if error_message:
         raise RuntimeError(error_message)

@@ -1,5 +1,6 @@
 """Loader for reasoning kits from filesystem and database."""
 
+import json
 import re
 from pathlib import Path
 from uuid import UUID
@@ -86,11 +87,41 @@ def load_reasoning_kit(kit_path: str | Path) -> ReasoningKit:
     if not workflow:
         raise FileNotFoundError(f"No instruction files found in {kit_path}")
 
+    # Auto-discover tools (tool_*.json)
+    tools: dict[str, Tool] = {}
+    tool_files = sorted(
+        kit_path.glob("tool_*.json"),
+        key=lambda f: _extract_number(f.name) or 0,
+    )
+    for tool_file in tool_files:
+        tool_num = _extract_number(tool_file.name)
+        if tool_num is None:
+            continue
+        try:
+            data = json.loads(tool_file.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+        raw_config = data.get("configuration")
+        if raw_config is None:
+            configuration = None
+        elif isinstance(raw_config, str):
+            configuration = raw_config
+        else:
+            configuration = json.dumps(raw_config)
+        tool = Tool(
+            tool_name=data.get("tool_name", ""),
+            tool_id=f"tool_{tool_num}",
+            display_name=data.get("display_name"),
+            configuration=configuration,
+        )
+        tools[str(tool_num)] = tool
+
     return ReasoningKit(
         name=kit_path.name,
         path=str(kit_path),
         resources=resources,
         workflow=workflow,
+        tools=tools,
     )
 
 

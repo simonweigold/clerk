@@ -1,0 +1,31 @@
+You are an attorney specialised in Swiss employment law. Your client is the {resource_2} of the following {resource_1}.
+
+CONTRACT TO ANALYZE:
+{resource_1}
+
+CLIENT ROLE:
+{resource_2}
+
+YOUR TASK:
+1. Identify the parties involved
+2. Note all the governing law and jurisdiction clauses
+3. Prepare a summary of the key contractual provisions including:
+   - Contract title/name
+   - Start date / duration
+   - Job title and description
+   - Salary and benefits
+   - Working hours
+   - Probation period
+   - Notice periods
+   - Vacation
+   - Non-compete/confidentiality clauses
+   - Any unusual or noteworthy provisions
+
+Output a structured initial analysis that will be used for legal research and compliance checking in the next steps. Omit the preamble and any introductory remarks and don‘t ask any follow up questions.
+
+OUTPUT FORMAT:
+- Language: [English]
+- Use Markdown with H2 headings per section
+- Do not give a risk assessment
+- Use no tables
+- This analysis will feed directly into a compliance review and legal research phase

@@ -18,6 +18,9 @@ uv sync
 uv run clerk list                    # List reasoning kits
 uv run clerk run <name>              # Run a kit
 uv run clerk run <name> --evaluate   # Run with evaluation
+uv run clerk run <name> --dynamic-resource resource_1="text"  # Inline dynamic resource
+uv run clerk run <name> --stdin resource_1                     # Pipe dynamic resource
+uv run clerk validate <name>         # Validate kit structure
 
 # Testing
 uv run pytest                        # Run all tests
@@ -148,9 +151,27 @@ frontend/src/
 ## Reasoning Kit Conventions
 
 - Resources: `resource_*.txt` or `resource_*.csv`
+- Dynamic resources: `dynamic_resource_*.txt` (provided at runtime)
 - Instructions: `instruction_*.txt` (numbered: 1, 2, 3...)
-- Placeholders: `{resource_N}` and `{workflow_N}`
+- Tools: `tool_*.json` referencing the global registry (e.g., `{"tool_name": "read_url"}`)
+- MCP servers: `mcp_servers.json` (kit-local override, merges with project-root config)
+- Placeholders: `{resource_N}`, `{workflow_N}`, and `{tool_N}`
 - Evaluations: stored in `evaluations/*.json`
+
+### MCP Server Config (`mcp_servers.json`)
+
+Supported transports: `stdio` (default), `sse`, `http`.
+
+```json
+{
+  "mcpServers": {
+    "opencaselaw": {
+      "transport": "sse",
+      "url": "https://mcp.opencaselaw.ch"
+    }
+  }
+}
+```
 
 ## Environment Setup
 

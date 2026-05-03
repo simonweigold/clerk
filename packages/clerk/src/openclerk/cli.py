@@ -2,6 +2,7 @@
 
 import argparse
 import asyncio
+import json
 import re
 import sys
 from pathlib import Path
@@ -9,7 +10,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 from .db.config import get_config
-from .graph import run_reasoning_kit
+from .graph import run_reasoning_kit_async
 from .loader import (
     get_kit_info_from_db,
     list_reasoning_kits,
@@ -77,6 +78,111 @@ def main() -> None:
         default="transparent",
         help="Evaluation mode: 'transparent' stores full text, 'anonymous' stores char counts",
     )
+    run_parser.add_argument(
+        "--dynamic-resource",
+        action="append",
+        default=[],
+        help='Inline dynamic resource (e.g., --dynamic-resource resource_1="text")',
+    )
+    run_parser.add_argument(
+        "--dynamic-resource-file",
+        action="append",
+        default=[],
+        help="Dynamic resource from file (e.g., --dynamic-resource-file resource_1=./file.txt)",
+    )
+    run_parser.add_argument(
+        "--stdin",
+        action="append",
+        default=[],
+        help="Read dynamic resource from stdin (e.g., --stdin resource_1)",
+    )
+    run_parser.add_argument(
+        "--verbose",
+        "-v",
+        action="store_true",
+        help="Enable verbose output (tool calls, LLM responses, etc.)",
+    )
+    run_parser.add_argument(
+        "--output-dir",
+        type=str,
+        default="outputs",
+        help="Base directory for saved run outputs (default: outputs/)",
+    )
+    run_parser.add_argument(
+        "--no-save",
+        action="store_true",
+        help="Do not save run outputs to disk",
+    )
+    run_parser.add_argument(
+        "--model",
+        type=str,
+        default=None,
+        help="Model to use (e.g. deepseek/deepseek-v4-pro). Overrides CLERK_DEFAULT_MODEL env var.",
+    )
+
+    # =========================================================================
+    # BATCH COMMAND
+    # =========================================================================
+    batch_parser = subparsers.add_parser(
+        "batch", help="Run a reasoning kit over multiple input files"
+    )
+    batch_parser.add_argument(
+        "kit",
+        type=str,
+        help="Name/slug of the reasoning kit to run",
+    )
+    batch_parser.add_argument(
+        "--input-dir",
+        type=str,
+        required=True,
+        help="Directory containing input files (.docx, .pdf, .txt, etc.)",
+    )
+    batch_parser.add_argument(
+        "--resource",
+        type=str,
+        required=True,
+        help="Resource ID to map each input file to (e.g. resource_1)",
+    )
+    batch_parser.add_argument(
+        "--dynamic",
+        action="append",
+        default=[],
+        help="Fixed value for another dynamic resource (e.g. --dynamic resource_2=employee)",
+    )
+    batch_parser.add_argument(
+        "--model",
+        type=str,
+        default=None,
+        help="Model to use (e.g. deepseek/deepseek-v4-pro). Overrides CLERK_DEFAULT_MODEL env var.",
+    )
+    batch_parser.add_argument(
+        "--local",
+        action="store_true",
+        help="Load from local filesystem instead of database",
+    )
+    batch_parser.add_argument(
+        "--base-path",
+        type=str,
+        default="reasoning_kits",
+        help="Base path for local reasoning kits",
+    )
+    batch_parser.add_argument(
+        "--output-dir",
+        type=str,
+        default="outputs",
+        help="Base directory for saved run outputs (default: outputs/)",
+    )
+    batch_parser.add_argument(
+        "--no-save",
+        action="store_true",
+        help="Do not save run outputs to disk",
+    )
+    batch_parser.add_argument(
+        "--verbose",
+        "-v",
+        action="store_true",
+        help="Enable verbose output (tool calls, LLM responses, etc.)",
+    )
 
     # =========================================================================
     # INFO COMMAND
@@ -93,6 +199,27 @@ def main() -> None:
         help="Load from local filesystem instead of database",
     )
     info_parser.add_argument(
+        "--base-path",
+        type=str,
+        default="reasoning_kits",
+        help="Base path for local reasoning kits",
+    )
+
+    # =========================================================================
+    # VALIDATE COMMAND
+    # =========================================================================
+    validate_parser = subparsers.add_parser("validate", help="Validate a reasoning kit")
+    validate_parser.add_argument(
+        "kit",
+        type=str,
+        help="Name/slug of the reasoning kit to validate",
+    )
+    validate_parser.add_argument(
+        "--local",
+        action="store_true",
+        help="Validate a local kit instead of database",
+    )
+    validate_parser.add_argument(
         "--base-path",
         type=str,
         default="reasoning_kits",
@@ -369,8 +496,12 @@ def main() -> None:
         _cmd_list(args)
     elif args.command == "run":
         _cmd_run(args)
+    elif args.command == "batch":
+        _cmd_batch(args)
     elif args.command == "info":
         _cmd_info(args)
+    elif args.command == "validate":
+        _cmd_validate(args)
     elif args.command == "db":
         _cmd_db(args)
     elif args.command == "sync":
@@ -437,18 +568,35 @@ def _cmd_list(args: argparse.Namespace) -> None:
 # =============================================================================
 
 
+def _save_run_outputs(kit, outputs: dict[str, str], prompts: dict[str, str], base_dir: str) -> None:
+    """Save run outputs to a versioned folder under base_dir/kit-name/timestamp/."""
+    from datetime import datetime
+
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    run_dir = Path(base_dir) / kit.name / timestamp
+    run_dir.mkdir(parents=True, exist_ok=True)
+    _write_run_files(kit, outputs, prompts, run_dir)
+    print(f"\nOutputs saved to: {run_dir}")
+
+
 def _cmd_run(args: argparse.Namespace) -> None:
     """Handle the run command."""
     from uuid import UUID
+
+    from .mcp_client import close_mcp_servers, init_mcp_servers
 
     try:
         kit = None
         db_version_id: UUID | None = None
         save_to_db = False
 
+        # Resolve local path early for MCP config detection
+        kit_path = resolve_kit_path(args.kit, args.base_path)
+        local_mcp = kit_path / "mcp_servers.json"
+        kit_config = str(local_mcp) if local_mcp.exists() else None
+
         if args.local:
             # Load from local filesystem
-            kit_path = resolve_kit_path(args.kit, args.base_path)
             kit = load_reasoning_kit(kit_path)
         else:
             # Try database first
@@ -462,20 +610,52 @@ def _cmd_run(args: argparse.Namespace) -> None:
                 except FileNotFoundError:
                     # Fall back to local
                     print(f"Kit '{args.kit}' not found in database, trying local...")
-                    kit_path = resolve_kit_path(args.kit, args.base_path)
                     kit = load_reasoning_kit(kit_path)
             else:
                 # No database configured, use local
-                kit_path = resolve_kit_path(args.kit, args.base_path)
                 kit = load_reasoning_kit(kit_path)
 
-        # Prompt for dynamic resources
+        # Parse dynamic resource inputs from CLI flags
+        dynamic_inputs: dict[str, str] = {}
+
+        # --stdin resource_id
+        for stdin_spec in args.stdin:
+            dynamic_inputs[stdin_spec] = sys.stdin.read()
+
+        # --dynamic-resource-file resource_id=./file.txt
+        for file_spec in args.dynamic_resource_file:
+            if "=" not in file_spec:
+                print(f"Error: Invalid --dynamic-resource-file format: {file_spec}")
+                sys.exit(1)
+            res_id, file_path = file_spec.split("=", 1)
+            path = Path(file_path)
+            if not path.exists():
+                print(f"Error: File not found for dynamic resource: {path}")
+                sys.exit(1)
+            dynamic_inputs[res_id] = path.read_text()
+
+        # --dynamic-resource resource_id=text
+        for inline_spec in args.dynamic_resource:
+            if "=" not in inline_spec:
+                print(f"Error: Invalid --dynamic-resource format: {inline_spec}")
+                sys.exit(1)
+            res_id, text = inline_spec.split("=", 1)
+            dynamic_inputs[res_id] = text
+
+        # Apply provided dynamic resources and prompt for remaining ones
         dynamic_resources = [r for r in kit.resources.values() if r.is_dynamic]
-        if dynamic_resources:
+        unresolved = []
+        for resource in dynamic_resources:
+            if resource.resource_id in dynamic_inputs:
+                resource.content = dynamic_inputs[resource.resource_id]
+            else:
+                unresolved.append(resource)
+
+        if unresolved:
             print(
                 f"\nThis kit has {len(dynamic_resources)} dynamic resource(s) that require user input.\n"
             )
-            for resource in dynamic_resources:
+            for resource in unresolved:
                 while True:
                     file_path = input(
                         f"  Enter file path for {resource.resource_id} ({resource.file}): "
@@ -495,13 +675,33 @@ def _cmd_run(args: argparse.Namespace) -> None:
                         print(f"    Error reading file: {e}. Please try again.")
             print()
 
-        run_reasoning_kit(
-            kit,
-            evaluate=args.evaluate,
-            evaluation_mode=args.mode,
-            save_to_db=save_to_db,
-            db_version_id=db_version_id,
-        )
+        collected_prompts: dict[str, str] = {}
+
+        async def _run_with_mcp() -> dict[str, str]:
+            """Initialize MCP, run kit async, and clean up in one event loop."""
+            await init_mcp_servers(
+                config_path="mcp_servers.json",
+                kit_config_path=kit_config,
+            )
+            try:
+                kwargs: dict = dict(
+                    evaluate=args.evaluate,
+                    evaluation_mode=args.mode,
+                    save_to_db=save_to_db,
+                    db_version_id=db_version_id,
+                    verbose=args.verbose,
+                    collected_prompts=collected_prompts,
+                )
+                if args.model:
+                    kwargs["model"] = args.model
+                return await run_reasoning_kit_async(kit, **kwargs)
+            finally:
+                await close_mcp_servers()
+
+        outputs = asyncio.run(_run_with_mcp())
+
+        if not args.no_save:
+            _save_run_outputs(kit, outputs, collected_prompts, args.output_dir)
         sys.exit(0)
     except FileNotFoundError as e:
         print(f"Error: {e}")
@@ -509,6 +709,181 @@ def _cmd_run(args: argparse.Namespace) -> None:
     except Exception as e:
         print(f"Error running reasoning kit: {e}")
         sys.exit(1)
+
+
+# =============================================================================
+# BATCH COMMAND
+# =============================================================================
+
+
+def _cmd_batch(args: argparse.Namespace) -> None:
+    """Handle the batch command — run a kit over each file in a directory."""
+    import copy
+
+    from .db.text_extraction import detect_mime_type, extract_text
+    from .mcp_client import close_mcp_servers, init_mcp_servers
+
+    input_dir = Path(args.input_dir)
+    if not input_dir.exists():
+        print(f"Error: Input directory not found: {input_dir}")
+        sys.exit(1)
+
+    # Collect supported input files (skip hidden/system files)
+    supported_exts = {".docx", ".pdf", ".txt", ".md", ".csv", ".json", ".xlsx", ".xls"}
+    input_files = sorted(
+        f for f in input_dir.iterdir() if f.is_file() and f.suffix.lower() in supported_exts
+    )
+    if not input_files:
+        print(f"No supported input files found in {input_dir}")
+        sys.exit(1)
+
+    print(f"Found {len(input_files)} file(s) to process in {input_dir}")
+
+    # Parse fixed dynamic resource values (--dynamic resource_2=employee)
+    fixed_dynamic: dict[str, str] = {}
+    for spec in args.dynamic:
+        if "=" not in spec:
+            print(f"Error: Invalid --dynamic format: {spec}")
+            sys.exit(1)
+        res_id, value = spec.split("=", 1)
+        fixed_dynamic[res_id] = value
+
+    # Load the kit once (template)
+    kit_path = resolve_kit_path(args.kit, args.base_path)
+    local_mcp = kit_path / "mcp_servers.json"
+    kit_config = str(local_mcp) if local_mcp.exists() else None
+
+    try:
+        if args.local:
+            from .loader import load_reasoning_kit
+
+            template_kit = load_reasoning_kit(kit_path)
+        else:
+            config = get_config()
+            if config.is_database_configured:
+                try:
+                    loaded = asyncio.run(load_reasoning_kit_from_db(args.kit))
+                    template_kit = loaded.kit
+                except FileNotFoundError:
+                    print(f"Kit '{args.kit}' not found in database, trying local...")
+                    from .loader import load_reasoning_kit
+
+                    template_kit = load_reasoning_kit(kit_path)
+            else:
+                from .loader import load_reasoning_kit
+
+                template_kit = load_reasoning_kit(kit_path)
+    except FileNotFoundError as e:
+        print(f"Error: {e}")
+        sys.exit(1)
+
+    errors: list[tuple[str, str]] = []
+
+    async def _run_one(file_path: Path, index: int) -> None:
+        """Run the kit on a single file with a fresh MCP connection."""
+        print(f"\n[{index}/{len(input_files)}] Processing: {file_path.name}")
+
+        text = extract_text(file_path, detect_mime_type(file_path))
+        if text is None:
+            print(f"  Warning: Could not extract text from {file_path.name}, skipping.")
+            errors.append((file_path.name, "text extraction failed"))
+            return
+
+        print(f"  Extracted {len(text)} characters")
+
+        kit = copy.deepcopy(template_kit)
+
+        target = next((r for r in kit.resources.values() if r.resource_id == args.resource), None)
+        if target is None:
+            available = [r.resource_id for r in kit.resources.values()]
+            print(f"Error: Resource '{args.resource}' not found in kit. " f"Available: {available}")
+            sys.exit(1)
+        target.content = text
+
+        for res_id, value in fixed_dynamic.items():
+            res_match = next((r for r in kit.resources.values() if r.resource_id == res_id), None)
+            if res_match:
+                res_match.content = value
+            else:
+                print(f"  Warning: Resource '{res_id}' not found in kit, skipping.")
+
+        collected_prompts: dict[str, str] = {}
+        run_kwargs: dict = dict(
+            verbose=args.verbose,
+            collected_prompts=collected_prompts,
+        )
+        if args.model:
+            run_kwargs["model"] = args.model
+
+        # Fresh MCP connection per file to avoid SSE timeouts on long batches
+        await init_mcp_servers(config_path="mcp_servers.json", kit_config_path=kit_config)
+        try:
+            outputs = await run_reasoning_kit_async(kit, **run_kwargs)
+        except Exception as e:
+            print(f"  Error running kit on {file_path.name}: {e}")
+            errors.append((file_path.name, str(e)))
+            return
+        finally:
+            await close_mcp_servers()
+
+        if not args.no_save:
+            from datetime import datetime
+
+            stem = file_path.stem
+            timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+            run_dir = Path(args.output_dir) / kit.name / stem / timestamp
+            run_dir.mkdir(parents=True, exist_ok=True)
+            _write_run_files(kit, outputs, collected_prompts, run_dir)
+            print(f"  Saved to: {run_dir}")
+
+    async def _run_all() -> None:
+        for i, file_path in enumerate(input_files, 1):
+            await _run_one(file_path, i)
+
+    asyncio.run(_run_all())
+
+    print(f"\nBatch complete. Processed {len(input_files) - len(errors)}/{len(input_files)} files.")
+    if errors:
+        print(f"Failed ({len(errors)}):")
+        for name, reason in errors:
+            print(f"  - {name}: {reason}")
+        sys.exit(1)
+
+
+def _write_run_files(kit, outputs: dict[str, str], prompts: dict[str, str], run_dir: Path) -> None:
+    """Write output and prompt files for a completed kit run into run_dir."""
+    import json
+
+    step_meta = []
+    for step_key in sorted(kit.workflow.keys(), key=int):
+        step = kit.workflow[step_key]
+        step_num = int(step_key)
+        base = f"step_{step_num}_{step.output_id}"
+
+        output_file = f"{base}.md"
+        (run_dir / output_file).write_text(outputs.get(step.output_id, ""), encoding="utf-8")
+
+        prompt_file = f"{base}_prompt.md"
+        (run_dir / prompt_file).write_text(prompts.get(step.output_id, ""), encoding="utf-8")
+
+        step_meta.append(
+            {
+                "step": step_num,
+                "output_id": step.output_id,
+                "display_name": step.display_name,
+                "output_file": output_file,
+                "prompt_file": prompt_file,
+            }
+        )
+
+    from datetime import datetime
+
+    run_info = {
+        "kit": kit.name,
+        "timestamp": datetime.now().strftime("%Y-%m-%d_%H-%M-%S"),
+        "steps": step_meta,
+    }
+    (run_dir / "run.json").write_text(json.dumps(run_info, indent=2), encoding="utf-8")
 
 
 # =============================================================================
@@ -523,14 +898,7 @@ def _cmd_info(args: argparse.Namespace) -> None:
             # Load from local filesystem
             kit_path = resolve_kit_path(args.kit, args.base_path)
             kit = load_reasoning_kit(kit_path)
-            print(f"\nReasoning Kit: {kit.name}")
-            print(f"Path: {kit.path}")
-            print(f"\nResources ({len(kit.resources)}):")
-            for key, resource in kit.resources.items():
-                print(f"  {key}. {resource.resource_id} ({resource.file})")
-            print(f"\nWorkflow Steps ({len(kit.workflow)}):")
-            for key, step in kit.workflow.items():
-                print(f"  {key}. {step.output_id} ({step.file})")
+            _print_local_kit_info(kit)
         else:
             # Try database first
             config = get_config()
@@ -544,18 +912,28 @@ def _cmd_info(args: argparse.Namespace) -> None:
 
             kit_path = resolve_kit_path(args.kit, args.base_path)
             kit = load_reasoning_kit(kit_path)
-            print(f"\nReasoning Kit: {kit.name}")
-            print(f"Path: {kit.path}")
-            print(f"\nResources ({len(kit.resources)}):")
-            for key, resource in kit.resources.items():
-                print(f"  {key}. {resource.resource_id} ({resource.file})")
-            print(f"\nWorkflow Steps ({len(kit.workflow)}):")
-            for key, step in kit.workflow.items():
-                print(f"  {key}. {step.output_id} ({step.file})")
+            _print_local_kit_info(kit)
 
     except FileNotFoundError as e:
         print(f"Error: {e}")
         sys.exit(1)
+
+
+def _print_local_kit_info(kit) -> None:
+    """Print formatted local kit info."""
+    print(f"\nReasoning Kit: {kit.name}")
+    print(f"Path: {kit.path}")
+    print(f"\nResources ({len(kit.resources)}):")
+    for key, resource in kit.resources.items():
+        print(f"  {key}. {resource.resource_id} ({resource.file})")
+    print(f"\nWorkflow Steps ({len(kit.workflow)}):")
+    for key, step in kit.workflow.items():
+        print(f"  {key}. {step.output_id} ({step.file})")
+    if kit.tools:
+        print(f"\nTools ({len(kit.tools)}):")
+        for key, tool in kit.tools.items():
+            display = f" ({tool.display_name})" if tool.display_name else ""
+            print(f"  {key}. {tool.tool_name}{display}")
 
 
 def _print_db_kit_info(info: dict) -> None:
@@ -591,6 +969,110 @@ def _print_db_kit_info(info: dict) -> None:
                 print(f"  {t['number']}. {t['tool_name']}{display}")
     else:
         print("\nNo published version available")
+
+
+# =============================================================================
+# VALIDATE COMMAND
+# =============================================================================
+
+
+def _cmd_validate(args: argparse.Namespace) -> None:
+    """Handle the validate command."""
+    from .tools import get_tool
+
+    errors: list[str] = []
+    warnings: list[str] = []
+
+    try:
+        kit_path = resolve_kit_path(args.kit, args.base_path)
+        kit = load_reasoning_kit(kit_path)
+    except FileNotFoundError as e:
+        print(f"Error: {e}")
+        sys.exit(1)
+
+    # 1. Sequential instruction numbering
+    step_nums = sorted(int(k) for k in kit.workflow.keys())
+    expected_steps = list(range(1, len(step_nums) + 1))
+    if step_nums != expected_steps:
+        errors.append(
+            f"Instructions are not numbered sequentially. Found: {step_nums}, expected: {expected_steps}"
+        )
+
+    # 2. All {resource_N} placeholders have matching resources
+    resource_ids = {r.resource_id for r in kit.resources.values()}
+    for step_num, step in kit.workflow.items():
+        placeholders = re.findall(r"\{(resource_\d+)\}", step.prompt)
+        for ph in placeholders:
+            if ph not in resource_ids:
+                errors.append(f"Step {step_num} references missing resource {{{ph}}}")
+
+    # 3. All {tool_N} placeholders have matching tool definitions
+    tool_ids = {t.tool_id for t in kit.tools.values()}
+    for step_num, step in kit.workflow.items():
+        placeholders = re.findall(r"\{(tool_\d+)\}", step.prompt)
+        for ph in placeholders:
+            if ph not in tool_ids:
+                errors.append(f"Step {step_num} references missing tool {{{ph}}}")
+            else:
+                # Also verify the tool exists in the global registry
+                tool_num = ph.replace("tool_", "")
+                tool = kit.tools[tool_num]
+                tool_name = tool.tool_name
+                if tool_name and get_tool(tool_name) is None:
+                    warnings.append(
+                        f"Step {step_num} references tool '{tool_name}' which is not available in the global registry"
+                    )
+
+    # 4. All {workflow_N} placeholders refer to earlier steps
+    for step_num, step in kit.workflow.items():
+        placeholders = re.findall(r"\{(workflow_(\d+))\}", step.prompt)
+        for full_ph, ref_num_str in placeholders:
+            if int(ref_num_str) >= int(step_num):
+                errors.append(
+                    f"Step {step_num} references {{{full_ph}}} which is not an earlier step"
+                )
+
+    # 5. Dynamic resources are present but empty (or placeholder text)
+    for resource in kit.resources.values():
+        if resource.is_dynamic and resource.content:
+            warnings.append(
+                f"Dynamic resource {resource.resource_id} has pre-filled content: '{resource.content[:50]}...'"
+            )
+
+    # 6. Approximate prompt size per step (rough char count heuristic: ~4 chars/token)
+    max_chars = 128_000 * 4  # ~128k tokens for gpt-5-mini context
+    for step_num, step in kit.workflow.items():
+        resolved = step.prompt
+        for r in kit.resources.values():
+            resolved = resolved.replace(f"{{{r.resource_id}}}", r.content)
+        for s_num, s in kit.workflow.items():
+            if int(s_num) < int(step_num):
+                resolved = resolved.replace(f"{{{s.output_id}}}", s.prompt)
+        if len(resolved) > max_chars:
+            warnings.append(
+                f"Step {step_num} resolved prompt is ~{len(resolved) // 4} tokens (approx), which may exceed context limits"
+            )
+
+    # Report
+    print(f"\nValidation Results for '{kit.name}':")
+    print("=" * 50)
+
+    if errors:
+        print(f"\nErrors ({len(errors)}):")
+        for err in errors:
+            print(f"  ❌ {err}")
+
+    if warnings:
+        print(f"\nWarnings ({len(warnings)}):")
+        for warn in warnings:
+            print(f"  ⚠️  {warn}")
+
+    if not errors and not warnings:
+        print("\n✅ Kit is valid!")
+
+    print()
+    if errors:
+        sys.exit(1)
 
 
 # =============================================================================
@@ -807,6 +1289,20 @@ async def _sync_push(kit_name: str, base_path: str, message: str | None) -> None
             )
             print(f"  - Added step {num}")
 
+        # Add tools
+        if local_kit.tools:
+            print("Adding tools...")
+            for num, tool in local_kit.tools.items():
+                await version_repo.add_tool(
+                    version_id=version.id,
+                    tool_number=int(num),
+                    tool_name=tool.tool_name,
+                    display_name=tool.display_name,
+                    configuration=tool.configuration,
+                )
+                display = f" ({tool.display_name})" if tool.display_name else ""
+                print(f"  - Added tool {num}: {tool.tool_name}{display}")
+
     print(f"\nSuccessfully pushed '{local_kit.name}' as version {version.version_number}")
 
 
@@ -850,6 +1346,22 @@ async def _sync_pull(slug: str, base_path: str) -> None:
             instruction_file = kit_dir / f"instruction_{step.step_number}.txt"
             instruction_file.write_text(step.prompt_template)
             print(f"  - Created instruction_{step.step_number}.txt")
+
+        # Write tool files
+        if version.tools:
+            print("Writing tool files...")
+            for tool in version.tools:
+                tool_file = kit_dir / f"tool_{tool.tool_number}.json"
+                data = {"tool_name": tool.tool_name}
+                if tool.display_name:
+                    data["display_name"] = tool.display_name
+                if tool.configuration:
+                    try:
+                        data["configuration"] = json.loads(tool.configuration)
+                    except Exception:
+                        data["configuration"] = tool.configuration
+                tool_file.write_text(json.dumps(data, indent=2), encoding="utf-8")
+                print(f"  - Created tool_{tool.tool_number}.json")
 
     print(f"\nSuccessfully pulled '{slug}' to {kit_dir}")
 

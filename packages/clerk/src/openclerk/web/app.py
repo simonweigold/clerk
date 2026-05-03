@@ -3,6 +3,7 @@
 import os
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -18,8 +19,15 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Application lifespan: startup and shutdown."""
     # Initialize database engines
     await init_engines()
-    # Initialize MCP servers
-    await init_mcp_servers()
+    # Scan all kit directories for local mcp_servers.json files so the web
+    # server has the same tool availability as the CLI (which merges per-kit
+    # configs at run-time).
+    kit_mcp_paths = (
+        sorted(str(p) for p in Path("reasoning_kits").glob("*/mcp_servers.json"))
+        if Path("reasoning_kits").exists()
+        else []
+    )
+    await init_mcp_servers(extra_kit_config_paths=kit_mcp_paths or None)
     yield
     # Cleanup
     await close_mcp_servers()

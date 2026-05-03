@@ -1,0 +1,33 @@
+{
+  "generated_at": "2026-04-20T19:49:36Z",
+  "generated_at_human": "April 20, 2026 at 19:49 UTC",
+  "source": "docs/",
+  "files": [
+    "README.md",
+    "cli/db.md",
+    "cli/info.md",
+    "cli/kit.md",
+    "cli/list.md",
+    "cli/run.md",
+    "cli/sync.md",
+    "cli/web.md",
+    "contributing/README.md",
+    "contributing/architecture.md",
+    "contributing/setup.md",
+    "deployment/docker.md",
+    "deployment/environment.md",
+    "deployment/production.md",
+    "integration.md",
+    "integration/README.md",
+    "integration/api-reference.md",
+    "integration/examples.md",
+    "mcp.md",
+    "reasoning_kits.md",
+    "ui/editing_kits.md",
+    "ui/overview.md",
+    "ui/running_kits.md",
+    "user-guide/README.md",
+    "user-guide/concepts.md",
+    "user-guide/faq.md"
+  ]
+}

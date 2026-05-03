@@ -43,6 +43,30 @@ dev-backend:
 dev-frontend:
     cd apps/website && npm run dev
 
+# Sync documentation to website
+sync-docs:
+    ./scripts/sync-docs.sh
+
+# Build website for production (includes docs sync)
+build-website: sync-docs
+    cd apps/website && npm run build
+
+# Build package for distribution
+build:
+    uv build packages/clerk
+
+# Publish to TestPyPI
+publish-test: build
+    uv publish --index testpypi dist/openclerk-*
+
+# Publish to PyPI (requires credentials)
+publish: build
+    uv publish dist/openclerk-*
+
+# Bump package version (e.g., just version patch)
+version BUMP:
+    cd packages/clerk && uvx bump-my-version bump {{BUMP}}
+
 # Clean build artifacts
 clean:
     find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true

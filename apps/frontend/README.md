@@ -1,15 +1,16 @@
-# OpenClerk Website
+# OpenClerk Frontend
 
-The official website for OpenClerk - built with React, TypeScript, and Vite.
+The main OpenClerk application frontend - built with React, TypeScript, and Vite.
 
 ## Overview
 
-This is the website application for openclerk.dev, providing:
+This is the primary application interface for OpenClerk, providing:
 
-- Documentation and guides
-- Interactive reasoning kit browser
-- Kit execution interface
+- Interactive reasoning kit browser and management
+- Visual kit editor with step-by-step workflow builder
+- Kit execution interface with real-time streaming
 - User authentication and settings
+- Execution history and evaluations
 
 ## Tech Stack
 
@@ -29,7 +30,7 @@ This is the website application for openclerk.dev, providing:
 ### Setup
 
 ```bash
-cd apps/website
+cd apps/frontend
 npm install
 ```
 
@@ -66,10 +67,16 @@ npm run lint
 ## Project Structure
 
 ```
-apps/website/
+apps/frontend/
 ├── src/
 │   ├── components/     # Reusable UI components
 │   ├── pages/         # Route/page components
+│   │   ├── HomePage.tsx       # Dashboard/home
+│   │   ├── KitDetailPage.tsx  # Kit detail view
+│   │   ├── KitEditorPage.tsx  # Kit creation/editing
+│   │   ├── KitRunPage.tsx     # Kit execution
+│   │   ├── DocsPage.tsx       # Documentation viewer
+│   │   └── ...
 │   ├── hooks/         # Custom React hooks
 │   ├── lib/           # Utilities and API clients
 │   ├── App.tsx        # Main app component with routing
@@ -81,7 +88,7 @@ apps/website/
 
 ## Environment Variables
 
-Create a `.env` file in `apps/website/` with:
+Create a `.env` file in `apps/frontend/` with:
 
 ```
 VITE_API_URL=http://localhost:8000
@@ -89,7 +96,9 @@ VITE_API_URL=http://localhost:8000
 
 ## Deployment
 
-The website is deployed to openclerk.dev via [deployment platform].
+The frontend is typically deployed alongside the backend in a Docker container (see `docker-compose.yml`), or can be deployed separately to platforms like Vercel or Netlify.
+
+**Note:** For the standalone marketing website and documentation (hosted on Vercel), see `apps/website/`.
 
 ## Links
 

@@ -1,0 +1,40 @@
+You are a Swiss employment law attorney analyzing contract compliance.
+
+CONTRACT:
+{resource_1}
+
+PREVIOUS ANALYSIS:
+{workflow_1}
+
+LEGAL RESEARCH:
+{workflow_2}
+
+TITLE ANALYSIS:
+{workflow_3}
+
+COMPLIANCE CHECK - MANDATORY REQUIREMENTS:
+Does the employment contract satisfy the mandatory requirements of an employment contract according to the legal research findings?
+
+Evaluate the following elements if they are mentioned in the contract:
+1. Parties (employer and employee clearly identified)
+2. Start date of employment
+3. Job description/duties
+4. Salary/wage (must meet minimum wage if applicable)
+5. Working hours
+6. Place of work
+7. Vacation (20 days = 4 weeks; 5 days = 5 weeks etc.):
+    - if employee is less than 20 years old, minimum is 5 weeks or 25 days per "Dienstjahr"
+    - the general minimum is usually 4 weeks or 20 days per "Dienstjahr"
+
+Also check for all legally required elements.
+
+For each element:
+- State whether it's present in the contract
+- Assess if it complies with mandatory legal requirements
+- Note any deviations or gaps
+
+Output a detailed compliance report with:
+- ✓ for compliant elements
+- ⚠ for present but potentially problematic elements  
+- ✗ for missing or non-compliant elements
+- Specific OR article references for any non-compliance

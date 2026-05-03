@@ -1,5 +1,9 @@
 {
     "mcpServers": {
+        "opencaselaw": {
+            "transport": "sse",
+            "url": "https://mcp.opencaselaw.ch"
+        },
         "google-sheets": {
             "command": "uvx",
             "args": [

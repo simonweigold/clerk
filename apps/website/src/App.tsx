@@ -10,6 +10,7 @@ import LoginPage from "./pages/LoginPage";
 import SignupPage from "./pages/SignupPage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
 import LogoutPage from "./pages/LogoutPage";
+import DocsPage from "./pages/DocsPage";
 
 export default function App() {
   return (
@@ -20,6 +21,10 @@ export default function App() {
             <Route element={<Layout />}>
               {/* Public landing page */}
               <Route path="/" element={<LandingPage />} />
+
+              {/* Documentation */}
+              <Route path="/docs" element={<DocsPage />} />
+              <Route path="/docs/*" element={<DocsPage />} />
 
               {/* Auth */}
               <Route path="/auth/login" element={<LoginPage />} />

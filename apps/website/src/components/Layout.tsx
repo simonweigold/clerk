@@ -36,6 +36,9 @@ export default function Layout() {
             {isLandingRoute ? (
               // Landing page navigation
               <>
+                <Link to="/docs" className="nav-link">
+                  Docs
+                </Link>
                 <a
                   href="https://github.com/simonweigold/clerk"
                   target="_blank"
@@ -44,9 +47,6 @@ export default function Layout() {
                 >
                   <Github className="w-4 h-4" />
                 </a>
-                {/* <Link to="/docs" className={`nav-link ${isActive('/docs') ? 'active' : ''}`}>
-                                    Docs
-                                </Link> */}
                 {loading ? (
                   <div className="flex items-center justify-center ml-2 w-8 h-8">
                     <span className="pulse-dot" />

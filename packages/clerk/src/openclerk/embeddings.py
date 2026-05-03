@@ -1,12 +1,15 @@
 """Cached embeddings wrapper for LangChain."""
 
 import hashlib
+import logging
 
 from langchain_core.embeddings import Embeddings
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from .db.models import EmbeddingCache
+
+logger = logging.getLogger(__name__)
 
 
 class CachedEmbeddings(Embeddings):
@@ -67,7 +70,9 @@ class CachedEmbeddings(Embeddings):
 
         # 4. Fetch missing embeddings from the underlying provider
         if missing_texts:
-            print(f"EmbeddingCache: missed {len(missing_texts)} chunks, fetching from provider...")
+            logger.debug(
+                "EmbeddingCache: missed %d chunks, fetching from provider...", len(missing_texts)
+            )
             if hasattr(self.underlying_embeddings, "aembed_documents"):
                 new_embeddings = await self.underlying_embeddings.aembed_documents(missing_texts)
             else:
@@ -92,10 +97,10 @@ class CachedEmbeddings(Embeddings):
                 try:
                     await session.commit()
                 except Exception as e:
-                    print(f"Warning: Failed to save embeddings to cache: {e}")
+                    logger.warning("Failed to save embeddings to cache: %s", e)
                     await session.rollback()
         else:
-            print(f"EmbeddingCache: served all {len(texts)} chunks from cache.")
+            logger.debug("EmbeddingCache: served all %d chunks from cache.", len(texts))
 
         # 6. Reconstruct the requested list in the exact original order
         final_embeddings: list[list[float]] = []

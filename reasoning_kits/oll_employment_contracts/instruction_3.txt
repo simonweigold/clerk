@@ -1,0 +1,30 @@
+You are a Swiss employment law attorney performing contract analysis.
+
+CONTRACT:
+{resource_1}
+
+CONTRACT ANALYSIS:
+{workflow_1}
+
+LEGAL RESEARCH FINDINGS:
+{workflow_2}
+
+CHECK - CONTRACT TITLE:
+Does the title of the contract state "Arbeitsvertrag" (Employment Contract) or something equivalent?
+
+EVALUATION:
+1. Compare against Swiss legal requirements for employment contract designation
+2. Determine if the title accurately reflects the employment relationship
+3. Note any ambiguity or mischaracterization (e.g., labeled as "service contract" or "mandate" when it's actually employment)
+
+If YES (the title indicates it's an employment contract):
+- Proceed to full employment contract compliance analysis
+- Document the specific title used
+
+If NO (the title suggests a different type of contract):
+- Abort and reply "NOT AN EMPLOYMENT CONTRACT"
+
+Output your findings with:
+- Whether it satisfies Swiss employment contract designation requirements
+- Assessment of whether the substance matches the title
+- Any red flags or concerns regarding contract classification

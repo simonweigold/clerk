@@ -39,6 +39,7 @@ class ReasoningKit(BaseModel):
     resources: dict[str, Resource]
     workflow: dict[str, WorkflowStep]
     tools: dict[str, Tool] = {}  # tool_number -> Tool
+    evaluators: dict[str, str] = {}  # step number (str) -> evaluator prompt text
 
 
 class StepEvaluation(BaseModel):

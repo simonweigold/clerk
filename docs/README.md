@@ -18,6 +18,7 @@ For developers who want to use Clerk as a standalone tool or self-host it.
 - [Core Concepts](user-guide/concepts.md) - Reasoning Kits and workflows
 - [FAQ](user-guide/faq.md) - Common questions and answers
 - [Reasoning Kits](reasoning_kits.md) - Deep dive into kit structure and creation
+- [Auto-Evaluation](auto_eval.md) - Automated step scoring with a judge LLM
 
 ## Integration Guide
 

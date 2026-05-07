@@ -92,6 +92,10 @@ class State(TypedDict):
     # Tool fields
     tools: dict[str, dict]  # tool_number -> {tool_name, tool_id, ...}
     user_id: str | None  # Add user ID for tool context
+    # Auto-evaluation fields
+    auto_evaluate: bool  # True = use judge LLM; False = interactive prompt
+    evaluators: dict[str, str]  # step number -> evaluator prompt template
+    judge_model: str | None  # model override for judge LLM; None = use main model
 
 
 def create_initial_state(
@@ -103,6 +107,8 @@ def create_initial_state(
     save_to_db: bool = False,
     model: str = DEFAULT_MODEL,
     user_id: str | None = None,
+    auto_evaluate: bool = False,
+    judge_model: str | None = None,
 ) -> State:
     """Create initial state from a reasoning kit.
 
@@ -154,6 +160,9 @@ def create_initial_state(
         model_used=model,
         tools=tools_data,
         user_id=user_id,
+        auto_evaluate=auto_evaluate,
+        evaluators=kit.evaluators,
+        judge_model=judge_model,
     )
 
 
@@ -415,6 +424,47 @@ def _run_coro_sync(coro: Coroutine[Any, Any, T]) -> T:
         return asyncio.run(coro)
 
 
+def _parse_score(response_text: str) -> int:
+    """Extract and validate integer score from judge LLM response."""
+    for line in reversed(response_text.strip().splitlines()):
+        line = line.strip()
+        if line.isdigit():
+            score = int(line)
+            if 0 <= score <= 100:
+                return score
+    raise ValueError(f"Could not parse valid score (0-100) from judge response: {response_text!r}")
+
+
+def _run_judge_llm(
+    template: str,
+    prompt: str,
+    output: str,
+    judge_model: str | None,
+    user_id: str | None,
+) -> int:
+    """Call judge LLM and return an integer score 0-100."""
+    eval_prompt = template.replace("{prompt}", prompt).replace("{output}", output)
+    model = judge_model or DEFAULT_MODEL
+    llm = _run_coro_sync(get_llm(user_id=user_id, model=model, temperature=0.0))
+    response = _run_coro_sync(llm.ainvoke(eval_prompt))
+    return _parse_score(str(response.content))
+
+
+async def _run_judge_llm_async(
+    template: str,
+    prompt: str,
+    output: str,
+    judge_model: str | None,
+    user_id: str | None,
+) -> int:
+    """Async version of judge LLM call."""
+    eval_prompt = template.replace("{prompt}", prompt).replace("{output}", output)
+    model = judge_model or DEFAULT_MODEL
+    llm = await get_llm(user_id=user_id, model=model, temperature=0.0)
+    response = await llm.ainvoke(eval_prompt)
+    return _parse_score(str(response.content))
+
+
 def execute_step(state: State) -> dict[str, Any]:
     """Execute the current workflow step."""
     current_step = str(state["current_step"])
@@ -576,15 +626,24 @@ def advance_step(state: State) -> dict[str, Any]:
 
 
 def evaluate_step(state: State) -> dict[str, Any]:
-    """Prompt user for evaluation of the current step if evaluation is enabled."""
+    """Evaluate the current step: auto-score via judge LLM or prompt the user."""
     if not state["evaluate"]:
         return {}
 
     current_step = str(state["current_step"])
     output_id = state["workflow_output_ids"][current_step]
+    evaluator_template = state["evaluators"].get(current_step)
 
-    # Prompt user for evaluation score
-    score = prompt_for_evaluation(state["current_step"], output_id)
+    if state["auto_evaluate"] and evaluator_template:
+        score = _run_judge_llm(
+            template=evaluator_template,
+            prompt=state["last_prompt"],
+            output=state["last_output"],
+            judge_model=state["judge_model"],
+            user_id=state.get("user_id"),
+        )
+    else:
+        score = prompt_for_evaluation(state["current_step"], output_id)
 
     # Create step evaluation based on mode
     step_eval = create_step_evaluation(
@@ -785,6 +844,8 @@ async def run_reasoning_kit_async(
     user_id: str | None = None,
     verbose: bool = False,
     collected_prompts: dict[str, str] | None = None,
+    auto_evaluate: bool = False,
+    judge_model: str | None = None,
 ) -> dict[str, str]:
     """Async version of run_reasoning_kit for use in async contexts.
 
@@ -1014,7 +1075,17 @@ async def run_reasoning_kit_async(
 
             # Evaluation
             if evaluate:
-                score = await asyncio.to_thread(prompt_for_evaluation, step_num, step.output_id)
+                evaluator_template = kit.evaluators.get(str(step_num))
+                if auto_evaluate and evaluator_template:
+                    score = await _run_judge_llm_async(
+                        template=evaluator_template,
+                        prompt=clean_prompt,
+                        output=result,
+                        judge_model=judge_model,
+                        user_id=user_id,
+                    )
+                else:
+                    score = await asyncio.to_thread(prompt_for_evaluation, step_num, step.output_id)
                 step_eval = create_step_evaluation(
                     prompt=clean_prompt,
                     output=result,

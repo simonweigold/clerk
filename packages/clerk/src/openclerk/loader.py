@@ -116,12 +116,24 @@ def load_reasoning_kit(kit_path: str | Path) -> ReasoningKit:
         )
         tools[str(tool_num)] = tool
 
+    # Auto-discover evaluators (evaluator_*.txt)
+    evaluators: dict[str, str] = {}
+    evaluator_files = sorted(
+        kit_path.glob("evaluator_*.txt"),
+        key=lambda f: _extract_number(f.name) or 0,
+    )
+    for evaluator_file in evaluator_files:
+        step_num = _extract_number(evaluator_file.name)
+        if step_num is not None:
+            evaluators[str(step_num)] = evaluator_file.read_text()
+
     return ReasoningKit(
         name=kit_path.name,
         path=str(kit_path),
         resources=resources,
         workflow=workflow,
         tools=tools,
+        evaluators=evaluators,
     )
 
 

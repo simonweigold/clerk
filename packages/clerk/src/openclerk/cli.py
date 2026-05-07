@@ -119,6 +119,18 @@ def main() -> None:
         default=None,
         help="Model to use (e.g. deepseek/deepseek-v4-pro). Overrides CLERK_DEFAULT_MODEL env var.",
     )
+    run_parser.add_argument(
+        "--auto-evaluate",
+        action="store_true",
+        help="Score each step automatically using evaluator_N.txt files instead of prompting the user.",
+    )
+    run_parser.add_argument(
+        "--judge-model",
+        type=str,
+        default=None,
+        metavar="MODEL",
+        help="Model to use for auto-evaluation scoring. Defaults to the same model as the main run.",
+    )
 
     # =========================================================================
     # BATCH COMMAND
@@ -684,13 +696,18 @@ def _cmd_run(args: argparse.Namespace) -> None:
                 kit_config_path=kit_config,
             )
             try:
+                evaluate = args.evaluate
+                if args.auto_evaluate:
+                    evaluate = True
                 kwargs: dict = dict(
-                    evaluate=args.evaluate,
+                    evaluate=evaluate,
                     evaluation_mode=args.mode,
                     save_to_db=save_to_db,
                     db_version_id=db_version_id,
                     verbose=args.verbose,
                     collected_prompts=collected_prompts,
+                    auto_evaluate=args.auto_evaluate,
+                    judge_model=args.judge_model,
                 )
                 if args.model:
                     kwargs["model"] = args.model

@@ -235,18 +235,18 @@ finally:
 
 **`run_reasoning_kit_async` keyword arguments:**
 
-| Argument           | Type            | Default          | Description                                                  |
-| ------------------ | --------------- | ---------------- | ------------------------------------------------------------ |
-| `evaluate`         | `bool`          | `False`          | Enable step-by-step evaluation                               |
-| `evaluation_mode`  | `str`           | `"transparent"`  | `"transparent"` or `"anonymous"`                             |
-| `auto_evaluate`    | `bool`          | `False`          | Score steps via judge LLM using `evaluator_N.txt` files      |
-| `judge_model`      | `str \| None`   | `None`           | Model for the judge LLM; `None` uses the main workflow model |
-| `save_to_db`       | `bool`          | `False`          | Persist execution to the database                            |
-| `db_version_id`    | `UUID \| None`  | `None`           | Required if `save_to_db=True`                                |
-| `model`            | `str`           | env default      | LLM model for the main workflow                              |
-| `user_id`          | `str \| None`   | `None`           | Used to look up per-user LLM provider config                 |
-| `verbose`          | `bool`          | `False`          | Print step details to stdout                                 |
-| `collected_prompts`| `dict \| None`  | `None`           | If provided, resolved prompts are written into this dict     |
+| Argument            | Type           | Default         | Description                                                  |
+| ------------------- | -------------- | --------------- | ------------------------------------------------------------ |
+| `evaluate`          | `bool`         | `False`         | Enable step-by-step evaluation                               |
+| `evaluation_mode`   | `str`          | `"transparent"` | `"transparent"` or `"anonymous"`                             |
+| `auto_evaluate`     | `bool`         | `False`         | Score steps via judge LLM using `evaluator_N.txt` files      |
+| `judge_model`       | `str \| None`  | `None`          | Model for the judge LLM; `None` uses the main workflow model |
+| `save_to_db`        | `bool`         | `False`         | Persist execution to the database                            |
+| `db_version_id`     | `UUID \| None` | `None`          | Required if `save_to_db=True`                                |
+| `model`             | `str`          | env default     | LLM model for the main workflow                              |
+| `user_id`           | `str \| None`  | `None`          | Used to look up per-user LLM provider config                 |
+| `verbose`           | `bool`         | `False`         | Print step details to stdout                                 |
+| `collected_prompts` | `dict \| None` | `None`          | If provided, resolved prompts are written into this dict     |
 
 **Evaluation modes:**
 
@@ -263,7 +263,7 @@ from openclerk.llm_factory import get_llm
 # Returns a LangChain-compatible chat model
 llm = await get_llm(
     user_id="uuid-string",   # looks up user's provider in DB; fallback to env vars
-    model="gpt-5-mini",
+    model="gpt-5.4-nano",
     temperature=0.0,
 )
 ```
@@ -417,7 +417,7 @@ openclerk run demo --local              # From filesystem (looks in reasoning_ki
 openclerk run demo --evaluate           # Enable step-by-step evaluation
 openclerk run demo --mode anonymous     # Privacy-preserving evaluation
 openclerk run demo --auto-evaluate      # Automated scoring via judge LLM (requires evaluator_N.txt)
-openclerk run demo --auto-evaluate --judge-model gpt-5-mini   # Use a specific model as judge
+openclerk run demo --auto-evaluate --judge-model gpt-5.4-nano   # Use a specific model as judge
 
 # Dynamic resources (skip interactive prompts)
 openclerk run demo --dynamic-resource resource_1="inline text"
@@ -700,7 +700,7 @@ outputs = await run_reasoning_kit_async(
     kit=kit,
     evaluate=True,
     auto_evaluate=True,
-    judge_model="gpt-5-mini",      # optional; None = use same model as main run
+    judge_model="gpt-5.4-nano",      # optional; None = use same model as main run
     evaluation_mode="transparent",
 )
 # Steps with evaluator_N.txt are scored by the judge LLM automatically
@@ -711,7 +711,7 @@ outputs = await run_reasoning_kit_async(
 Or via CLI (no Python required):
 
 ```bash
-openclerk run my-kit --local --auto-evaluate --judge-model gpt-5-mini
+openclerk run my-kit --local --auto-evaluate --judge-model gpt-5.4-nano
 ```
 
 ---

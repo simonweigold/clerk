@@ -21,8 +21,8 @@ my-kit/
 
 Plain text prompt for the judge LLM. Two placeholders are available:
 
-| Placeholder | Resolves to                                        |
-|-------------|---------------------------------------------------|
+| Placeholder | Resolves to                                       |
+| ----------- | ------------------------------------------------- |
 | `{prompt}`  | The resolved prompt sent to the LLM for this step |
 | `{output}`  | The LLM's output for this step                    |
 
@@ -54,7 +54,7 @@ Reply with ONLY a single integer between 0 and 100. No explanation.
 openclerk run my-kit --auto-evaluate
 
 # Use a specific model as judge (defaults to the same model as the main run)
-openclerk run my-kit --auto-evaluate --judge-model gpt-5-mini
+openclerk run my-kit --auto-evaluate --judge-model gpt-5.4-nano
 
 # Store full prompt/output text alongside scores
 openclerk run my-kit --auto-evaluate --mode transparent
@@ -67,10 +67,10 @@ Passing `--auto-evaluate` automatically enables evaluation — you do not need t
 
 ## CLI Options
 
-| Option | Description |
-|--------|-------------|
-| `--auto-evaluate` | Score each step using `evaluator_N.txt` instead of prompting the user |
-| `--judge-model MODEL` | Model to use for the judge LLM. Defaults to the same model as the main run |
+| Option                          | Description                                                                          |
+| ------------------------------- | ------------------------------------------------------------------------------------ |
+| `--auto-evaluate`               | Score each step using `evaluator_N.txt` instead of prompting the user                |
+| `--judge-model MODEL`           | Model to use for the judge LLM. Defaults to the same model as the main run           |
 | `--mode transparent\|anonymous` | Controls what is stored: full text (`transparent`) or character counts (`anonymous`) |
 
 See the full [run command reference](cli/run.md).
@@ -87,7 +87,7 @@ outputs = await run_reasoning_kit_async(
     kit=kit,
     evaluate=True,
     auto_evaluate=True,
-    judge_model="gpt-5-mini",       # optional; omit to use the default model
+    judge_model="gpt-5.4-nano",       # optional; omit to use the default model
     evaluation_mode="transparent",
 )
 ```

@@ -33,7 +33,7 @@ const KNOWN_PROVIDERS = [
     name: "openai",
     label: "OpenAI",
     vars: ["OPENAI_API_KEY"],
-    models: ["gpt-5-mini", "gpt-5", "gpt-5.4", "gpt-5.4-nano"],
+    models: ["gpt-5.4-nano", "gpt-5", "gpt-5.4", "gpt-5.4-nano"],
   },
   {
     name: "anthropic",
@@ -72,7 +72,7 @@ const KNOWN_PROVIDERS = [
     label: "OpenRouter",
     vars: ["OPENROUTER_API_KEY"],
     models: [
-      "openai/gpt-5-mini",
+      "openai/gpt-5.4-nano",
       "anthropic/claude-3.5-sonnet",
       "google/gemini-1.5-pro",
     ],

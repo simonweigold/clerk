@@ -259,7 +259,7 @@ The `step_executions` table already has an `evaluation_score` column (integer, 0
 openclerk run my-kit --auto-evaluate
 
 # Use a specific model as judge
-openclerk run my-kit --auto-evaluate --judge-model gpt-5-mini
+openclerk run my-kit --auto-evaluate --judge-model gpt-5.4-nano
 
 # Store full prompt/output text alongside scores
 openclerk run my-kit --auto-evaluate --mode transparent

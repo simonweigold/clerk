@@ -1057,7 +1057,7 @@ def _cmd_validate(args: argparse.Namespace) -> None:
             )
 
     # 6. Approximate prompt size per step (rough char count heuristic: ~4 chars/token)
-    max_chars = 128_000 * 4  # ~128k tokens for gpt-5-mini context
+    max_chars = 128_000 * 4  # ~128k tokens for gpt-5.4-nano context
     for step_num, step in kit.workflow.items():
         resolved = step.prompt
         for r in kit.resources.values():

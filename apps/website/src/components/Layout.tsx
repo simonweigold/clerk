@@ -30,7 +30,7 @@ export default function Layout() {
           isSplashActive ? "splash-active" : ""
         }`}
       >
-        <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
+        <div className="max-w-5xl mx-auto px-4 py-3 sm:px-6 sm:py-4 flex items-center justify-between">
           <Link
             to="/"
             className={`clerk-logo transition-opacity duration-500 ${
@@ -45,7 +45,7 @@ export default function Layout() {
             <span className="clerk-dot" />
           </Link>
           <nav
-            className={`flex items-center gap-2 transition-all duration-500 ${
+            className={`flex items-center justify-end gap-0.5 sm:gap-1.5 transition-all duration-500 ${
               isSplashActive ? "blur-nav" : ""
             }`}
           >
@@ -64,24 +64,24 @@ export default function Layout() {
                   <Github className="w-4 h-4" />
                 </a>
                 {loading ? (
-                  <div className="flex items-center justify-center ml-2 w-8 h-8">
+                  <div className="flex items-center justify-center ml-1 w-8 h-8">
                     <span className="pulse-dot" />
                   </div>
                 ) : user ? (
-                  <Link to="/app" className="btn btn-primary btn-sm ml-2">
+                  <Link to="/app" className="btn btn-primary btn-sm ml-1">
                     App
                   </Link>
                 ) : (
                   <>
                     <Link
                       to="/auth/login"
-                      className="btn btn-ghost btn-sm ml-2"
+                      className="btn btn-ghost btn-sm ml-1 hidden sm:inline-flex"
                     >
                       Sign In
                     </Link>
                     <Link
                       to="/auth/signup"
-                      className="btn btn-primary btn-sm ml-2"
+                      className="btn btn-primary btn-sm ml-1"
                     >
                       Sign Up
                     </Link>
@@ -120,7 +120,7 @@ export default function Layout() {
                   </>
                 )} */}
                 {loading ? (
-                  <div className="flex items-center justify-center ml-2 w-8 h-8">
+                  <div className="flex items-center justify-center ml-1 w-8 h-8">
                     <span className="pulse-dot" />
                   </div>
                 ) : supabaseConfigured ? (
@@ -130,7 +130,7 @@ export default function Layout() {
                         {/* Settings link disabled for launch */}
                         {/* <Link
                           to="/settings"
-                          className="btn btn-ghost btn-sm ml-2 px-2"
+                          className="btn btn-ghost btn-sm ml-1 px-2"
                           title="Account Settings"
                         >
                           <Settings className="w-4 h-4" />
@@ -147,7 +147,7 @@ export default function Layout() {
                       !isLandingRoute && (
                         <Link
                           to="/auth/login"
-                          className="btn btn-ghost btn-sm ml-2"
+                          className="btn btn-ghost btn-sm ml-1"
                         >
                           Sign In
                         </Link>

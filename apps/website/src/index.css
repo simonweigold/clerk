@@ -773,3 +773,166 @@ textarea.input {
   opacity: 1;
   color: #d97706;
 }
+
+/* ── Landing design language (scoped) ── */
+.landing {
+  --brand: #130DDD;
+  --brand-40: #716EEB;
+  --brand-82: #D5D3F9;
+  --brand-90: #E4E3FB;
+  --brand-guide: #D9D6F8;
+  --ink: #111418;
+  --muted-l: #6b7280;
+  --hairline: #ececec;
+
+  /* Motion: strong custom curves, never the built-in CSS easings */
+  --ease-entrance: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-move: cubic-bezier(0.77, 0, 0.175, 1);
+
+  color: var(--ink);
+}
+
+.landing h1 {
+  font-family: 'Inter', system-ui, sans-serif;
+  font-weight: 800;
+  font-size: clamp(2.2rem, 5.4vw, 3.9rem);
+  line-height: 1.1;
+  letter-spacing: -0.015em;
+}
+
+.landing h1 .acc { color: var(--brand); }
+
+.landing .sub {
+  color: var(--muted-l);
+  font-size: 1.08rem;
+  line-height: 1.6;
+}
+
+/* Buttons: solid pill, no gradient, no glass */
+.landing .btn-landing {
+  display: inline-block;
+  padding: 12px 26px;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 0.95rem;
+  text-decoration: none;
+  transition: transform 160ms var(--ease-entrance), box-shadow 160ms ease, border-color 160ms ease, color 160ms ease;
+}
+
+.landing .btn-landing:active { transform: scale(0.97); }
+
+.landing .btn-solid { background: var(--brand); color: #fff; }
+
+@media (hover: hover) and (pointer: fine) {
+  .landing .btn-solid:hover { box-shadow: 0 8px 30px rgba(19, 13, 221, 0.3); transform: translateY(-1px); }
+  .landing .btn-line:hover { border-color: var(--brand); color: var(--brand); }
+}
+
+.landing .btn-line { color: var(--ink); border: 1px solid var(--hairline); }
+
+/* ── Animated lifecycle ── */
+.landing .stage { width: 100%; max-width: 760px; }
+
+.landing #life { width: 100%; height: auto; display: block; }
+
+.landing #dots .dot { opacity: 0; }
+
+.landing #dots .sh { fill: rgba(19, 13, 221, 0.12); }
+
+.landing #track { opacity: 0; }
+
+.landing #packetG,
+.landing #ghost1,
+.landing #ghost2 { opacity: 0; }
+
+.landing #packetG rect,
+.landing #ghost1 rect,
+.landing #ghost2 rect { fill: #111418; }
+
+.landing #gauge {
+  fill: none;
+  stroke: #716EEB;
+  stroke-width: 9;
+  stroke-linecap: round;
+  opacity: 0;
+  transform: rotate(-90deg);
+  transform-origin: 410px 210px;
+}
+
+.landing #delta {
+  fill: none;
+  stroke: #130DDD;
+  stroke-width: 9;
+  stroke-linecap: round;
+  opacity: 0;
+  transform: rotate(176.4deg);
+  transform-origin: 410px 210px;
+}
+
+.landing #head {
+  fill: #fff;
+  opacity: 0;
+}
+
+.landing #ring-guide {
+  fill: none;
+  stroke: #D9D6F8;
+  stroke-width: 2;
+  stroke-dasharray: 2 8;
+  opacity: 0;
+  transform-origin: 410px 210px;
+  animation: guidespin 96s linear infinite;
+}
+
+.landing #edit-pulse {
+  fill: none;
+  stroke: #A8A4F2;
+  stroke-width: 3;
+  stroke-linecap: round;
+  opacity: 0;
+  transform: rotate(-90deg);
+  transform-origin: 410px 210px;
+}
+
+.landing #sweep {
+  fill: none;
+  stroke: #130DDD;
+  stroke-width: 9;
+  stroke-linecap: round;
+  opacity: 0;
+  transform: rotate(248.4deg);
+  transform-origin: 410px 210px;
+}
+
+@keyframes guidespin { to { transform: rotate(360deg); } }
+
+.landing #score {
+  font-weight: 800;
+  font-size: 56px;
+  text-anchor: middle;
+  opacity: 0;
+}
+
+.landing .phase {
+  min-height: 60px;
+  margin-top: 18px;
+  text-align: center;
+}
+
+.landing #phaseWord {
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  color: var(--brand);
+  text-transform: uppercase;
+}
+
+.landing #phaseLine {
+  color: var(--muted-l);
+  font-size: 0.9rem;
+  margin-top: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing #ring-guide { animation: none; }
+}

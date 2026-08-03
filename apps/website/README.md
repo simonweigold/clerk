@@ -4,7 +4,7 @@ The public-facing marketing website for OpenClerk - built with React, TypeScript
 
 ## Overview
 
-This is the landing page and documentation site hosted on Vercel at openclerk.dev, providing:
+This is the landing page and documentation site hosted on Vercel at openclerk.ch, providing:
 
 - **Landing page** - Product overview and features
 - **Documentation** - User guides and API reference (static, no backend required)
@@ -94,7 +94,7 @@ This copies all `.md` files from `docs/` to `apps/website/public/docs/` and gene
 
 - **URL**: `/docs` or `/docs/path/to/file.md`
 - **Navigation**: Sidebar with sections based on directory structure
-- **Features**: 
+- **Features**:
   - Syntax-highlighted code blocks
   - Tables and GitHub-flavored Markdown
   - Responsive design with mobile sidebar
@@ -128,13 +128,13 @@ VITE_API_URL=http://localhost:8000
 
 ## Deployment
 
-The website is deployed to openclerk.dev via **Vercel**.
+The website is deployed to openclerk.ch via **Vercel**.
 
 See `vercel.json` for deployment configuration.
 
 ## Links
 
-- [Live Site](https://openclerk.dev)
+- [Live Site](https://openclerk.ch)
 - [Main Repository](../../README.md)
 - [Python Package](../../packages/clerk/README.md)
 - [Main Application](../frontend/README.md) - The full OpenClerk app

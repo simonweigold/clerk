@@ -102,6 +102,6 @@ The frontend is typically deployed alongside the backend in a Docker container (
 
 ## Links
 
-- [Live Site](https://openclerk.dev)
+- [Live Site](https://openclerk.ch)
 - [Main Repository](../../README.md)
 - [Python Package](../../packages/clerk/README.md)

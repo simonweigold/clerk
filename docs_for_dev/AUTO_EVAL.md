@@ -25,15 +25,14 @@ my-kit/
 
 Plain text prompt for the judge LLM. Two placeholders are available:
 
-| Placeholder | Resolves to                                                |
-| ----------- | ---------------------------------------------------------- |
+| Placeholder | Resolves to |
+|-------------|-------------|
 | `{prompt}`  | The resolved prompt that was sent to the LLM for this step |
-| `{output}`  | The LLM's output for this step                             |
+| `{output}`  | The LLM's output for this step |
 
 The judge LLM must return a single integer 0–100 on the last line of its response and nothing else. Kit authors should make this explicit in the evaluator file.
 
 **Example `evaluator_1.txt`:**
-
 ```
 You are an expert evaluator. Score the following LLM response on a scale of 0–100.
 
@@ -259,7 +258,7 @@ The `step_executions` table already has an `evaluation_score` column (integer, 0
 openclerk run my-kit --auto-evaluate
 
 # Use a specific model as judge
-openclerk run my-kit --auto-evaluate --judge-model gpt-5.4-nano
+openclerk run my-kit --auto-evaluate --judge-model gpt-4o
 
 # Store full prompt/output text alongside scores
 openclerk run my-kit --auto-evaluate --mode transparent
@@ -272,9 +271,9 @@ openclerk run my-kit --evaluate --auto-evaluate
 
 ## Summary of Files to Change
 
-| File        | Change                                                                                                                               |
-| ----------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| `models.py` | Add `evaluators: dict[str, str] = {}` to `ReasoningKit`                                                                              |
-| `loader.py` | Glob `evaluator_*.txt`, populate `kit.evaluators`                                                                                    |
-| `graph.py`  | Add `auto_evaluate`, `evaluators`, `judge_model` to `State`; update `evaluate_step`; add `_run_judge_llm` and `_parse_score` helpers |
-| `cli.py`    | Add `--auto-evaluate` and `--judge-model` flags; auto-enable `evaluate` when `auto_evaluate` is set                                  |
+| File | Change |
+|------|--------|
+| `models.py` | Add `evaluators: dict[str, str] = {}` to `ReasoningKit` |
+| `loader.py` | Glob `evaluator_*.txt`, populate `kit.evaluators` |
+| `graph.py` | Add `auto_evaluate`, `evaluators`, `judge_model` to `State`; update `evaluate_step`; add `_run_judge_llm` and `_parse_score` helpers |
+| `cli.py` | Add `--auto-evaluate` and `--judge-model` flags; auto-enable `evaluate` when `auto_evaluate` is set |

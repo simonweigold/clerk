@@ -13,7 +13,7 @@ from .db import (
 )
 from .db.models import KitVersion
 from .db.models import ReasoningKit as DBReasoningKit
-from .models import KitConfig, ReasoningKit, Resource, Tool, WorkflowStep
+from .models import ReasoningKit, Resource, Tool, WorkflowStep
 
 
 class LoadedKit:
@@ -116,65 +116,12 @@ def load_reasoning_kit(kit_path: str | Path) -> ReasoningKit:
         )
         tools[str(tool_num)] = tool
 
-    # Auto-discover evaluators.
-    # evaluator_N.json  — multi-dimension: {"aggregation": "average", "dimensions": {"label": "prompt", ...}}
-    # evaluator_N.txt   — single-dimension fallback; label is "default"
-    # JSON takes precedence over TXT for the same step number.
-    evaluators: dict[str, list[tuple[str, str]]] = {}
-    evaluator_aggregations: dict[str, str] = {}
-
-    seen_steps: set[str] = set()
-    for json_file in sorted(
-        kit_path.glob("evaluator_*.json"),
-        key=lambda f: _extract_number(f.name) or 0,
-    ):
-        step_num = _extract_number(json_file.name)
-        if step_num is None:
-            continue
-        key = str(step_num)
-        try:
-            data = json.loads(json_file.read_text(encoding="utf-8"))
-        except Exception:
-            continue
-        dimensions = data.get("dimensions", {})
-        if not isinstance(dimensions, dict):
-            continue
-        evaluators[key] = list(dimensions.items())  # [(label, prompt), ...]
-        if "aggregation" in data:
-            evaluator_aggregations[key] = data["aggregation"]
-        seen_steps.add(key)
-
-    for txt_file in sorted(
-        kit_path.glob("evaluator_*.txt"),
-        key=lambda f: _extract_number(f.name) or 0,
-    ):
-        step_num = _extract_number(txt_file.name)
-        if step_num is None:
-            continue
-        key = str(step_num)
-        if key in seen_steps:
-            continue  # JSON already loaded for this step
-        evaluators[key] = [("default", txt_file.read_text())]
-
-    # Load optional kit.json config
-    kit_config = KitConfig()
-    kit_json_path = kit_path / "kit.json"
-    if kit_json_path.exists():
-        try:
-            kit_json_data = json.loads(kit_json_path.read_text(encoding="utf-8"))
-            kit_config = KitConfig(**kit_json_data)
-        except Exception:
-            pass
-
     return ReasoningKit(
         name=kit_path.name,
         path=str(kit_path),
         resources=resources,
         workflow=workflow,
         tools=tools,
-        evaluators=evaluators,
-        evaluator_aggregations=evaluator_aggregations,
-        config=kit_config,
     )
 
 

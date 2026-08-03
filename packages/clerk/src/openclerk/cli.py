@@ -75,8 +75,8 @@ def main() -> None:
     run_parser.add_argument(
         "--mode",
         choices=["transparent", "anonymous"],
-        default=None,
-        help="Evaluation mode: 'transparent' (default) stores full text, 'anonymous' stores char counts",
+        default="transparent",
+        help="Evaluation mode: 'transparent' stores full text, 'anonymous' stores char counts",
     )
     run_parser.add_argument(
         "--dynamic-resource",
@@ -118,25 +118,6 @@ def main() -> None:
         type=str,
         default=None,
         help="Model to use (e.g. deepseek/deepseek-v4-pro). Overrides CLERK_DEFAULT_MODEL env var.",
-    )
-    run_parser.add_argument(
-        "--auto-evaluate",
-        action="store_true",
-        help="Score each step automatically using evaluator_N.txt files instead of prompting the user.",
-    )
-    run_parser.add_argument(
-        "--judge-model",
-        type=str,
-        default=None,
-        metavar="MODEL",
-        help="Model to use for auto-evaluation scoring. Defaults to the same model as the main run.",
-    )
-    run_parser.add_argument(
-        "--evaluator-aggregation",
-        choices=["average", "min", "max", "first"],
-        default=None,
-        metavar="STRATEGY",
-        help="How to combine scores when a step has multiple evaluator files: average (default), min, max, or first.",
     )
 
     # =========================================================================
@@ -696,13 +677,6 @@ def _cmd_run(args: argparse.Namespace) -> None:
 
         collected_prompts: dict[str, str] = {}
 
-        # Resolve effective settings: CLI flag > kit.json > hardcoded default
-        cfg = kit.config
-        effective_mode = args.mode or cfg.mode or "transparent"
-        effective_aggregation = args.evaluator_aggregation or cfg.evaluator_aggregation or "average"
-        effective_judge_model = args.judge_model or cfg.judge_model
-        effective_model = args.model or cfg.model
-
         async def _run_with_mcp() -> dict[str, str]:
             """Initialize MCP, run kit async, and clean up in one event loop."""
             await init_mcp_servers(
@@ -710,22 +684,16 @@ def _cmd_run(args: argparse.Namespace) -> None:
                 kit_config_path=kit_config,
             )
             try:
-                evaluate = args.evaluate
-                if args.auto_evaluate:
-                    evaluate = True
                 kwargs: dict = dict(
-                    evaluate=evaluate,
-                    evaluation_mode=effective_mode,
+                    evaluate=args.evaluate,
+                    evaluation_mode=args.mode,
                     save_to_db=save_to_db,
                     db_version_id=db_version_id,
                     verbose=args.verbose,
                     collected_prompts=collected_prompts,
-                    auto_evaluate=args.auto_evaluate,
-                    judge_model=effective_judge_model,
-                    evaluator_aggregation=effective_aggregation,
                 )
-                if effective_model:
-                    kwargs["model"] = effective_model
+                if args.model:
+                    kwargs["model"] = args.model
                 return await run_reasoning_kit_async(kit, **kwargs)
             finally:
                 await close_mcp_servers()
@@ -966,13 +934,6 @@ def _print_local_kit_info(kit) -> None:
         for key, tool in kit.tools.items():
             display = f" ({tool.display_name})" if tool.display_name else ""
             print(f"  {key}. {tool.tool_name}{display}")
-    if kit.evaluators:
-        print(f"\nEvaluators ({len(kit.evaluators)} step(s)):")
-        for step_key in sorted(kit.evaluators.keys(), key=int):
-            pairs = kit.evaluators[step_key]
-            labels = ", ".join(label for label, _ in pairs)
-            dim_str = f"({len(pairs)} dimension{'s' if len(pairs) != 1 else ''})"
-            print(f"  Step {step_key}: {labels}  {dim_str}")
 
 
 def _print_db_kit_info(info: dict) -> None:
@@ -1079,7 +1040,7 @@ def _cmd_validate(args: argparse.Namespace) -> None:
             )
 
     # 6. Approximate prompt size per step (rough char count heuristic: ~4 chars/token)
-    max_chars = 128_000 * 4  # ~128k tokens for gpt-5.4-nano context
+    max_chars = 128_000 * 4  # ~128k tokens for gpt-5-mini context
     for step_num, step in kit.workflow.items():
         resolved = step.prompt
         for r in kit.resources.values():

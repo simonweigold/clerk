@@ -92,12 +92,6 @@ class State(TypedDict):
     # Tool fields
     tools: dict[str, dict]  # tool_number -> {tool_name, tool_id, ...}
     user_id: str | None  # Add user ID for tool context
-    # Auto-evaluation fields
-    auto_evaluate: bool  # True = use judge LLM; False = interactive prompt
-    evaluators: dict[str, list[tuple[str, str]]]  # step number -> [(label, prompt), ...]
-    evaluator_aggregations: dict[str, str]  # step number -> per-step aggregation strategy
-    judge_model: str | None  # model override for judge LLM; None = use main model
-    evaluator_aggregation: str  # global fallback aggregation: "average"|"min"|"max"|"first"
 
 
 def create_initial_state(
@@ -109,9 +103,6 @@ def create_initial_state(
     save_to_db: bool = False,
     model: str = DEFAULT_MODEL,
     user_id: str | None = None,
-    auto_evaluate: bool = False,
-    judge_model: str | None = None,
-    evaluator_aggregation: str = "average",
 ) -> State:
     """Create initial state from a reasoning kit.
 
@@ -163,11 +154,6 @@ def create_initial_state(
         model_used=model,
         tools=tools_data,
         user_id=user_id,
-        auto_evaluate=auto_evaluate,
-        evaluators=kit.evaluators,
-        evaluator_aggregations=kit.evaluator_aggregations,
-        judge_model=judge_model,
-        evaluator_aggregation=evaluator_aggregation,
     )
 
 
@@ -429,60 +415,6 @@ def _run_coro_sync(coro: Coroutine[Any, Any, T]) -> T:
         return asyncio.run(coro)
 
 
-def _parse_score(response_text: str) -> int:
-    """Extract and validate integer score from judge LLM response."""
-    for line in reversed(response_text.strip().splitlines()):
-        line = line.strip()
-        if line.isdigit():
-            score = int(line)
-            if 0 <= score <= 100:
-                return score
-    raise ValueError(f"Could not parse valid score (0-100) from judge response: {response_text!r}")
-
-
-def _aggregate_scores(scores: list[int], strategy: str) -> int:
-    """Aggregate multiple dimension scores into a single score."""
-    if not scores:
-        return 0
-    if strategy == "min":
-        return min(scores)
-    if strategy == "max":
-        return max(scores)
-    if strategy == "first":
-        return scores[0]
-    return round(sum(scores) / len(scores))  # default: average
-
-
-def _run_judge_llm(
-    template: str,
-    prompt: str,
-    output: str,
-    judge_model: str | None,
-    user_id: str | None,
-) -> int:
-    """Call judge LLM and return an integer score 0-100."""
-    eval_prompt = template.replace("{prompt}", prompt).replace("{output}", output)
-    model = judge_model or DEFAULT_MODEL
-    llm = _run_coro_sync(get_llm(user_id=user_id, model=model, temperature=0.0))
-    response = _run_coro_sync(llm.ainvoke(eval_prompt))
-    return _parse_score(str(response.content))
-
-
-async def _run_judge_llm_async(
-    template: str,
-    prompt: str,
-    output: str,
-    judge_model: str | None,
-    user_id: str | None,
-) -> int:
-    """Async version of judge LLM call."""
-    eval_prompt = template.replace("{prompt}", prompt).replace("{output}", output)
-    model = judge_model or DEFAULT_MODEL
-    llm = await get_llm(user_id=user_id, model=model, temperature=0.0)
-    response = await llm.ainvoke(eval_prompt)
-    return _parse_score(str(response.content))
-
-
 def execute_step(state: State) -> dict[str, Any]:
     """Execute the current workflow step."""
     current_step = str(state["current_step"])
@@ -644,56 +576,31 @@ def advance_step(state: State) -> dict[str, Any]:
 
 
 def evaluate_step(state: State) -> dict[str, Any]:
-    """Evaluate the current step: auto-score via judge LLM or prompt the user."""
+    """Prompt user for evaluation of the current step if evaluation is enabled."""
     if not state["evaluate"]:
         return {}
 
     current_step = str(state["current_step"])
     output_id = state["workflow_output_ids"][current_step]
-    evaluator_list = state["evaluators"].get(current_step, [])
-    aggregation = state["evaluator_aggregations"].get(
-        current_step, state.get("evaluator_aggregation", "average")
-    )
 
-    if state["auto_evaluate"] and evaluator_list:
-        dimension_scores: list[dict[str, int | str]] = []
-        for label, template in evaluator_list:
-            s = _run_judge_llm(
-                template=template,
-                prompt=state["last_prompt"],
-                output=state["last_output"],
-                judge_model=state["judge_model"],
-                user_id=state.get("user_id"),
-            )
-            dimension_scores.append({"label": label, "score": s})
+    # Prompt user for evaluation score
+    score = prompt_for_evaluation(state["current_step"], output_id)
 
-        score = _aggregate_scores([int(d["score"]) for d in dimension_scores], aggregation)
-
-        if len(dimension_scores) > 1:
-            print(f"\nStep {current_step} — Evaluation")
-            for d in dimension_scores:
-                print(f"  {d['label']:<16} {d['score']:>3}/100")
-            print(f"  {'─' * 20}")
-            print(f"  {'Aggregate':<16} {score:>3}/100  ({aggregation})")
-        else:
-            print(f"\nStep {current_step} — Score: {score}/100")
-    else:
-        score = prompt_for_evaluation(state["current_step"], output_id)
-        dimension_scores = [{"label": "default", "score": score}]
-
+    # Create step evaluation based on mode
     step_eval = create_step_evaluation(
         prompt=state["last_prompt"],
         output=state["last_output"],
         score=score,
         mode=state["evaluation_mode"],
-        dimension_scores=dimension_scores,
     )
 
+    # Update evaluations dict
     new_evaluations = {
         **state["evaluations"],
         current_step: step_eval.model_dump(),
     }
 
+    # Update evaluation in database if enabled
     if state["save_to_db"] and state["db_run_id"]:
         try:
             asyncio.get_event_loop().run_until_complete(
@@ -701,16 +608,15 @@ def evaluate_step(state: State) -> dict[str, Any]:
                     run_id=UUID(state["db_run_id"]),
                     step_number=int(current_step),
                     score=score,
-                    dimension_scores=dimension_scores,
                 )
             )
         except RuntimeError:
+            # No event loop running, create a new one
             asyncio.run(
                 update_step_evaluation_in_db(
                     run_id=UUID(state["db_run_id"]),
                     step_number=int(current_step),
                     score=score,
-                    dimension_scores=dimension_scores,
                 )
             )
 
@@ -879,9 +785,6 @@ async def run_reasoning_kit_async(
     user_id: str | None = None,
     verbose: bool = False,
     collected_prompts: dict[str, str] | None = None,
-    auto_evaluate: bool = False,
-    judge_model: str | None = None,
-    evaluator_aggregation: str = "average",
 ) -> dict[str, str]:
     """Async version of run_reasoning_kit for use in async contexts.
 
@@ -1111,50 +1014,12 @@ async def run_reasoning_kit_async(
 
             # Evaluation
             if evaluate:
-                evaluator_list = kit.evaluators.get(str(step_num), [])
-                step_aggregation = kit.evaluator_aggregations.get(
-                    str(step_num), evaluator_aggregation
-                )
-                if auto_evaluate and evaluator_list:
-                    # Run all evaluators concurrently
-                    scores = await asyncio.gather(
-                        *[
-                            _run_judge_llm_async(
-                                template=template,
-                                prompt=clean_prompt,
-                                output=result,
-                                judge_model=judge_model,
-                                user_id=user_id,
-                            )
-                            for _, template in evaluator_list
-                        ]
-                    )
-                    dimension_scores: list[dict[str, int | str]] = [
-                        {"label": label, "score": s}
-                        for (label, _), s in zip(evaluator_list, scores)
-                    ]
-                    score = _aggregate_scores(
-                        [int(d["score"]) for d in dimension_scores], step_aggregation
-                    )
-                    if verbose:
-                        if len(dimension_scores) > 1:
-                            print(f"\nStep {step_num} — Evaluation")
-                            for d in dimension_scores:
-                                print(f"  {d['label']:<16} {d['score']:>3}/100")
-                            print(f"  {'─' * 20}")
-                            print(f"  {'Aggregate':<16} {score:>3}/100  ({step_aggregation})")
-                        else:
-                            print(f"\nStep {step_num} — Score: {score}/100")
-                else:
-                    score = await asyncio.to_thread(prompt_for_evaluation, step_num, step.output_id)
-                    dimension_scores = [{"label": "default", "score": score}]
-
+                score = await asyncio.to_thread(prompt_for_evaluation, step_num, step.output_id)
                 step_eval = create_step_evaluation(
                     prompt=clean_prompt,
                     output=result,
                     score=score,
                     mode=evaluation_mode,
-                    dimension_scores=dimension_scores,
                 )
                 evaluations[str(step_num)] = step_eval.model_dump()
 
@@ -1164,7 +1029,6 @@ async def run_reasoning_kit_async(
                             run_id=db_run_id,
                             step_number=step_num,
                             score=score,
-                            dimension_scores=dimension_scores,
                         )
                     except Exception:
                         pass

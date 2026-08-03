@@ -818,16 +818,13 @@ class ExecutionRepository:
         run_id: UUID,
         step_number: int,
         evaluation_score: int,
-        evaluation_scores: list[dict] | None = None,
     ) -> StepExecution | None:
-        """Update the evaluation score(s) for a step.
+        """Update the evaluation score for a step.
 
         Args:
             run_id: The run's UUID
             step_number: The step number
-            evaluation_score: Aggregated evaluation score (0-100)
-            evaluation_scores: Optional per-dimension breakdown as
-                [{"label": str, "score": int}, ...]
+            evaluation_score: Evaluation score (0-100)
 
         Returns:
             Updated step execution or None if not found
@@ -844,7 +841,6 @@ class ExecutionRepository:
             return None
 
         step.evaluation_score = evaluation_score
-        step.evaluation_scores = evaluation_scores
         await self.session.flush()
         return step
 

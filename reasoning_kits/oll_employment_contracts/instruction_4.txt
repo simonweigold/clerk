@@ -33,10 +33,8 @@ For each element:
 - Assess if it complies with mandatory legal requirements
 - Note any deviations or gaps
 
-Output a compliance report as a Markdown table with columns: Element | Status | Notes | OR Reference.
+Output a detailed compliance report with:
 - ✓ for compliant elements
-- ⚠ for present but potentially problematic elements
+- ⚠ for present but potentially problematic elements  
 - ✗ for missing or non-compliant elements
-- The OR Reference column must cite a specific article for any ⚠ or ✗ finding.
-- Do not write a prose list — use the table format only.
-- Do not copy verbatim text from workflow_3.
+- Specific OR article references for any non-compliance

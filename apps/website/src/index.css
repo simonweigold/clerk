@@ -936,3 +936,14 @@ textarea.input {
 @media (prefers-reduced-motion: reduce) {
   .landing #ring-guide { animation: none; }
 }
+
+/* ── Splash state for Layout during landing intro ── */
+.splash-active {
+  border-bottom-color: transparent;
+}
+
+.blur-nav {
+  filter: blur(6px);
+  opacity: 0.25;
+  pointer-events: none;
+}

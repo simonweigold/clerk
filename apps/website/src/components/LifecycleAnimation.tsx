@@ -1,10 +1,11 @@
 import { useEffect, useRef } from "react";
 
 interface LifecycleAnimationProps {
+  onFlyStart?: () => void;
   onComplete?: () => void;
 }
 
-export default function LifecycleAnimation({ onComplete }: LifecycleAnimationProps) {
+export default function LifecycleAnimation({ onFlyStart, onComplete }: LifecycleAnimationProps) {
   const rootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -60,6 +61,7 @@ export default function LifecycleAnimation({ onComplete }: LifecycleAnimationPro
     }
 
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    let cleanupTimer: number | null = null;
 
     /* ---------- tuning ---------- */
     const DUR = 18.2;
@@ -527,8 +529,80 @@ export default function LifecycleAnimation({ onComplete }: LifecycleAnimationPro
       score.setAttribute("fill", "#130DDD");
       phaseWord.textContent = "Assemble";
       phaseLine.textContent = "Execute · Evaluate · Improve · Complete";
-      const doneTimer = window.setTimeout(() => onComplete?.(), 2500);
-      return () => window.clearTimeout(doneTimer);
+      cleanupTimer = window.setTimeout(() => flyToLogo(), 2500);
+      return;
+    }
+
+    /* ---------- fly the five dots to the nav logo ---------- */
+    function flyToLogo() {
+      onFlyStart?.();
+
+      const logo = document.getElementById("clerk-logo");
+      const logoDots = logo
+        ? Array.from(logo.querySelectorAll(".clerk-dot"))
+        : [];
+      if (logoDots.length !== 5) {
+        onComplete?.();
+        return;
+      }
+
+      const svgRect = svg.getBoundingClientRect();
+      const unitX = 820 / svgRect.width;
+
+      // Reveal only the dots for the flight
+      scene.style.opacity = "1";
+      score.style.opacity = "0";
+      head.style.opacity = "0";
+      guide.style.opacity = "0";
+      sweep.style.opacity = "0";
+      gauge.style.opacity = "0";
+      delta.style.opacity = "0";
+      pulse1.style.opacity = "0";
+      track.style.opacity = "0";
+      packetG.style.opacity = "0";
+      ghost1.style.opacity = "0";
+      ghost2.style.opacity = "0";
+      svg.style.overflow = "visible";
+
+      const targets = logoDots.map((ld) => {
+        const r = ld.getBoundingClientRect();
+        const targetCx = (r.left + r.width / 2 - svgRect.left) * unitX;
+        const targetCy = (r.top + r.height / 2 - svgRect.top) * unitX;
+        const targetScale = (r.width / 2) / (26 / unitX);
+        return { x: targetCx, y: targetCy, scale: targetScale };
+      });
+
+      dots.forEach((dot, i) => {
+        const cp = circPos(i);
+        const target = targets[i];
+        dot.style.opacity = "1";
+        dot.animate(
+          [
+            {
+              transform: `translate(${cp.x.toFixed(1)}px, ${cp.y.toFixed(1)}px) scale(0.867)`,
+            },
+            {
+              transform: `translate(${target.x.toFixed(1)}px, ${target.y.toFixed(1)}px) scale(${target.scale.toFixed(3)})`,
+            },
+          ],
+          {
+            duration: 900,
+            easing: "cubic-bezier(0.77, 0, 0.175, 1)",
+            fill: "forwards",
+          },
+        );
+      });
+
+      cleanupTimer = window.setTimeout(() => {
+        onComplete?.();
+        dots.forEach((dot) => {
+          dot.animate([{ opacity: 1 }, { opacity: 0 }], {
+            duration: 200,
+            easing: "ease-in",
+            fill: "forwards",
+          });
+        });
+      }, 900);
     }
 
     /* ---------- loop driver: play once on load ---------- */
@@ -549,7 +623,7 @@ export default function LifecycleAnimation({ onComplete }: LifecycleAnimationPro
       if (acc >= DUR) {
         done = true;
         stop();
-        onComplete?.();
+        flyToLogo();
         return;
       }
       raf = requestAnimationFrame(tick);
@@ -570,8 +644,9 @@ export default function LifecycleAnimation({ onComplete }: LifecycleAnimationPro
 
     return () => {
       stop();
+      if (cleanupTimer) window.clearTimeout(cleanupTimer);
     };
-  }, [onComplete]);
+  }, [onComplete, onFlyStart]);
 
   return (
     <div ref={rootRef} className="stage">

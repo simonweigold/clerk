@@ -1,10 +1,12 @@
 import { Link, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
+import { useSplash } from "../hooks/useSplash";
 import { ToastContainer } from "../hooks/useToast";
 import { LogOut, Github } from "lucide-react";
 
 export default function Layout() {
   const { user, supabaseConfigured, loading } = useAuth();
+  const { isSplashActive } = useSplash();
   const location = useLocation();
 
   // Determine if we're on a landing page route
@@ -23,16 +25,30 @@ export default function Layout() {
   return (
     <div className="min-h-screen flex flex-col bg-white font-sans text-foreground antialiased">
       {/* Navigation — frosted glass */}
-      <header className="sticky top-0 z-50 border-b border-border bg-white/80 backdrop-blur-lg">
+      <header
+        className={`sticky top-0 z-50 border-b border-border bg-white/80 backdrop-blur-lg transition-all duration-700 ${
+          isSplashActive ? "splash-active" : ""
+        }`}
+      >
         <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
-          <Link to="/" className="clerk-logo" id="clerk-logo">
+          <Link
+            to="/"
+            className={`clerk-logo transition-opacity duration-500 ${
+              isSplashActive ? "opacity-0" : "opacity-100"
+            }`}
+            id="clerk-logo"
+          >
             <span className="clerk-dot" />
             <span className="clerk-dot" />
             <span className="clerk-dot" />
             <span className="clerk-dot" />
             <span className="clerk-dot" />
           </Link>
-          <nav className="flex items-center gap-2">
+          <nav
+            className={`flex items-center gap-2 transition-all duration-500 ${
+              isSplashActive ? "blur-nav" : ""
+            }`}
+          >
             {isLandingRoute ? (
               // Landing page navigation
               <>

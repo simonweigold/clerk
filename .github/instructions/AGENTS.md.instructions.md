@@ -1,6 +1,7 @@
 ---
-applyTo: '**'
+applyTo: "**"
 ---
+
 Provide project context and coding guidelines that AI should follow when generating code, answering questions, or reviewing changes.
 
 # AGENTS.md - Guidelines for AI Coding Agents
@@ -12,13 +13,14 @@ This document provides guidelines for AI coding agents working in the CLERK (Com
 CLERK is a Python framework for defining and executing multi-step LLM reasoning workflows using file-based configuration. It uses LangChain/LangGraph for workflow orchestration and Pydantic for data validation.
 
 **Tech Stack:**
+
 - Python 3.13+
 - Package Manager: UV
 - LLM Framework: LangChain + LangGraph
 - Data Validation: Pydantic
 - Database: Supabase (PostgreSQL) with SQLAlchemy async
 - File Storage: Supabase Storage
-- LLM Provider: OpenAI (gpt-5-mini)
+- LLM Provider: OpenAI (gpt-5.4-nano)
 
 ## Project Structure
 
@@ -57,11 +59,13 @@ clerk/
 ## Build/Lint/Test Commands
 
 ### Installation
+
 ```bash
 uv sync                     # Install all dependencies
 ```
 
 ### Running the Application
+
 ```bash
 uv run clerk list           # List available reasoning kits
 uv run clerk info <name>    # Show info about a reasoning kit
@@ -72,6 +76,7 @@ uv run python main.py       # Alternative direct execution
 ```
 
 ### Testing
+
 ```bash
 # No test suite currently configured
 # When tests are added, expected commands:
@@ -83,6 +88,7 @@ uv run pytest -x            # Stop on first failure
 ```
 
 ### Linting/Formatting
+
 ```bash
 # No linting currently configured
 # When configured, expected commands:
@@ -92,6 +98,7 @@ uv run ruff format .        # Format code
 ```
 
 ### Environment Setup
+
 ```bash
 cp .env.example .env        # Create env file
 # Add OPENAI_API_KEY to .env
@@ -100,6 +107,7 @@ cp .env.example .env        # Create env file
 ## Code Style Guidelines
 
 ### Python Version
+
 - Python 3.13+ required
 - Use modern syntax: `str | None` not `Optional[str]`
 - Use built-in generics: `dict[str, str]` not `Dict[str, str]`
@@ -128,20 +136,21 @@ from .models import ReasoningKit, Resource
 ```
 
 **Rules:**
+
 - Use relative imports (`.module`) within the package
 - Use `from X import Y` style, not `import X`
 - Alphabetize imports within each group
 
 ### Naming Conventions
 
-| Element | Convention | Example |
-|---------|------------|---------|
-| Files | snake_case | `loader.py`, `graph.py` |
+| Element   | Convention             | Example                                  |
+| --------- | ---------------------- | ---------------------------------------- |
+| Files     | snake_case             | `loader.py`, `graph.py`                  |
 | Functions | snake_case, verb-first | `load_reasoning_kit()`, `create_state()` |
-| Variables | snake_case | `kit_path`, `resource_id` |
-| Classes | PascalCase | `ReasoningKit`, `GraphState` |
-| Constants | UPPER_SNAKE_CASE | `DEFAULT_MODEL` |
-| Private | underscore prefix | `_extract_number()` |
+| Variables | snake_case             | `kit_path`, `resource_id`                |
+| Classes   | PascalCase             | `ReasoningKit`, `GraphState`             |
+| Constants | UPPER_SNAKE_CASE       | `DEFAULT_MODEL`                          |
+| Private   | underscore prefix      | `_extract_number()`                      |
 
 ### Type Annotations
 
@@ -191,11 +200,13 @@ class State(TypedDict):
 ### Documentation
 
 **Module docstrings** - required at the top of every file:
+
 ```python
 """Loader for reasoning kits."""
 ```
 
 **Function docstrings** - Google-style with Args/Returns:
+
 ```python
 def resolve_placeholders(text: str, resources: dict[str, str], outputs: dict[str, str]) -> str:
     """Resolve {placeholder} references in text.
@@ -211,6 +222,7 @@ def resolve_placeholders(text: str, resources: dict[str, str], outputs: dict[str
 ```
 
 **Class docstrings** - brief single-line for data classes:
+
 ```python
 class Resource(BaseModel):
     """A resource in a reasoning kit."""
@@ -223,10 +235,10 @@ Use guard clauses with early returns and descriptive error messages:
 ```python
 def load_reasoning_kit(kit_path: str | Path) -> ReasoningKit:
     kit_path = Path(kit_path)
-    
+
     if not kit_path.exists():
         raise FileNotFoundError(f"Reasoning kit not found: {kit_path}")
-    
+
     # ... rest of function
 ```
 
@@ -255,12 +267,14 @@ except Exception as e:
 ### Common Patterns
 
 **String formatting** - always use f-strings:
+
 ```python
 print(f"Running Reasoning Kit: {kit.name}")
 raise FileNotFoundError(f"Reasoning kit not found: {kit_path}")
 ```
 
 **Path handling** - use pathlib.Path, not string manipulation:
+
 ```python
 from pathlib import Path
 kit_path = Path(kit_path)
@@ -268,12 +282,14 @@ resource_files = sorted(kit_path.glob("resource_*.*"))
 ```
 
 **Immutable state updates** - use spread operator:
+
 ```python
 new_outputs = {**state["outputs"], output_id: result}
 return {**state, "outputs": new_outputs}
 ```
 
 **Entry points** - use main() function pattern:
+
 ```python
 def main():
     """Main entry point for the CLI."""
@@ -287,6 +303,7 @@ if __name__ == "__main__":
 ## Reasoning Kit File Conventions
 
 When working with reasoning kits:
+
 - Resources: `resource_*.txt` or `resource_*.csv`
 - Instructions: `instruction_*.txt` (numbered sequentially: 1, 2, 3...)
 - Placeholders in instructions: `{resource_N}` and `{workflow_N}`
@@ -298,38 +315,40 @@ The evaluation system allows users to rate each workflow step during execution.
 
 ### CLI Flags
 
-| Flag | Description |
-|------|-------------|
+| Flag         | Description                            |
+| ------------ | -------------------------------------- |
 | `--evaluate` | Enable step-by-step evaluation prompts |
-| `--mode` | `transparent` (default) or `anonymous` |
+| `--mode`     | `transparent` (default) or `anonymous` |
 
 ### Evaluation Modes
 
 **Transparent mode** - stores full prompt/output text:
+
 ```json
 {
-    "mode": "transparent",
-    "steps": {
-        "1": {
-            "input": "<full prompt text>",
-            "output": "<full LLM response>",
-            "evaluation": 85
-        }
+  "mode": "transparent",
+  "steps": {
+    "1": {
+      "input": "<full prompt text>",
+      "output": "<full LLM response>",
+      "evaluation": 85
     }
+  }
 }
 ```
 
 **Anonymous mode** - stores character counts only:
+
 ```json
 {
-    "mode": "anonymous",
-    "steps": {
-        "1": {
-            "input": 1234,
-            "output": 567,
-            "evaluation": 85
-        }
+  "mode": "anonymous",
+  "steps": {
+    "1": {
+      "input": 1234,
+      "output": 567,
+      "evaluation": 85
     }
+  }
 }
 ```
 
@@ -341,12 +360,12 @@ The evaluation system allows users to rate each workflow step during execution.
 
 ### Key Functions
 
-| Function | Location | Purpose |
-|----------|----------|---------|
-| `prompt_for_evaluation()` | `evaluation.py` | Prompt user for 0-100 score with validation |
-| `save_evaluation()` | `evaluation.py` | Save evaluation to JSON file |
-| `create_step_evaluation()` | `evaluation.py` | Create step data based on mode |
-| `evaluate_step()` | `graph.py` | LangGraph node that handles evaluation |
+| Function                   | Location        | Purpose                                     |
+| -------------------------- | --------------- | ------------------------------------------- |
+| `prompt_for_evaluation()`  | `evaluation.py` | Prompt user for 0-100 score with validation |
+| `save_evaluation()`        | `evaluation.py` | Save evaluation to JSON file                |
+| `create_step_evaluation()` | `evaluation.py` | Create step data based on mode              |
+| `evaluate_step()`          | `graph.py`      | LangGraph node that handles evaluation      |
 
 ### Data Models
 
@@ -401,6 +420,7 @@ OPENAI_API_KEY=sk-...
 ### CLI Commands
 
 #### Database Commands
+
 ```bash
 uv run clerk db setup              # Full setup: migrations + storage bucket
 uv run clerk db migrate            # Apply pending migrations
@@ -409,6 +429,7 @@ uv run clerk db status             # Show current migration status
 ```
 
 #### Sync Commands
+
 ```bash
 uv run clerk sync list             # Compare local vs database kits
 uv run clerk sync push <kit>       # Push local kit to database
@@ -417,6 +438,7 @@ uv run clerk sync pull <kit>       # Pull kit from database to local
 ```
 
 #### Default Behavior
+
 - `clerk list` - Lists from database (falls back to local if DB not configured)
 - `clerk run <kit>` - Loads from database first, then tries local
 - `clerk info <kit>` - Shows database info first, then tries local
@@ -426,15 +448,15 @@ uv run clerk sync pull <kit>       # Pull kit from database to local
 
 #### Tables
 
-| Table | Description |
-|-------|-------------|
-| `user_profiles` | User profiles linked to Supabase Auth |
-| `reasoning_kits` | Main reasoning kit entities |
-| `kit_versions` | Versioned snapshots of kits |
-| `resources` | Resource files with extracted text |
-| `workflow_steps` | Instruction prompts |
-| `execution_runs` | Execution tracking |
-| `step_executions` | Per-step results and evaluations |
+| Table             | Description                           |
+| ----------------- | ------------------------------------- |
+| `user_profiles`   | User profiles linked to Supabase Auth |
+| `reasoning_kits`  | Main reasoning kit entities           |
+| `kit_versions`    | Versioned snapshots of kits           |
+| `resources`       | Resource files with extracted text    |
+| `workflow_steps`  | Instruction prompts                   |
+| `execution_runs`  | Execution tracking                    |
+| `step_executions` | Per-step results and evaluations      |
 
 #### Entity Relationships
 
@@ -533,20 +555,20 @@ from clerk.db import (
 
 async with get_async_session() as session:
     kit_repo = ReasoningKitRepository(session)
-    
+
     # List public kits
     kits = await kit_repo.list_public()
-    
+
     # Get kit by slug (with version, resources, steps loaded)
     kit = await kit_repo.get_by_slug("my-kit")
-    
+
     # Create new kit
     kit = await kit_repo.create(
         slug="new-kit",
         name="New Kit",
         description="A new reasoning kit",
     )
-    
+
     # Search kits
     results = await kit_repo.search("keyword")
 ```
@@ -585,6 +607,7 @@ extracted_text = extract_text(Path("document.pdf"), mime_type)
 ```
 
 Supported formats:
+
 - **Text**: `.txt`, `.md`, `.csv` (read directly)
 - **PDF**: `.pdf` (extracted with pypdf)
 - **Excel**: `.xlsx`, `.xls` (extracted with openpyxl)
@@ -610,18 +633,18 @@ outputs = run_reasoning_kit(
 
 ### Key Database Functions
 
-| Function | Location | Purpose |
-|----------|----------|---------|
-| `get_async_session()` | `db/config.py` | Get async database session context manager |
-| `get_config()` | `db/config.py` | Get Supabase configuration |
-| `ReasoningKitRepository` | `db/repository.py` | CRUD for reasoning kits |
-| `KitVersionRepository` | `db/repository.py` | CRUD for kit versions |
-| `ExecutionRepository` | `db/repository.py` | CRUD for execution runs |
-| `StorageService` | `db/storage.py` | Supabase Storage operations |
-| `extract_text()` | `db/text_extraction.py` | Extract text from files |
-| `create_execution_run()` | `evaluation.py` | Create DB execution run |
-| `save_step_to_db()` | `evaluation.py` | Save step execution to DB |
-| `complete_execution_run()` | `evaluation.py` | Mark run as completed/failed |
+| Function                   | Location                | Purpose                                    |
+| -------------------------- | ----------------------- | ------------------------------------------ |
+| `get_async_session()`      | `db/config.py`          | Get async database session context manager |
+| `get_config()`             | `db/config.py`          | Get Supabase configuration                 |
+| `ReasoningKitRepository`   | `db/repository.py`      | CRUD for reasoning kits                    |
+| `KitVersionRepository`     | `db/repository.py`      | CRUD for kit versions                      |
+| `ExecutionRepository`      | `db/repository.py`      | CRUD for execution runs                    |
+| `StorageService`           | `db/storage.py`         | Supabase Storage operations                |
+| `extract_text()`           | `db/text_extraction.py` | Extract text from files                    |
+| `create_execution_run()`   | `evaluation.py`         | Create DB execution run                    |
+| `save_step_to_db()`        | `evaluation.py`         | Save step execution to DB                  |
+| `complete_execution_run()` | `evaluation.py`         | Mark run as completed/failed               |
 
 ### Migrations
 

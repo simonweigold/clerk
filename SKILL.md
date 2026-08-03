@@ -32,13 +32,29 @@ A **reasoning kit** is a directory of plain text files that define a multi-step 
 
 | File pattern             | Role                         | Notes                                                           |
 | ------------------------ | ---------------------------- | --------------------------------------------------------------- |
+| `kit.json`               | Kit-level defaults (optional)| Sets default `model`, `judge_model`, `mode`, `evaluator_aggregation` |
 | `instruction_N.txt`      | Workflow step N              | N starts at 1; steps run in ascending order                     |
 | `resource_N.EXT`         | Static resource N            | Read at load time; any extension supported                      |
 | `dynamic_resource_N.EXT` | Dynamic resource N           | Content is empty at load time; user provides it at runtime      |
 | `tool_N.json`            | Tool reference N             | References a tool from the global registry (built-in or MCP)    |
+| `evaluator_N.json`       | Multi-dimension evaluator N  | JSON with `dimensions` dict and optional `aggregation` key      |
+| `evaluator_N.txt`        | Single-dimension evaluator N | Plain text fallback; label is `"default"`                       |
 | `mcp_servers.json`       | MCP server config (optional) | Kit-local override; merges with project-root `mcp_servers.json` |
 
 Directories named `evaluations/` inside a kit are created automatically and hold evaluation JSON files — do not create them manually.
+
+### kit.json format
+
+```json
+{
+  "judge_model": "deepseek/deepseek-v4-pro",
+  "model": "gpt-5.4-nano",
+  "evaluator_aggregation": "average",
+  "mode": "transparent"
+}
+```
+
+All fields are optional. Precedence: **CLI flag → `kit.json` → env var → hardcoded default**.
 
 ### Placeholder syntax inside instructions
 
@@ -123,12 +139,21 @@ class Tool(BaseModel):
     display_name: str | None
     configuration: str | None  # optional JSON overrides
 
+class KitConfig(BaseModel):
+    model: str | None = None           # default LLM for the main workflow
+    judge_model: str | None = None     # default judge LLM for auto-evaluation
+    evaluator_aggregation: str | None  # "average" | "min" | "max" | "first"
+    mode: str | None = None            # "transparent" | "anonymous"
+
 class ReasoningKit(BaseModel):
     name: str
     path: str              # filesystem path or "db://<slug>"
     resources: dict[str, Resource]     # "1" -> Resource
     workflow: dict[str, WorkflowStep]  # "1" -> WorkflowStep
     tools: dict[str, Tool]             # "1" -> Tool  (may be empty)
+    evaluators: dict[str, list[tuple[str, str]]] = {}   # "1" -> [(label, prompt), ...]
+    evaluator_aggregations: dict[str, str] = {}         # "1" -> aggregation strategy
+    config: KitConfig = KitConfig()    # loaded from kit.json; all fields optional
 ```
 
 ---
@@ -231,6 +256,21 @@ finally:
     await close_mcp_servers()
 ```
 
+**`run_reasoning_kit_async` keyword arguments:**
+
+| Argument            | Type           | Default         | Description                                                  |
+| ------------------- | -------------- | --------------- | ------------------------------------------------------------ |
+| `evaluate`          | `bool`         | `False`         | Enable step-by-step evaluation                               |
+| `evaluation_mode`   | `str`          | `"transparent"` | `"transparent"` or `"anonymous"`                             |
+| `auto_evaluate`     | `bool`         | `False`         | Score steps via judge LLM using `evaluator_N.txt` files      |
+| `judge_model`       | `str \| None`  | `None`          | Model for the judge LLM; `None` uses the main workflow model |
+| `save_to_db`        | `bool`         | `False`         | Persist execution to the database                            |
+| `db_version_id`     | `UUID \| None` | `None`          | Required if `save_to_db=True`                                |
+| `model`             | `str`          | env default     | LLM model for the main workflow                              |
+| `user_id`           | `str \| None`  | `None`          | Used to look up per-user LLM provider config                 |
+| `verbose`           | `bool`         | `False`         | Print step details to stdout                                 |
+| `collected_prompts` | `dict \| None` | `None`          | If provided, resolved prompts are written into this dict     |
+
 **Evaluation modes:**
 
 - `transparent` — stores full prompt + output text in DB
@@ -246,7 +286,7 @@ from openclerk.llm_factory import get_llm
 # Returns a LangChain-compatible chat model
 llm = await get_llm(
     user_id="uuid-string",   # looks up user's provider in DB; fallback to env vars
-    model="gpt-4o-mini",
+    model="gpt-5.4-nano",
     temperature=0.0,
 )
 ```
@@ -399,6 +439,8 @@ openclerk run demo                      # From database
 openclerk run demo --local              # From filesystem (looks in reasoning_kits/)
 openclerk run demo --evaluate           # Enable step-by-step evaluation
 openclerk run demo --mode anonymous     # Privacy-preserving evaluation
+openclerk run demo --auto-evaluate      # Automated scoring via judge LLM (requires evaluator_N.txt)
+openclerk run demo --auto-evaluate --judge-model gpt-5.4-nano   # Use a specific model as judge
 
 # Dynamic resources (skip interactive prompts)
 openclerk run demo --dynamic-resource resource_1="inline text"
@@ -413,6 +455,12 @@ echo "piped text" | openclerk run demo --stdin resource_1
 - `--stdin resource_N` — Read content from standard input (useful for piping)
 
 If all dynamic resources are satisfied via flags, the interactive prompt is skipped entirely.
+
+**Auto-evaluation flags:**
+
+- `--auto-evaluate` — Score each step using `evaluator_N.txt` / `evaluator_N.json` instead of prompting the user. Implicitly enables evaluation. Steps without a matching evaluator file fall back to the interactive prompt if `--evaluate` is also passed, or are silently skipped otherwise.
+- `--judge-model MODEL` — Model for the judge LLM. Overrides `kit.json` → defaults to the same model as the main run.
+- `--evaluator-aggregation STRATEGY` — Score aggregation for multi-dimension evaluators: `average` (default), `min`, `max`, `first`. Overrides `kit.json`.
 
 ### Validating a kit
 
@@ -653,7 +701,7 @@ kit.tools["1"] = Tool(tool_name="read_url", tool_id="tool_1")
 # Then in instruction_1.txt:  "Fetch {tool_1} and summarise the content."
 ```
 
-### Evaluate a run
+### Evaluate a run (interactive)
 
 ```python
 outputs = await run_reasoning_kit_async(
@@ -665,6 +713,29 @@ outputs = await run_reasoning_kit_async(
 )
 # After each step the CLI prompts: "Rate step N (0-100):"
 # Scores are stored in evaluations/{N}.json and in the DB step_executions table
+```
+
+### Auto-evaluate a run (judge LLM)
+
+Add `evaluator_N.txt` files to the kit directory, then pass `auto_evaluate=True`:
+
+```python
+outputs = await run_reasoning_kit_async(
+    kit=kit,
+    evaluate=True,
+    auto_evaluate=True,
+    judge_model="gpt-5.4-nano",      # optional; None = use same model as main run
+    evaluation_mode="transparent",
+)
+# Steps with evaluator_N.txt are scored by the judge LLM automatically
+# Steps without evaluator_N.txt fall back to the interactive prompt
+# Scores are written to the same DB column (evaluation_score) as manual scores
+```
+
+Or via CLI (no Python required):
+
+```bash
+openclerk run my-kit --local --auto-evaluate --judge-model gpt-5.4-nano
 ```
 
 ---

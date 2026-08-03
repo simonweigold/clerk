@@ -31,6 +31,15 @@ class Tool(BaseModel):
     configuration: str | None = None  # Optional JSON config overrides
 
 
+class KitConfig(BaseModel):
+    """Per-kit default settings loaded from kit.json."""
+
+    model: str | None = None
+    judge_model: str | None = None
+    evaluator_aggregation: str | None = None
+    mode: str | None = None
+
+
 class ReasoningKit(BaseModel):
     """A complete reasoning kit with resources and workflow."""
 
@@ -39,6 +48,18 @@ class ReasoningKit(BaseModel):
     resources: dict[str, Resource]
     workflow: dict[str, WorkflowStep]
     tools: dict[str, Tool] = {}  # tool_number -> Tool
+    # step number (str) -> [(label, prompt), ...]; label "default" for plain .txt evaluators
+    evaluators: dict[str, list[tuple[str, str]]] = {}
+    # step number (str) -> aggregation strategy; set when evaluator_N.json defines "aggregation"
+    evaluator_aggregations: dict[str, str] = {}
+    config: KitConfig = KitConfig()
+
+
+class DimensionScore(BaseModel):
+    """Score for one evaluation dimension of a workflow step."""
+
+    label: str  # e.g. "structure", "coverage", "default"
+    score: int  # 0-100
 
 
 class StepEvaluation(BaseModel):
@@ -46,7 +67,8 @@ class StepEvaluation(BaseModel):
 
     input: str | int  # Full text (transparent) or char count (anonymous)
     output: str | int  # Full text (transparent) or char count (anonymous)
-    evaluation: int  # 0-100 score from user
+    dimension_scores: list[DimensionScore] = []  # one entry per evaluator; [] for legacy data
+    evaluation: int  # aggregated 0-100 score (average by default)
 
 
 class Evaluation(BaseModel):

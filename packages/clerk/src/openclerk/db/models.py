@@ -321,6 +321,7 @@ class StepExecution(Base):
     output_text: Mapped[str | None] = mapped_column(Text)
     output_char_count: Mapped[int | None] = mapped_column(Integer)
     evaluation_score: Mapped[int | None] = mapped_column(Integer)
+    evaluation_scores: Mapped[list | None] = mapped_column(JSONB, nullable=True)
     model_used: Mapped[str | None] = mapped_column(String(100))
     tokens_used: Mapped[int | None] = mapped_column(Integer)
     latency_ms: Mapped[int | None] = mapped_column(Integer)

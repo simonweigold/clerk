@@ -32,14 +32,29 @@ A **reasoning kit** is a directory of plain text files that define a multi-step 
 
 | File pattern             | Role                         | Notes                                                           |
 | ------------------------ | ---------------------------- | --------------------------------------------------------------- |
+| `kit.json`               | Kit-level defaults (optional)| Sets default `model`, `judge_model`, `mode`, `evaluator_aggregation` |
 | `instruction_N.txt`      | Workflow step N              | N starts at 1; steps run in ascending order                     |
 | `resource_N.EXT`         | Static resource N            | Read at load time; any extension supported                      |
 | `dynamic_resource_N.EXT` | Dynamic resource N           | Content is empty at load time; user provides it at runtime      |
 | `tool_N.json`            | Tool reference N             | References a tool from the global registry (built-in or MCP)    |
-| `evaluator_N.txt`        | Judge LLM prompt for step N  | Auto-scores step N's output when `--auto-evaluate` is used      |
+| `evaluator_N.json`       | Multi-dimension evaluator N  | JSON with `dimensions` dict and optional `aggregation` key      |
+| `evaluator_N.txt`        | Single-dimension evaluator N | Plain text fallback; label is `"default"`                       |
 | `mcp_servers.json`       | MCP server config (optional) | Kit-local override; merges with project-root `mcp_servers.json` |
 
 Directories named `evaluations/` inside a kit are created automatically and hold evaluation JSON files — do not create them manually.
+
+### kit.json format
+
+```json
+{
+  "judge_model": "deepseek/deepseek-v4-pro",
+  "model": "gpt-5.4-nano",
+  "evaluator_aggregation": "average",
+  "mode": "transparent"
+}
+```
+
+All fields are optional. Precedence: **CLI flag → `kit.json` → env var → hardcoded default**.
 
 ### Placeholder syntax inside instructions
 
@@ -124,13 +139,21 @@ class Tool(BaseModel):
     display_name: str | None
     configuration: str | None  # optional JSON overrides
 
+class KitConfig(BaseModel):
+    model: str | None = None           # default LLM for the main workflow
+    judge_model: str | None = None     # default judge LLM for auto-evaluation
+    evaluator_aggregation: str | None  # "average" | "min" | "max" | "first"
+    mode: str | None = None            # "transparent" | "anonymous"
+
 class ReasoningKit(BaseModel):
     name: str
     path: str              # filesystem path or "db://<slug>"
     resources: dict[str, Resource]     # "1" -> Resource
     workflow: dict[str, WorkflowStep]  # "1" -> WorkflowStep
     tools: dict[str, Tool]             # "1" -> Tool  (may be empty)
-    evaluators: dict[str, str] = {}    # "1" -> evaluator prompt text (may be empty)
+    evaluators: dict[str, list[tuple[str, str]]] = {}   # "1" -> [(label, prompt), ...]
+    evaluator_aggregations: dict[str, str] = {}         # "1" -> aggregation strategy
+    config: KitConfig = KitConfig()    # loaded from kit.json; all fields optional
 ```
 
 ---
@@ -435,8 +458,9 @@ If all dynamic resources are satisfied via flags, the interactive prompt is skip
 
 **Auto-evaluation flags:**
 
-- `--auto-evaluate` — Score each step using `evaluator_N.txt` instead of prompting the user. Implicitly enables evaluation. Steps without a matching evaluator file fall back to the interactive prompt if `--evaluate` is also passed, or are silently skipped otherwise.
-- `--judge-model MODEL` — Model for the judge LLM. Defaults to the same model as the main run.
+- `--auto-evaluate` — Score each step using `evaluator_N.txt` / `evaluator_N.json` instead of prompting the user. Implicitly enables evaluation. Steps without a matching evaluator file fall back to the interactive prompt if `--evaluate` is also passed, or are silently skipped otherwise.
+- `--judge-model MODEL` — Model for the judge LLM. Overrides `kit.json` → defaults to the same model as the main run.
+- `--evaluator-aggregation STRATEGY` — Score aggregation for multi-dimension evaluators: `average` (default), `min`, `max`, `first`. Overrides `kit.json`.
 
 ### Validating a kit
 

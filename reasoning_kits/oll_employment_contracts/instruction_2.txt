@@ -9,37 +9,63 @@ INITIAL CONTRACT ANALYSIS:
 AVAILABLE TOOLS:
 You have access to the following Swiss legal research tools from OpenCaseLaw. You MUST invoke them by calling the tool function with the exact parameters. Do not merely describe what you would do — actually call the tools. Do not invent stuff and leave nothing out.
 
-- {tool_1}: search_decisions — Search Swiss court decisions using full-text search. Supports keywords, phrases, canton filters, court filters, date ranges, and result limits. Parameters: query (string, required), canton (string, optional, e.g. "ZH", "BE", "GE"), court (string, optional), date_from (string, optional, YYYY-MM-DD), date_to (string, optional, YYYY-MM-DD), limit (integer, optional, default 10, max 50).
-- {tool_2}: get_law — Look up the current authoritative text of any Swiss law article — federal or cantonal. Parameters: abbreviation (string, required, e.g. "OR", "ZGB", "StGB", "MRG"), article (string, required, e.g. "319", "320", "334"), language (string, optional, "de", "fr", "it", default "de").
-- {tool_3}: find_leading_cases — Find the most-cited decisions for a topic or statute. Authority ranking based on citation count. Parameters: law_code (string, optional, e.g. "OR"), article (string, optional, e.g. "319"), topic (string, optional), limit (integer, optional, default 5).
-- {tool_4}: get_doctrine — Get statute text + leading cases + doctrinal timeline + Federal Council Botschaft for a Swiss law article. Parameters: abbreviation (string, required), article (string, required), language (string, optional, default "de").
+- {tool_1}: search_decisions — Search Swiss court decisions using full-text search. Parameters: query (string, required), canton (string, optional), court (string, optional), date_from (string, optional, YYYY-MM-DD), date_to (string, optional, YYYY-MM-DD), limit (integer, optional, default 10, max 50).
+- {tool_2}: get_law — Look up the current authoritative text of any Swiss law article. Parameters: abbreviation (string, required, e.g. "OR"), article (string, required, e.g. "319"), language (string, optional, default "de").
+- {tool_3}: find_leading_cases — Find the most-cited decisions for a topic or statute. Parameters: law_code (string, optional, e.g. "OR"), article (string, optional, e.g. "319"), topic (string, optional), limit (integer, optional, default 5).
+- {tool_4}: get_doctrine — Get doctrinal commentary and Federal Council Botschaft for a Swiss law article. Parameters: abbreviation (string, required), article (string, required), language (string, optional, default "de").
 - {tool_5}: search_laws — Full-text search across Swiss statute articles. Parameters: query (string, required), limit (integer, optional, default 10).
 - {tool_6}: get_case_brief — Get a structured case brief for a Swiss court decision. Parameters: decision_id (string, required, e.g. "bger_4a_2023_123") OR reference (string, e.g. "BGE 143 III 123").
 
-RESEARCH TASK:
-Find everything about Swiss employment law relevant to the analyzed contract from the tools above.
+RESEARCH STRATEGY — follow this order:
 
-Use the available legal research tools to:
-1. Look up the mandatory requirements for employment contracts under Swiss law
-2. Find relevant articles using the research tools
-3. Search for relevant Swiss court decisions on employment contract validity
-4. Search for relevant doctrine
-5. Identify any mandatory provisions that cannot be contractually waived
+Step A — Statute lookup (mandatory):
+Call get_law for each of the following OR articles. These are required regardless of what the contract says:
+- OR 319 (Einzelarbeitsvertrag definition)
+- OR 324a (wage continuation during illness)
+- OR 329a (minimum vacation)
+- OR 335b (probation period and notice)
+- OR 335c (notice periods)
+- OR 336c (notice during protected periods)
+- OR 340 and OR 340a (non-compete validity and limits)
 
-Research strategy:
-1. Start by looking up the most relevant statute articles with {tool_2} or {tool_4}.
-2. Use {tool_3} to identify landmark decisions on those articles.
-3. Use {tool_1} with your key terms to find recent and relevant case law.
-4. Call tools iteratively — use findings from one search to refine the next.
+Step B — Leading court decisions (mandatory):
+Call find_leading_cases for EVERY mandatory article listed above. You must make at least 7 separate find_leading_cases calls — one per article:
+  find_leading_cases(law_code="OR", article="319", limit=5)
+  find_leading_cases(law_code="OR", article="324a", limit=5)
+  find_leading_cases(law_code="OR", article="329a", limit=5)
+  find_leading_cases(law_code="OR", article="335b", limit=5)
+  find_leading_cases(law_code="OR", article="335c", limit=5)
+  find_leading_cases(law_code="OR", article="336c", limit=5)
+  find_leading_cases(law_code="OR", article="340", limit=5)
 
-For each tool call, include in your output:
-- Which tool you called and with what parameters
-- A summary of the actual results returned by the tool
-- Your analysis of how the result advances the research
+Each BGE decision returned becomes its own entry in the output JSON. Do not group them.
 
-Output a list of sources relevant for the contract to be analyzed and a brief description of why the source is relevant in this format:
+Also call search_decisions with 2–3 targeted keyword queries to find additional decisions (e.g. "Konkurrenzverbot Konventionalstrafe", "Sperrfrist Kündigung nichtig", "Probezeit Kündigung").
+
+Step C — Additional research:
+Look up any further articles, decisions, or statutes relevant to this specific contract's provisions.
+
+OUTPUT FORMAT:
+Produce a single JSON object. Each key is a source identifier, each value has exactly three fields: "retrieved_by", "source_type", "relevance".
+
+- source_type "statute": entries from get_law calls. Key format: "OR Art. 319"
+- source_type "case_law": entries from find_leading_cases or search_decisions. Key format: "BGE 130 III 28"
+
+Example:
 {
-   "source": "description",
-   "source": "description",
-   ...
+  "OR Art. 319": {
+    "retrieved_by": "get_law(abbreviation='OR', article='319') — returned: statute text defining Einzelarbeitsvertrag",
+    "source_type": "statute",
+    "relevance": "Foundational article classifying this contract as an Einzelarbeitsvertrag, triggering all mandatory OR employment protections."
+  },
+  "BGE 130 III 28": {
+    "retrieved_by": "find_leading_cases(law_code='OR', article='337', limit=5) — returned: citation count 412, summary of holding on wichtiger Grund",
+    "source_type": "case_law",
+    "relevance": "Leading case on immediate termination — relevant to the fristlose Auflösung clause in this contract."
+  }
 }
+
+Rules:
+- "retrieved_by": name the exact tool and parameters used, plus a brief summary of what it actually returned.
+- Every entry must correspond to an actual tool call. Do not invent sources.
+- Create one entry per source. Each BGE decision is its own entry with the BGE citation as the key.

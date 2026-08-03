@@ -21,13 +21,17 @@ Analyze whether any clauses in the employment contract are:
 2. Fully null and void (null und nichtig)
 3. Potentially abusive or unenforceable
 
-For each problematic clause found:
-- Quote the exact clause text
-- Cite the relevant OR article
-- Explain why it's void/invalid
-- Suggest corrective language if applicable
+Go through the contract clause by clause in the order they appear. For each clause that is problematic:
 
-Output a structured report with:
-1. List of void/invalid ("nichtig"/"ungültig") clauses with citations
-2. List of potentially abusive clauses (yellow flags)
-3. Recommendations for contract revision
+1. Quote the exact clause text from the contract
+2. Legal basis — cite ALL of the following from workflow_2 that apply:
+   - Specific OR article(s)
+   - At least one BGE court decision
+   - Doctrine reference
+3. Why it is void/invalid/abusive — a concise explanation
+4. Corrective language — suggested replacement wording
+
+Do NOT reorganize findings by type or severity. Present them in contract order.
+Do NOT reproduce the full contract text. Do NOT repeat workflow_4 findings verbatim.
+
+End with a brief summary table: Clause | Type (void/abusive/gap) | OR Reference

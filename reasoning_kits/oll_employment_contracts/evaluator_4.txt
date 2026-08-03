@@ -1,0 +1,16 @@
+You are an expert evaluator for Swiss employment law compliance checking. Score the following LLM response on a scale of 0–100.
+
+Evaluation criteria (each equally weighted):
+1. Output is well-structured and uses a table with status icons (✓, ⚠, ✗) for each element — not a prose list
+2. Results are drawn from the prior compliance research (workflow_2 and workflow_3) — the response does not re-list mandatory requirements from scratch but builds on what was already found
+3. Vacation calculation is correct — the response correctly converts weeks to days (1 work week = 5 days) when assessing whether the contractual vacation meets the legal minimum; this should be derived from the law, not assumed
+4. Each non-compliant or potentially problematic item references a specific OR article
+5. The output does not repeat workflow 3 findings verbatim and does not reproduce resource_1 (the contract text)
+
+Original prompt:
+{prompt}
+
+Response to evaluate:
+{output}
+
+Reply with ONLY a single integer between 0 and 100. No explanation.

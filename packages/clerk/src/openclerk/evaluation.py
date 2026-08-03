@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 from uuid import UUID
 
-from .models import Evaluation, StepEvaluation
+from .models import DimensionScore, Evaluation, StepEvaluation
 
 
 def prompt_for_evaluation(step: int, output_id: str) -> int:
@@ -87,28 +87,38 @@ def create_step_evaluation(
     output: str,
     score: int,
     mode: str,
+    dimension_scores: list[dict] | None = None,
 ) -> StepEvaluation:
     """Create a StepEvaluation with the appropriate data based on mode.
 
     Args:
         prompt: The input prompt sent to the LLM
         output: The output received from the LLM
-        score: The user's evaluation score (0-100)
+        score: The aggregated evaluation score (0-100)
         mode: Either "transparent" (store full text) or "anonymous" (store char counts)
+        dimension_scores: Optional list of per-dimension scores, each a dict with
+            "label" and "score" keys. When None, a single "default" dimension is created.
 
     Returns:
         StepEvaluation with data appropriate for the mode
     """
+    if dimension_scores is None:
+        dims = [DimensionScore(label="default", score=score)]
+    else:
+        dims = [DimensionScore(label=d["label"], score=d["score"]) for d in dimension_scores]
+
     if mode == "transparent":
         return StepEvaluation(
             input=prompt,
             output=output,
+            dimension_scores=dims,
             evaluation=score,
         )
     else:  # anonymous
         return StepEvaluation(
             input=len(prompt),
             output=len(output),
+            dimension_scores=dims,
             evaluation=score,
         )
 
@@ -224,13 +234,16 @@ async def update_step_evaluation_in_db(
     run_id: UUID,
     step_number: int,
     score: int,
+    dimension_scores: list[dict] | None = None,
 ) -> None:
     """Update the evaluation score for a step in the database.
 
     Args:
         run_id: The execution run's UUID
         step_number: The workflow step number
-        score: The user's evaluation score (0-100)
+        score: The aggregated evaluation score (0-100)
+        dimension_scores: Optional per-dimension breakdown as list of
+            {"label": str, "score": int} dicts
     """
     from .db import ExecutionRepository, get_async_session
 
@@ -240,6 +253,7 @@ async def update_step_evaluation_in_db(
             run_id=run_id,
             step_number=step_number,
             evaluation_score=score,
+            evaluation_scores=dimension_scores,
         )
 
 

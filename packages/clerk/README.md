@@ -45,7 +45,7 @@ clerk web
 
 ## Documentation
 
-For full documentation, visit [https://openclerk.dev/docs](https://openclerk.dev/docs)
+For full documentation, visit [https://openclerk.ch/docs](https://openclerk.ch/docs)
 
 ## License
 

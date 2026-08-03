@@ -1,199 +1,93 @@
 import { Link } from "react-router-dom";
-import { ArrowRight, Github, Layers, Zap, Shield, Upload } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
+import LifecycleAnimation from "../components/LifecycleAnimation";
 
 export default function LandingPage() {
   const { user } = useAuth();
 
   return (
-    <div className="fade-in">
-      {/* Hero Section */}
-      <section className="py-20 md:py-28 text-center">
-        <h1 className="text-5xl md:text-6xl font-bold text-foreground mb-6 tracking-tight">
-          Executable Reasoning
+    <div className="landing fade-in">
+      {/* Hero */}
+      <section className="pt-24 pb-10 text-center">
+        <span className="eyebrow">Open-source · Reasoning kits</span>
+        <h1 className="mt-6 max-w-3xl mx-auto">
+          Multi-step LLM workflows
           <br />
-          <span className="text-primary">Made Simple</span>
+          you can <span className="acc">score</span>.
         </h1>
-        <p className="text-xl text-muted-foreground max-w-2xl mx-auto mb-10 leading-relaxed">
-          CLERK is the community library for multi-step LLM reasoning workflows.
-          Create, share, and run reasoning kits — from simple prompts to complex
-          LangGraph-powered pipelines.
+        <p className="sub mt-6 max-w-xl mx-auto">
+          OpenClerk packages expert reasoning into reusable pipelines where
+          every step is judged. Quality becomes measured, not guessed.
         </p>
-        <div className="flex items-center justify-center gap-4 flex-wrap">
+        <div className="mt-10 flex items-center justify-center gap-3.5 flex-wrap">
           {user ? (
-            <Link to="/app" className="btn btn-primary btn-lg">
-              Go to App
-              <ArrowRight className="w-5 h-5" />
-            </Link>
+            <Link to="/app" className="btn-landing btn-solid">Go to App</Link>
           ) : (
-            <Link to="/auth/signup" className="btn btn-primary btn-lg">
+            <Link to="/auth/signup" className="btn-landing btn-solid">
               Sign Up for Early Access
-              <ArrowRight className="w-5 h-5" />
             </Link>
           )}
           <a
             href="https://github.com/simonweigold/clerk"
             target="_blank"
             rel="noopener noreferrer"
-            className="btn btn-secondary btn-lg"
+            className="btn-landing btn-line"
           >
-            <Github className="w-5 h-5" />
             View on GitHub
           </a>
         </div>
       </section>
 
-      {/* Features Section */}
-      <section className="py-16 border-t border-border">
-        <div className="text-center mb-12">
-          <h2 className="text-3xl font-bold mb-3">Why CLERK?</h2>
-          <p className="text-muted-foreground max-w-lg mx-auto">
-            Everything you need to build and share executable reasoning
-            workflows
-          </p>
-        </div>
-
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <FeatureCard
-            icon={<Layers className="w-6 h-6" />}
-            title="Multi-Step Workflows"
-            description="Chain prompts together with dependencies. Each step builds on the previous, creating complex reasoning pipelines."
-          />
-          <FeatureCard
-            icon={<Zap className="w-6 h-6" />}
-            title="LangGraph Powered"
-            description="Built on LangGraph for robust, stateful execution. Handle loops, branching, and conditional logic with ease."
-          />
-          <FeatureCard
-            icon={<Shield className="w-6 h-6" />}
-            title="Self-Hostable"
-            description="Own your data. Deploy CLERK on your own infrastructure with full control over your reasoning workflows."
-          />
-          <FeatureCard
-            icon={<Upload className="w-6 h-6" />}
-            title="Kit Marketplace"
-            description="Share your reasoning kits with the community. Discover and use workflows created by others."
-          />
+      {/* The animation is the explanation */}
+      <section className="pb-16">
+        <div className="max-w-[760px] mx-auto">
+          <LifecycleAnimation />
         </div>
       </section>
 
-      {/* How It Works Section */}
-      <section className="py-16 border-t border-border">
-        <div className="text-center mb-12">
-          <h2 className="text-3xl font-bold mb-3">How It Works</h2>
-          <p className="text-muted-foreground max-w-lg mx-auto">
-            Get started with executable reasoning in three simple steps
-          </p>
-        </div>
-
-        <div className="grid md:grid-cols-4 gap-8">
-          <StepCard
-            number={1}
-            title="Install"
-            description="Set up CLERK locally or self-host. One command to get the CLI and web interface running."
-          />
-          <StepCard
-            number={2}
-            title="Define a Kit"
-            description="Create a reasoning kit with prompts, resources, and workflow steps. Version control your reasoning."
-          />
-          <StepCard
-            number={3}
-            title="Execute"
-            description="Run your kit with any input. Watch the reasoning unfold step by step, with full visibility into the process."
-          />
-          <StepCard
-            number={4}
-            title="Evaluate"
-            description="Assess the performance of your kit. Iterate and improve your reasoning workflows based on real-world usage."
-          />
+      {/* Three quiet points, no cards, no icons */}
+      <section className="hairline py-14">
+        <div className="max-w-3xl mx-auto grid sm:grid-cols-3 gap-10 text-center">
+          <Point title="Kits" line="Executable multi-step workflows, versioned like code." />
+          <Point title="Evaluation first" line="A judge model scores every run out of 100." />
+          <Point title="Open" line="MIT licensed and self-hostable." />
         </div>
       </section>
 
-      {/* CTA Section */}
-      <section className="py-20 text-center border-t border-border">
-        <h2 className="text-3xl font-bold mb-4">Ready to get started?</h2>
-        <p className="text-muted-foreground max-w-lg mx-auto mb-8">
-          Join the early access list and be the first to experience the future
-          of executable reasoning.
+      {/* Roadmap strip */}
+      <section className="hairline py-14 text-center">
+        <p className="sub max-w-md mx-auto">
+          The same kits can later be{" "}
+          <span className="text-foreground font-medium">
+            distilled into a small, fast model
+          </span>{" "}
+          that knows the workflow natively.
         </p>
-        <div className="flex items-center justify-center gap-4 flex-wrap">
-          {user ? (
-            <Link to="/app" className="btn btn-primary btn-lg">
-              Go to Early Access
-              <ArrowRight className="w-5 h-5" />
-            </Link>
-          ) : (
-            <Link to="/auth/signup" className="btn btn-primary btn-lg">
-              Sign Up for Early Access
-              <ArrowRight className="w-5 h-5" />
-            </Link>
-          )}
+        <div className="mt-7 inline-flex items-center text-sm font-medium">
+          <span className="px-4 py-2 border-y border-l border-[var(--hairline)] rounded-l-[10px] text-[var(--brand)]">Author</span>
+          <span className="px-2 text-gray-300">→</span>
+          <span className="px-4 py-2 border-y border-[var(--hairline)] text-[var(--muted-l)]">Evaluate</span>
+          <span className="px-2 text-gray-300">→</span>
+          <span className="px-4 py-2 border-y border-[var(--hairline)] text-[var(--muted-l)]">Compile</span>
+          <span className="px-2 text-gray-300">→</span>
+          <span className="px-4 py-2 border-y border-r border-[var(--hairline)] rounded-r-[10px] text-[var(--brand)]">Distill</span>
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="py-8 border-t border-border">
-        <div className="flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-muted-foreground">
-          <div className="flex items-center gap-6">
-            <a
-              href="https://github.com/simonweigold/clerk"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hover:text-foreground transition-colors"
-            >
-              GitHub
-            </a>
-            {/* <Link
-              to="/docs"
-              className="hover:text-foreground transition-colors"
-            >
-              Documentation
-            </Link> */}
-          </div>
-          <p>CLERK — Community Library of Executable Reasoning Kits</p>
-        </div>
-      </footer>
+      {/* Footer note */}
+      <section className="hairline py-8 text-center text-sm text-[var(--muted-l)]">
+        CLERK · Community Library of Executable Reasoning Kits · MIT License
+      </section>
     </div>
   );
 }
 
-function FeatureCard({
-  icon,
-  title,
-  description,
-}: {
-  icon: React.ReactNode;
-  title: string;
-  description: string;
-}) {
+function Point({ title, line }: { title: string; line: string }) {
   return (
-    <div className="glass-card text-center p-6">
-      <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center mx-auto mb-4 text-primary">
-        {icon}
-      </div>
-      <h3 className="font-semibold text-lg mb-2">{title}</h3>
-      <p className="text-sm text-muted-foreground">{description}</p>
-    </div>
-  );
-}
-
-function StepCard({
-  number,
-  title,
-  description,
-}: {
-  number: number;
-  title: string;
-  description: string;
-}) {
-  return (
-    <div className="text-center">
-      <div className="w-12 h-12 rounded-full bg-primary text-white flex items-center justify-center mx-auto mb-4 text-lg font-bold">
-        {number}
-      </div>
-      <h3 className="font-semibold text-lg mb-2">{title}</h3>
-      <p className="text-sm text-muted-foreground">{description}</p>
+    <div>
+      <span className="inline-block w-2 h-2 rounded-full bg-[var(--brand)] mb-3" />
+      <h3 className="font-semibold text-base mb-1">{title}</h3>
+      <p className="text-sm text-[var(--muted-l)]">{line}</p>
     </div>
   );
 }

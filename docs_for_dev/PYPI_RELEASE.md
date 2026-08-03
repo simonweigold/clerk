@@ -200,7 +200,7 @@ Before proceeding, clarify the following:
 
 4. ~~**TestPyPI**: Should we automate TestPyPI uploads on every merge to main, or only on demand?~~ **Configured**: Index added to workspace `pyproject.toml`; use `just publish-test` on demand.
 
-5. **Homepage URL**: The README shows `openclerk.dev` - is this the correct domain for `project.urls.Homepage`?
+5. **Homepage URL**: The README shows `openclerk.ch` - is this the correct domain for `project.urls.Homepage`?
 
 6. ~~**License**: The LICENSE file is at root level. Should it be copied to `packages/clerk/` or is hatchling configured to find it at workspace root?~~ **Resolved**: Copied to `packages/clerk/LICENSE` and verified in wheel/sdist.
 

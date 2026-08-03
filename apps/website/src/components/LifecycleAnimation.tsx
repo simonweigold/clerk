@@ -1,6 +1,10 @@
 import { useEffect, useRef } from "react";
 
-export default function LifecycleAnimation() {
+interface LifecycleAnimationProps {
+  onComplete?: () => void;
+}
+
+export default function LifecycleAnimation({ onComplete }: LifecycleAnimationProps) {
   const rootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -190,7 +194,6 @@ export default function LifecycleAnimation() {
     const rerun = [false, false, false, false, false];
     let shimmered = false;
     let prevPx = 88;
-    let prevT = 0;
     let lastKey: string | null = "Assemble|The steps come together into one kit";
 
     function pulse(i: number, t0: number, dur: number, amp: number): void {
@@ -205,16 +208,6 @@ export default function LifecycleAnimation() {
         if (u > 0 && u < 1) s += p.amp * Math.sin(u * Math.PI);
       }
       return s;
-    }
-    function resetLoop(): void {
-      pulses.length = 0;
-      act.fill(-1);
-      settled.fill(false);
-      scanned.fill(false);
-      rerun.fill(false);
-      shimmered = false;
-      prevPx = 88;
-      lastKey = null;
     }
 
     /* ---------- captions ---------- */
@@ -534,25 +527,31 @@ export default function LifecycleAnimation() {
       score.setAttribute("fill", "#130DDD");
       phaseWord.textContent = "Assemble";
       phaseLine.textContent = "Execute · Evaluate · Improve · Complete";
-      return;
+      const doneTimer = window.setTimeout(() => onComplete?.(), 2500);
+      return () => window.clearTimeout(doneTimer);
     }
 
-    /* ---------- loop driver ---------- */
+    /* ---------- loop driver: play once on load ---------- */
     let running = false;
     let raf: number | null = null;
     let acc = 0;
     let last = 0;
+    let done = false;
 
     function tick(ts: number): void {
-      if (!running) return;
+      if (!running || done) return;
       if (!last) last = ts;
       const dt = Math.min((ts - last) / 1000, 0.05);
       last = ts;
       acc += dt;
-      const t = acc % DUR;
-      if (t < prevT) resetLoop();
+      const t = Math.min(acc, DUR);
       frame(t, dt);
-      prevT = t;
+      if (acc >= DUR) {
+        done = true;
+        stop();
+        onComplete?.();
+        return;
+      }
       raf = requestAnimationFrame(tick);
     }
     function start(): void {
@@ -567,18 +566,12 @@ export default function LifecycleAnimation() {
       raf = null;
     }
 
-    const stage = svg.closest(".stage") || svg;
-    const io = new IntersectionObserver(
-      (es) => es.forEach((e) => (e.isIntersecting ? start() : stop())),
-      { threshold: 0.05 },
-    );
-    io.observe(stage);
+    start();
 
     return () => {
       stop();
-      io.disconnect();
     };
-  }, []);
+  }, [onComplete]);
 
   return (
     <div ref={rootRef} className="stage">

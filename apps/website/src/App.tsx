@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { Analytics } from "@vercel/analytics/react";
 import { AuthProvider } from "./hooks/useAuth";
 import { ToastProvider } from "./hooks/useToast";
+import { SplashProvider } from "./contexts/SplashProvider";
 import Layout from "./components/Layout";
 import AuthGuard from "./components/AuthGuard";
 import LandingPage from "./pages/LandingPage";
@@ -15,39 +16,41 @@ import DocsPage from "./pages/DocsPage";
 export default function App() {
   return (
     <BrowserRouter>
-      <ToastProvider>
-        <AuthProvider>
-          <Routes>
-            <Route element={<Layout />}>
-              {/* Public landing page */}
-              <Route path="/" element={<LandingPage />} />
+      <SplashProvider>
+        <ToastProvider>
+          <AuthProvider>
+            <Routes>
+              <Route element={<Layout />}>
+                {/* Public landing page */}
+                <Route path="/" element={<LandingPage />} />
 
-              {/* Documentation */}
-              <Route path="/docs" element={<DocsPage />} />
-              <Route path="/docs/*" element={<DocsPage />} />
+                {/* Documentation */}
+                <Route path="/docs" element={<DocsPage />} />
+                <Route path="/docs/*" element={<DocsPage />} />
 
-              {/* Auth */}
-              <Route path="/auth/login" element={<LoginPage />} />
-              <Route path="/auth/signup" element={<SignupPage />} />
-              <Route
-                path="/auth/reset-password"
-                element={<ResetPasswordPage />}
-              />
-              <Route path="/auth/logout" element={<LogoutPage />} />
+                {/* Auth */}
+                <Route path="/auth/login" element={<LoginPage />} />
+                <Route path="/auth/signup" element={<SignupPage />} />
+                <Route
+                  path="/auth/reset-password"
+                  element={<ResetPasswordPage />}
+                />
+                <Route path="/auth/logout" element={<LogoutPage />} />
 
-              {/* Early Access page - requires auth */}
-              <Route
-                path="/app"
-                element={
-                  <AuthGuard>
-                    <EarlyAccessPage />
-                  </AuthGuard>
-                }
-              />
-            </Route>
-          </Routes>
-        </AuthProvider>
-      </ToastProvider>
+                {/* Early Access page - requires auth */}
+                <Route
+                  path="/app"
+                  element={
+                    <AuthGuard>
+                      <EarlyAccessPage />
+                    </AuthGuard>
+                  }
+                />
+              </Route>
+            </Routes>
+          </AuthProvider>
+        </ToastProvider>
+      </SplashProvider>
       <Analytics />
     </BrowserRouter>
   );

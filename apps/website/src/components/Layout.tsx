@@ -1,10 +1,12 @@
 import { Link, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
+import { useSplash } from "../hooks/useSplash";
 import { ToastContainer } from "../hooks/useToast";
 import { LogOut, Github } from "lucide-react";
 
 export default function Layout() {
   const { user, supabaseConfigured, loading } = useAuth();
+  const { isSplashActive } = useSplash();
   const location = useLocation();
 
   // Determine if we're on a landing page route
@@ -23,16 +25,30 @@ export default function Layout() {
   return (
     <div className="min-h-screen flex flex-col bg-white font-sans text-foreground antialiased">
       {/* Navigation — frosted glass */}
-      <header className="sticky top-0 z-50 border-b border-border bg-white/80 backdrop-blur-lg">
-        <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
-          <Link to="/" className="clerk-logo" id="clerk-logo">
+      <header
+        className={`sticky top-0 z-50 border-b border-border bg-white/80 backdrop-blur-lg transition-all duration-700 ${
+          isSplashActive ? "splash-active" : ""
+        }`}
+      >
+        <div className="max-w-5xl mx-auto px-4 py-3 sm:px-6 sm:py-4 flex items-center justify-between">
+          <Link
+            to="/"
+            className={`clerk-logo transition-opacity duration-500 ${
+              isSplashActive ? "opacity-0" : "opacity-100"
+            }`}
+            id="clerk-logo"
+          >
             <span className="clerk-dot" />
             <span className="clerk-dot" />
             <span className="clerk-dot" />
             <span className="clerk-dot" />
             <span className="clerk-dot" />
           </Link>
-          <nav className="flex items-center gap-2">
+          <nav
+            className={`flex items-center justify-end gap-0.5 sm:gap-1.5 transition-all duration-500 ${
+              isSplashActive ? "blur-nav" : ""
+            }`}
+          >
             {isLandingRoute ? (
               // Landing page navigation
               <>
@@ -48,24 +64,24 @@ export default function Layout() {
                   <Github className="w-4 h-4" />
                 </a>
                 {loading ? (
-                  <div className="flex items-center justify-center ml-2 w-8 h-8">
+                  <div className="flex items-center justify-center ml-1 w-8 h-8">
                     <span className="pulse-dot" />
                   </div>
                 ) : user ? (
-                  <Link to="/app" className="btn btn-primary btn-sm ml-2">
+                  <Link to="/app" className="btn btn-primary btn-sm ml-1">
                     App
                   </Link>
                 ) : (
                   <>
                     <Link
                       to="/auth/login"
-                      className="btn btn-ghost btn-sm ml-2"
+                      className="btn btn-ghost btn-sm ml-1 hidden sm:inline-flex"
                     >
                       Sign In
                     </Link>
                     <Link
                       to="/auth/signup"
-                      className="btn btn-primary btn-sm ml-2"
+                      className="btn btn-primary btn-sm ml-1"
                     >
                       Sign Up
                     </Link>
@@ -104,7 +120,7 @@ export default function Layout() {
                   </>
                 )} */}
                 {loading ? (
-                  <div className="flex items-center justify-center ml-2 w-8 h-8">
+                  <div className="flex items-center justify-center ml-1 w-8 h-8">
                     <span className="pulse-dot" />
                   </div>
                 ) : supabaseConfigured ? (
@@ -114,7 +130,7 @@ export default function Layout() {
                         {/* Settings link disabled for launch */}
                         {/* <Link
                           to="/settings"
-                          className="btn btn-ghost btn-sm ml-2 px-2"
+                          className="btn btn-ghost btn-sm ml-1 px-2"
                           title="Account Settings"
                         >
                           <Settings className="w-4 h-4" />
@@ -131,7 +147,7 @@ export default function Layout() {
                       !isLandingRoute && (
                         <Link
                           to="/auth/login"
-                          className="btn btn-ghost btn-sm ml-2"
+                          className="btn btn-ghost btn-sm ml-1"
                         >
                           Sign In
                         </Link>

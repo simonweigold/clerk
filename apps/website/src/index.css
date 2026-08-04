@@ -679,6 +679,18 @@ textarea.input {
   background: rgba(19, 13, 221, 0.06);
 }
 
+@media (max-width: 639px) {
+  .nav-link {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.875rem;
+  }
+
+  header .btn-sm {
+    padding: 0.375rem 0.75rem;
+    font-size: 0.8125rem;
+  }
+}
+
 /* ── Kit filter toggle ── */
 .kit-filter-toggle {
   display: inline-flex;
@@ -935,4 +947,15 @@ textarea.input {
 
 @media (prefers-reduced-motion: reduce) {
   .landing #ring-guide { animation: none; }
+}
+
+/* ── Splash state for Layout during landing intro ── */
+.splash-active {
+  border-bottom-color: transparent;
+}
+
+.blur-nav {
+  filter: blur(6px);
+  opacity: 0.25;
+  pointer-events: none;
 }

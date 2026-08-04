@@ -1,21 +1,40 @@
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
+import { useSplash } from "../hooks/useSplash";
 import LifecycleAnimation from "../components/LifecycleAnimation";
 
 export default function LandingPage() {
   const { user } = useAuth();
+  const { setSplashActive } = useSplash();
   const [showHero, setShowHero] = useState(false);
+
+  const handleFlyStart = useCallback(
+    () => setSplashActive(false),
+    [setSplashActive],
+  );
+  const handleComplete = useCallback(
+    () => setShowHero(true),
+    [setShowHero],
+  );
+
+  useEffect(() => {
+    setSplashActive(true);
+    return () => setSplashActive(false);
+  }, [setSplashActive]);
 
   return (
     <div className="landing">
       <div className="relative min-h-[80vh] flex items-center justify-center">
         <div
-          className={`absolute inset-0 flex items-center justify-center px-6 transition-opacity duration-700 ${
+          className={`absolute inset-0 z-[60] flex items-center justify-center px-6 transition-opacity duration-700 ${
             showHero ? "opacity-0 pointer-events-none" : "opacity-100"
           }`}
         >
-          <LifecycleAnimation onComplete={() => setShowHero(true)} />
+          <LifecycleAnimation
+            onFlyStart={handleFlyStart}
+            onComplete={handleComplete}
+          />
         </div>
 
         <div

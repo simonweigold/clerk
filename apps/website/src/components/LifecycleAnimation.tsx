@@ -565,6 +565,10 @@ export default function LifecycleAnimation({ onFlyStart, onComplete }: Lifecycle
       ghost1.style.opacity = "0";
       ghost2.style.opacity = "0";
       svg.style.overflow = "visible";
+      // Force the SVG into its own compositing layer so Safari keeps the
+      // overflowing dots above the sticky nav during the flight.
+      svg.style.transform = "translateZ(0)";
+      svg.style.webkitTransform = "translateZ(0)";
 
       const targets = logoDots.map((ld) => {
         const r = ld.getBoundingClientRect();

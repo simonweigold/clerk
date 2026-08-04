@@ -21,6 +21,7 @@ export default function LifecycleAnimation({ onFlyStart, onComplete }: Lifecycle
     if (!svg) return;
 
     const scene = q<SVGGElement>("#scene");
+    const stageElements = q<SVGGElement>("#stage-elements");
     const dots = qa<SVGGElement>("#dots .dot");
     const bodies = dots.map(
       (g) => g.querySelector(".bd") as SVGCircleElement,
@@ -41,6 +42,7 @@ export default function LifecycleAnimation({ onFlyStart, onComplete }: Lifecycle
 
     if (
       !scene ||
+      !stageElements ||
       dots.length !== 5 ||
       bodies.some((b) => !b) ||
       !track ||
@@ -485,7 +487,7 @@ export default function LifecycleAnimation({ onFlyStart, onComplete }: Lifecycle
         bodies[i].setAttribute("fill", dotColor(lit));
       }
 
-      scene.style.opacity = (1 - seg(t, T.holdEnd, T.fadeEnd)).toFixed(3);
+      stageElements.style.opacity = (1 - seg(t, T.holdEnd, T.fadeEnd)).toFixed(3);
 
       const ph = phaseAt(t);
       setCaption(ph.name, ph.line);
@@ -549,8 +551,8 @@ export default function LifecycleAnimation({ onFlyStart, onComplete }: Lifecycle
       const svgRect = svg.getBoundingClientRect();
       const unitX = 820 / svgRect.width;
 
-      // Reveal only the dots for the flight
-      scene.style.opacity = "1";
+      // Hide the remaining stage elements so only the dots fly
+      stageElements.style.opacity = "0";
       score.style.opacity = "0";
       head.style.opacity = "0";
       guide.style.opacity = "0";
@@ -595,13 +597,6 @@ export default function LifecycleAnimation({ onFlyStart, onComplete }: Lifecycle
 
       cleanupTimer = window.setTimeout(() => {
         onComplete?.();
-        dots.forEach((dot) => {
-          dot.animate([{ opacity: 1 }, { opacity: 0 }], {
-            duration: 200,
-            easing: "ease-in",
-            fill: "forwards",
-          });
-        });
       }, 900);
     }
 
@@ -657,60 +652,62 @@ export default function LifecycleAnimation({ onFlyStart, onComplete }: Lifecycle
         aria-label="Animated loop showing a reasoning kit assembling from five dots into a row, executing by passing a document through each step, moving into a gauge that is scored, and improving from 74 to 94."
       >
         <g id="scene">
-          <line
-            id="track"
-            x1="70"
-            y1="205"
-            x2="750"
-            y2="205"
-            stroke="#E4E3FB"
-            strokeWidth="3"
-            strokeLinecap="round"
-          />
-          <circle id="ring-guide" cx="410" cy="210" r="172" />
-          <circle
-            id="gauge"
-            cx="410"
-            cy="210"
-            r="172"
-            pathLength="100"
-            stroke="#716EEB"
-            strokeDasharray="100 100"
-            strokeDashoffset="100"
-          />
-          <circle
-            id="delta"
-            cx="410"
-            cy="210"
-            r="172"
-            pathLength="100"
-            strokeDasharray="100 100"
-            strokeDashoffset="100"
-          />
-          <circle id="edit-pulse" cx="410" cy="210" r="172" pathLength="100" />
-          <circle
-            id="sweep"
-            cx="410"
-            cy="210"
-            r="172"
-            pathLength="100"
-            stroke="#130DDD"
-            strokeDasharray="100 100"
-            strokeDashoffset="100"
-          />
-          <text id="score" x="410" y="246" fill="#111418">
-            94
-          </text>
-          <g id="ghost2">
-            <rect x="-15" y="-11" width="30" height="22" rx="6" />
+          <g id="stage-elements">
+            <line
+              id="track"
+              x1="70"
+              y1="205"
+              x2="750"
+              y2="205"
+              stroke="#E4E3FB"
+              strokeWidth="3"
+              strokeLinecap="round"
+            />
+            <circle id="ring-guide" cx="410" cy="210" r="172" />
+            <circle
+              id="gauge"
+              cx="410"
+              cy="210"
+              r="172"
+              pathLength="100"
+              stroke="#716EEB"
+              strokeDasharray="100 100"
+              strokeDashoffset="100"
+            />
+            <circle
+              id="delta"
+              cx="410"
+              cy="210"
+              r="172"
+              pathLength="100"
+              strokeDasharray="100 100"
+              strokeDashoffset="100"
+            />
+            <circle id="edit-pulse" cx="410" cy="210" r="172" pathLength="100" />
+            <circle
+              id="sweep"
+              cx="410"
+              cy="210"
+              r="172"
+              pathLength="100"
+              stroke="#130DDD"
+              strokeDasharray="100 100"
+              strokeDashoffset="100"
+            />
+            <text id="score" x="410" y="246" fill="#111418">
+              94
+            </text>
+            <g id="ghost2">
+              <rect x="-15" y="-11" width="30" height="22" rx="6" />
+            </g>
+            <g id="ghost1">
+              <rect x="-15" y="-11" width="30" height="22" rx="6" />
+            </g>
+            <g id="packetG">
+              <rect id="packet" x="-15" y="-11" width="30" height="22" rx="6" />
+            </g>
+            <circle id="head" r="5.5" stroke="#716EEB" strokeWidth="3" />
           </g>
-          <g id="ghost1">
-            <rect x="-15" y="-11" width="30" height="22" rx="6" />
-          </g>
-          <g id="packetG">
-            <rect id="packet" x="-15" y="-11" width="30" height="22" rx="6" />
-          </g>
-          <circle id="head" r="5.5" stroke="#716EEB" strokeWidth="3" />
           <g id="dots">
             <g className="dot">
               <circle className="sh" cy="5" r="29" />

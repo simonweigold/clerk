@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(uv run:*)",
+      "Bash(npx tsc:*)",
+      "Bash(python -c \"from packages.clerk.src.openclerk.models import ReasoningKit; print\\(ReasoningKit.model_fields.keys\\(\\)\\)\")",
+      "Bash(python -c \":*)",
+      "Bash(python3:*)"
+    ]
+  }
+}

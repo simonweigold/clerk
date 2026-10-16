@@ -6,73 +6,58 @@ default:
 
 # Setup development environment
 setup:
-    #!/usr/bin/env bash
-    echo "Setting up Clerk development environment..."
-    uv sync
-    cd packages/clerk && uv pip install -e ".[dev]"
-    cd apps/website && npm install
-    echo "Setup complete! Run 'just dev' to start development."
+    uv sync --all-groups
+    echo "Setup complete! Run 'just test' to verify."
 
 # Run all tests with coverage
 test:
-    cd packages/clerk && uv run --extra dev pytest --cov=src/openclerk --cov-report=term-missing; \
-    exit_code=$?; [ $exit_code -eq 5 ] && exit 0 || exit $exit_code
+    uv run --extra dev pytest --cov=src/reasoning_kits --cov-report=term-missing
 
 # Run linting (Ruff + mypy)
 lint:
-    cd packages/clerk && uv run --extra dev ruff check src/ tests/
-    cd packages/clerk && uv run --extra dev mypy src/
+    uv run --extra dev ruff check src/ tests/
+    uv run --extra dev mypy src/
 
 # Format all code
 format:
-    cd packages/clerk && uv run --extra dev ruff format src/ tests/
+    uv run --extra dev ruff format src/ tests/
+    uv run --extra dev ruff check --fix src/ tests/
 
-# Start full development environment
-dev:
-    #!/usr/bin/env bash
-    trap "kill %1 %2 2>/dev/null || true" EXIT
-    just dev-backend &
-    just dev-frontend &
-    wait
+# Run the CLI against the reference kits
+list:
+    uv run rk list
 
-# Start backend only
-dev-backend:
-    cd packages/clerk && uv run clerk web --host 0.0.0.0
+# Validate every reference kit
+validate:
+    uv run rk validate demo --base-path kits
+    uv run rk validate oll_employment_contracts --base-path kits
+    uv run rk validate test_swiss_legal --base-path kits
 
-# Start frontend only
-dev-frontend:
-    cd apps/website && npm run dev
-
-# Sync documentation to website
-sync-docs:
-    ./scripts/sync-docs.sh
-
-# Build website for production (includes docs sync)
-build-website: sync-docs
-    cd apps/website && npm run build
+# Run a kit (usage: just run <kit-name>)
+run KIT:
+    uv run rk run {{KIT}} --base-path kits --verbose
 
 # Build package for distribution
 build:
-    uv build packages/clerk
+    uv build
 
 # Publish to TestPyPI
 publish-test: build
-    uv publish --index testpypi dist/openclerk-*
+    uv publish --index testpypi dist/reasoning-kits-*
 
 # Publish to PyPI (requires credentials)
 publish: build
-    uv publish dist/openclerk-*
+    uv publish dist/reasoning-kits-*
 
-# Bump package version (e.g., just version patch)
+# Bump package version (e.g. just version patch)
 version BUMP:
-    cd packages/clerk && uvx bump-my-version bump {{BUMP}}
+    uvx bump-my-version bump {{BUMP}}
 
-# Clean build artifacts
+# Clean build artifacts and caches
 clean:
-    find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
-    find . -type d -name .pytest_cache -exec rm -rf {} + 2>/dev/null || true
-    find . -type d -name .mypy_cache -exec rm -rf {} + 2>/dev/null || true
-    find . -type d -name .ruff_cache -exec rm -rf {} + 2>/dev/null || true
-    find . -type d -name node_modules -path "*/website/*" -exec rm -rf {} + 2>/dev/null || true
-    find . -type d -name dist -exec rm -rf {} + 2>/dev/null || true
+    find . -type d -name __pycache__ -not -path "./.venv/*" -exec rm -rf {} + 2>/dev/null || true
+    find . -type d -name .pytest_cache -not -path "./.venv/*" -exec rm -rf {} + 2>/dev/null || true
+    find . -type d -name .mypy_cache -not -path "./.venv/*" -exec rm -rf {} + 2>/dev/null || true
+    find . -type d -name .ruff_cache -not -path "./.venv/*" -exec rm -rf {} + 2>/dev/null || true
+    rm -rf dist build *.egg-info 2>/dev/null || true
     echo "Cleaned build artifacts"
